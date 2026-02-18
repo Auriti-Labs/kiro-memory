@@ -286,45 +286,214 @@ function detectShellRc(): { name: string; rcFile: string } {
   return { name: 'bash', rcFile: join(homedir(), '.bashrc') };
 }
 
+// ─── Auto-fix per problemi rilevati ───
+
+/** Identifica quali check falliti sono auto-fixabili */
+const AUTOFIXABLE_CHECKS = new Set([
+  'WSL: npm global prefix',
+  'WSL: npm binary',
+  'Build tools (native modules)',
+  'better-sqlite3',
+]);
+
+/** Tenta il fix automatico dei problemi rilevati. Ritorna true se qualcosa è stato fixato */
+async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean; needsRestart: boolean }> {
+  const fixable = failedChecks.filter(c => !c.ok && AUTOFIXABLE_CHECKS.has(c.name));
+  if (fixable.length === 0) return { fixed: false, needsRestart: false };
+
+  const { rcFile } = detectShellRc();
+  let anyFixed = false;
+  let needsRestart = false;
+
+  console.log(`  \x1b[36mFound ${fixable.length} issue(s) that can be fixed automatically:\x1b[0m\n`);
+  for (const check of fixable) {
+    console.log(`    - ${check.name}: ${check.message}`);
+  }
+  console.log('');
+
+  const answer = await askUser('  Fix automatically? [Y/n] ');
+  if (answer !== '' && answer !== 'y' && answer !== 'yes') {
+    console.log('\n  Skipped auto-fix. Fix manually and run: kiro-memory install\n');
+    return { fixed: false, needsRestart: false };
+  }
+
+  console.log('');
+
+  // Fix 1: npm global prefix su Windows
+  const prefixCheck = fixable.find(c => c.name === 'WSL: npm global prefix');
+  if (prefixCheck) {
+    console.log('  Fixing npm global prefix...');
+    try {
+      const npmGlobalDir = join(homedir(), '.npm-global');
+      mkdirSync(npmGlobalDir, { recursive: true });
+      execSync(`npm config set prefix "${npmGlobalDir}"`, { stdio: 'ignore' });
+
+      // Aggiorna rcFile se non contiene già il path
+      const exportLine = 'export PATH="$HOME/.npm-global/bin:$PATH"';
+      let alreadyInRc = false;
+      if (existsSync(rcFile)) {
+        const content = readFileSync(rcFile, 'utf8');
+        alreadyInRc = content.includes('.npm-global/bin');
+      }
+      if (!alreadyInRc) {
+        appendFileSync(rcFile, `\n# npm global prefix (added by kiro-memory)\n${exportLine}\n`);
+      }
+
+      // Aggiorna PATH del processo corrente
+      process.env.PATH = `${npmGlobalDir}/bin:${process.env.PATH}`;
+
+      console.log(`  \x1b[32m✓\x1b[0m npm prefix set to ${npmGlobalDir}`);
+      console.log(`  \x1b[32m✓\x1b[0m PATH updated in ${rcFile}`);
+      anyFixed = true;
+    } catch (err: any) {
+      console.log(`  \x1b[31m✗\x1b[0m Could not fix npm prefix: ${err.message}`);
+    }
+  }
+
+  // Fix 2: npm binary è Windows → installa nvm + Node 22 (no sudo)
+  const npmBinaryCheck = fixable.find(c => c.name === 'WSL: npm binary');
+  if (npmBinaryCheck) {
+    console.log('\n  Fixing npm binary (installing nvm + Node.js 22)...');
+    const nvmDir = join(homedir(), '.nvm');
+
+    try {
+      if (existsSync(nvmDir)) {
+        console.log(`  nvm already installed at ${nvmDir}`);
+      } else {
+        console.log('  Downloading nvm...');
+        execSync('curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash', {
+          stdio: 'inherit',
+          timeout: 60000,
+        });
+        console.log(`  \x1b[32m✓\x1b[0m nvm installed`);
+      }
+
+      // Installa Node 22 via nvm (in una subshell che carica nvm)
+      console.log('  Installing Node.js 22 via nvm...');
+      execSync('bash -c "source $HOME/.nvm/nvm.sh && nvm install 22"', {
+        stdio: 'inherit',
+        timeout: 120000,
+      });
+      console.log(`  \x1b[32m✓\x1b[0m Node.js 22 installed`);
+      anyFixed = true;
+      needsRestart = true; // Il processo corrente usa ancora il vecchio npm
+    } catch (err: any) {
+      console.log(`  \x1b[31m✗\x1b[0m Could not install nvm/Node: ${err.message}`);
+      console.log('  Install manually:');
+      console.log('    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash');
+      console.log('    source ~/.bashrc');
+      console.log('    nvm install 22');
+    }
+  }
+
+  // Fix 3: build tools mancanti (richiede sudo)
+  const buildCheck = fixable.find(c => c.name === 'Build tools (native modules)');
+  if (buildCheck) {
+    console.log('\n  Fixing build tools (requires sudo)...');
+    try {
+      execSync('sudo apt-get update -qq && sudo apt-get install -y build-essential python3', {
+        stdio: 'inherit',
+        timeout: 120000,
+      });
+      console.log(`  \x1b[32m✓\x1b[0m Build tools installed`);
+      anyFixed = true;
+    } catch (err: any) {
+      console.log(`  \x1b[31m✗\x1b[0m Could not install build tools: ${err.message}`);
+      console.log('  Install manually: sudo apt-get install -y build-essential python3');
+    }
+  }
+
+  // Fix 4: better-sqlite3 ELF error → rebuild
+  const sqliteCheck = fixable.find(c => c.name === 'better-sqlite3');
+  if (sqliteCheck) {
+    console.log('\n  Rebuilding better-sqlite3...');
+    try {
+      // Trova il path del modulo installato globalmente
+      const globalDir = execSync('npm prefix -g', { encoding: 'utf8' }).trim();
+      const sqlitePkg = join(globalDir, 'lib', 'node_modules', 'kiro-memory');
+      if (existsSync(sqlitePkg)) {
+        execSync(`cd "${sqlitePkg}" && npm rebuild better-sqlite3`, {
+          stdio: 'inherit',
+          timeout: 60000,
+        });
+      } else {
+        execSync('npm rebuild better-sqlite3', { stdio: 'inherit', timeout: 60000 });
+      }
+      console.log(`  \x1b[32m✓\x1b[0m better-sqlite3 rebuilt`);
+      anyFixed = true;
+    } catch (err: any) {
+      console.log(`  \x1b[31m✗\x1b[0m Could not rebuild: ${err.message}`);
+      console.log('  Try: npm install -g kiro-memory --build-from-source');
+    }
+  }
+
+  console.log('');
+  return { fixed: anyFixed, needsRestart };
+}
+
 // ─── Install command ───
 
 async function installKiro() {
   console.log('\n=== Kiro Memory - Installation ===\n');
-  console.log('[1/3] Running environment checks...');
+  console.log('[1/4] Running environment checks...');
 
-  const checks = runEnvironmentChecks();
-  const { hasErrors } = printChecks(checks);
+  let checks = runEnvironmentChecks();
+  let { hasErrors } = printChecks(checks);
 
+  // Se ci sono errori, tenta auto-fix
   if (hasErrors) {
-    console.log('\x1b[31mInstallation aborted.\x1b[0m Fix the issues above and retry.');
-    console.log('After fixing, run: kiro-memory install\n');
-    process.exit(1);
+    const { fixed, needsRestart } = await tryAutoFix(checks);
+
+    if (needsRestart) {
+      // nvm/Node installati — serve nuovo terminale
+      console.log('  \x1b[33m┌─────────────────────────────────────────────────────────┐\x1b[0m');
+      console.log('  \x1b[33m│\x1b[0m  Node.js was installed via nvm. To activate it:         \x1b[33m│\x1b[0m');
+      console.log('  \x1b[33m│\x1b[0m                                                         \x1b[33m│\x1b[0m');
+      console.log('  \x1b[33m│\x1b[0m  1. Close and reopen your terminal                      \x1b[33m│\x1b[0m');
+      console.log('  \x1b[33m│\x1b[0m  2. Run: \x1b[1mnpm install -g kiro-memory\x1b[0m                     \x1b[33m│\x1b[0m');
+      console.log('  \x1b[33m│\x1b[0m  3. Run: \x1b[1mkiro-memory install\x1b[0m                            \x1b[33m│\x1b[0m');
+      console.log('  \x1b[33m└─────────────────────────────────────────────────────────┘\x1b[0m\n');
+      process.exit(0);
+    }
+
+    if (fixed) {
+      // Re-run check dopo i fix applicati in-process
+      console.log('  Re-running checks...\n');
+      checks = runEnvironmentChecks();
+      ({ hasErrors } = printChecks(checks));
+    }
+
+    if (hasErrors) {
+      console.log('\x1b[31mInstallation aborted.\x1b[0m Fix the remaining issues and retry.');
+      console.log('After fixing, run: kiro-memory install\n');
+      process.exit(1);
+    }
   }
 
-  // dist directory (where compiled files live)
+  // dist directory (dove risiedono i file compilati)
   const distDir = DIST_DIR;
 
-  // Destination directories
+  // Directory di destinazione
   const kiroDir = process.env.KIRO_CONFIG_DIR || join(homedir(), '.kiro');
   const agentsDir = join(kiroDir, 'agents');
   const settingsDir = join(kiroDir, 'settings');
   const steeringDir = join(kiroDir, 'steering');
   const dataDir = process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.contextkit');
 
-  console.log('[2/3] Installing Kiro configuration...\n');
+  console.log('[2/4] Installing Kiro configuration...\n');
 
-  // Create directories
+  // Crea directory
   for (const dir of [agentsDir, settingsDir, steeringDir, dataDir]) {
     mkdirSync(dir, { recursive: true });
   }
 
-  // Generate agent config with absolute paths (from embedded template)
+  // Genera agent config con path assoluti (da template embedded)
   const agentConfig = AGENT_TEMPLATE.replace(/__DIST_DIR__/g, distDir);
   const agentDestPath = join(agentsDir, 'contextkit.json');
   writeFileSync(agentDestPath, agentConfig, 'utf8');
   console.log(`  → Agent config: ${agentDestPath}`);
 
-  // Update/create mcp.json
+  // Aggiorna/crea mcp.json
   const mcpFilePath = join(settingsDir, 'mcp.json');
   let mcpConfig: any = { mcpServers: {} };
 
@@ -333,7 +502,7 @@ async function installKiro() {
       mcpConfig = JSON.parse(readFileSync(mcpFilePath, 'utf8'));
       if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
     } catch {
-      // Corrupted file, overwrite
+      // File corrotto, sovrascrivi
     }
   }
 
@@ -344,7 +513,7 @@ async function installKiro() {
   writeFileSync(mcpFilePath, JSON.stringify(mcpConfig, null, 2), 'utf8');
   console.log(`  → MCP config:   ${mcpFilePath}`);
 
-  // Write steering file (from embedded content)
+  // Scrivi steering file (da contenuto embedded)
   const steeringDestPath = join(steeringDir, 'contextkit.md');
   writeFileSync(steeringDestPath, STEERING_CONTENT, 'utf8');
   console.log(`  → Steering:     ${steeringDestPath}`);
@@ -352,9 +521,9 @@ async function installKiro() {
   console.log(`  → Data dir:     ${dataDir}`);
 
   // 3. Prompt per creazione alias
-  console.log('\n[3/3] Shell alias setup\n');
+  console.log('\n[3/4] Shell alias setup\n');
 
-  const { name: shellName, rcFile } = detectShellRc();
+  const { rcFile } = detectShellRc();
   const aliasLine = 'alias kiro="kiro-cli --agent contextkit-memory"';
 
   // Controlla se l'alias è già presente
@@ -394,8 +563,9 @@ async function installKiro() {
     }
   }
 
-  // Riepilogo finale
-  console.log('\n\x1b[32m═══ Installation complete! ═══\x1b[0m\n');
+  // 4. Riepilogo finale
+  console.log('\n[4/4] Done!\n');
+  console.log('  \x1b[32m═══ Installation complete! ═══\x1b[0m\n');
   console.log('  Start Kiro with memory:');
   if (aliasAlreadySet) {
     console.log('    \x1b[1mkiro\x1b[0m');
