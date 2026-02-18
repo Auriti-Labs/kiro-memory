@@ -308,6 +308,105 @@ npm run test:context
 npm run test:server
 ```
 
+## Troubleshooting
+
+### `invalid ELF header` (WSL)
+
+```
+Error: .../better_sqlite3.node: invalid ELF header
+```
+
+This happens when the native module was compiled for Windows but you're running inside WSL (Linux). Common cause: npm installed to the Windows filesystem (`/mnt/c/...`) instead of the Linux one.
+
+**Fix:**
+
+```bash
+# Check which node you're using
+which node
+# If it shows /mnt/c/... you're using Windows Node inside WSL
+
+# Install Node.js natively in WSL
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Or use nvm (recommended)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+nvm install 22
+
+# Verify
+which node  # Should be /home/... or /root/.nvm/...
+
+# Reinstall
+npm install -g kiro-memory
+```
+
+### `npm prefix` pointing to Windows (WSL)
+
+If `npm prefix -g` returns a `/mnt/c/...` path, npm installs global packages on the Windows filesystem, causing native module issues.
+
+**Fix:**
+
+```bash
+mkdir -p ~/.npm-global
+npm config set prefix ~/.npm-global
+echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# Reinstall
+npm install -g kiro-memory
+```
+
+### Missing build tools (Linux/WSL)
+
+```
+gyp ERR! find Python
+gyp ERR! stack Error: Could not find any Python installation to use
+```
+
+Native modules like `better-sqlite3` need compilation tools.
+
+**Fix:**
+
+```bash
+sudo apt-get update && sudo apt-get install -y build-essential python3
+npm install -g kiro-memory --build-from-source
+```
+
+### `no agent with name kiro-memory found`
+
+The agent configuration was not installed. Run the install command:
+
+```bash
+kiro-memory install
+```
+
+This creates the agent config at `~/.kiro/agents/contextkit.json`. Note: the agent name is `contextkit-memory`, so start Kiro with:
+
+```bash
+kiro-cli --agent contextkit-memory
+```
+
+### Port 3001 already in use
+
+```bash
+# Find what's using the port
+lsof -i :3001
+
+# Kill the process
+kill -9 <PID>
+
+# Or use a different port
+export KIRO_MEMORY_WORKER_PORT=3002
+```
+
+### Quick diagnostics
+
+Run the built-in doctor command to check your environment:
+
+```bash
+kiro-memory doctor
+```
+
 ## Contributing
 
 Contributions are welcome. Please open an issue to discuss proposed changes before submitting a pull request. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.

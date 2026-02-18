@@ -12,24 +12,100 @@ KIRO_AGENTS_DIR="$KIRO_DIR/agents"
 KIRO_MCP_DIR="$KIRO_DIR/settings"
 DATA_DIR="$HOME/.contextkit"
 
+ERRORS=0
+
 echo "=== Installazione ContextKit per Kiro CLI ==="
 echo ""
 
 # 1. Verifica prerequisiti
 echo "[1/6] Verifica prerequisiti..."
+
+# Rileva WSL
+IS_WSL=false
+if [ -f /proc/version ]; then
+    if grep -qi "microsoft\|wsl" /proc/version 2>/dev/null; then
+        IS_WSL=true
+        echo "  ℹ  Ambiente WSL rilevato"
+    fi
+fi
+
+# Verifica Node.js presente
 if ! command -v node &> /dev/null; then
-    echo "ERRORE: Node.js non trovato. Installalo prima: https://nodejs.org"
+    echo "  ✗ ERRORE: Node.js non trovato."
+    if [ "$IS_WSL" = true ]; then
+        echo "    → In WSL, installa Node.js nativo Linux:"
+        echo "      curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -"
+        echo "      sudo apt-get install -y nodejs"
+        echo "      Oppure usa nvm: https://github.com/nvm-sh/nvm"
+    else
+        echo "    → Installalo da: https://nodejs.org"
+    fi
     exit 1
 fi
 
+# Versione Node >= 18
 NODE_VERSION=$(node -v | sed 's/v//' | cut -d. -f1)
 if [ "$NODE_VERSION" -lt 18 ]; then
-    echo "ERRORE: Node.js >= 18 richiesto. Versione attuale: $(node -v)"
+    echo "  ✗ ERRORE: Node.js >= 18 richiesto. Versione attuale: $(node -v)"
+    echo "    → Aggiorna: nvm install 22 && nvm use 22"
+    exit 1
+fi
+echo "  ✓ Node.js $(node -v)"
+
+# WSL: verifica che Node sia nativo Linux
+if [ "$IS_WSL" = true ]; then
+    NODE_PATH=$(which node)
+    if echo "$NODE_PATH" | grep -q "^/mnt/[c-z]/"; then
+        echo "  ✗ ERRORE: Node.js punta a Windows ($NODE_PATH)"
+        echo "    → Installa Node.js dentro WSL:"
+        echo "      curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -"
+        echo "      sudo apt-get install -y nodejs"
+        ERRORS=$((ERRORS + 1))
+    else
+        echo "  ✓ Node.js nativo Linux: $NODE_PATH"
+    fi
+
+    # WSL: verifica npm prefix
+    NPM_PREFIX=$(npm prefix -g 2>/dev/null || echo "")
+    if echo "$NPM_PREFIX" | grep -q "^/mnt/[c-z]/"; then
+        echo "  ✗ ERRORE: npm global prefix punta a Windows ($NPM_PREFIX)"
+        echo "    → Fix:"
+        echo "      mkdir -p ~/.npm-global"
+        echo "      npm config set prefix ~/.npm-global"
+        echo "      echo 'export PATH=\"\$HOME/.npm-global/bin:\$PATH\"' >> ~/.bashrc"
+        echo "      source ~/.bashrc"
+        ERRORS=$((ERRORS + 1))
+    fi
+fi
+
+# Build tools (Linux)
+if [ "$(uname)" = "Linux" ]; then
+    MISSING_PKGS=""
+    if ! command -v make &> /dev/null || ! command -v g++ &> /dev/null; then
+        MISSING_PKGS="build-essential"
+    fi
+    if ! command -v python3 &> /dev/null; then
+        MISSING_PKGS="$MISSING_PKGS python3"
+    fi
+    if [ -n "$MISSING_PKGS" ]; then
+        echo "  ✗ AVVISO: Build tools mancanti ($MISSING_PKGS)"
+        echo "    → sudo apt-get update && sudo apt-get install -y $MISSING_PKGS"
+        ERRORS=$((ERRORS + 1))
+    else
+        echo "  ✓ Build tools disponibili (make, g++, python3)"
+    fi
+fi
+
+# Se ci sono errori critici, fermati
+if [ "$ERRORS" -gt 0 ]; then
+    echo ""
+    echo "  ✗ Installazione annullata: $ERRORS problema(i) da risolvere."
+    echo "    Risolvi e riprova: npm run install:kiro"
     exit 1
 fi
 
 if ! command -v kiro-cli &> /dev/null; then
-    echo "AVVISO: kiro-cli non trovato nel PATH. Assicurati che sia installato."
+    echo "  ⚠ AVVISO: kiro-cli non trovato nel PATH. Assicurati che sia installato."
 fi
 
 # 2. Build
