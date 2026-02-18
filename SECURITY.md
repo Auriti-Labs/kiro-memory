@@ -12,7 +12,7 @@
 
 If you discover a security vulnerability in ContextKit, please report it responsibly:
 
-1. **Email**: Send a detailed report to the maintainers via [GitHub Security Advisories](https://github.com/auriti-web-design/contextkit/security/advisories/new).
+1. **Email**: Send a detailed report to the maintainers via [GitHub Security Advisories](https://github.com/auriti-web-design/kiro-memory/security/advisories/new).
 2. **Include**:
    - Description of the vulnerability
    - Steps to reproduce

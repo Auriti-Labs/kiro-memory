@@ -2,7 +2,7 @@
 
 **Persistent cross-session memory for [Kiro CLI](https://kiro.dev/).**
 
-![CI](https://github.com/auriti-web-design/contextkit/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/auriti-web-design/kiro-memory/actions/workflows/ci.yml/badge.svg)
 ![npm](https://img.shields.io/npm/v/kiro-memory)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
 ![Node](https://img.shields.io/badge/node-%3E%3D18-green)
@@ -57,7 +57,7 @@ contextkit install
 Or from source:
 
 ```bash
-git clone https://github.com/auriti-web-design/contextkit.git
+git clone https://github.com/auriti-web-design/kiro-memory.git
 cd contextkit
 npm install && npm run build
 npm run install:kiro

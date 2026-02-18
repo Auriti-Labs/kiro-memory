@@ -22,4 +22,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **npm package name**: Published as `kiro-memory` (the name `contextkit` was unavailable on npm registry)
 
-[1.0.0]: https://github.com/auriti-web-design/contextkit/releases/tag/v1.0.0
+[1.0.0]: https://github.com/auriti-web-design/kiro-memory/releases/tag/v1.0.0

@@ -17,7 +17,7 @@ Thank you for your interest in contributing to ContextKit! This guide will help 
 ### Getting Started
 
 ```bash
-git clone https://github.com/auriti-web-design/contextkit.git
+git clone https://github.com/auriti-web-design/kiro-memory.git
 cd contextkit
 npm install
 npm run build

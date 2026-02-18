@@ -19,11 +19,11 @@
   "license": "AGPL-3.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/auriti-web-design/contextkit.git"
+    "url": "https://github.com/auriti-web-design/kiro-memory.git"
   },
-  "homepage": "https://github.com/auriti-web-design/contextkit#readme",
+  "homepage": "https://github.com/auriti-web-design/kiro-memory#readme",
   "bugs": {
-    "url": "https://github.com/auriti-web-design/contextkit/issues"
+    "url": "https://github.com/auriti-web-design/kiro-memory/issues"
   },
   "type": "module",
   "exports": {
