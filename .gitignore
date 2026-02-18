@@ -45,6 +45,9 @@ https*/
 # Session analysis logs
 *.txt
 
+# npm tarballs
+*.tgz
+
 # Local dev instructions (not for open-source repo)
 CLAUDE.md
 .kiro/context.md
