@@ -1,5 +1,5 @@
 {
-  "name": "contextkit",
+  "name": "kiro-memory",
   "version": "1.0.0",
   "description": "Persistent cross-session memory for Kiro CLI. Automatically tracks context, observations, and summaries across coding sessions.",
   "keywords": [
