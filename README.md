@@ -147,7 +147,7 @@ The hooks are fully automatic. No changes to your workflow required.
 The TypeScript SDK provides full programmatic access to the memory system.
 
 ```typescript
-import { createContextKit } from 'contextkit';
+import { createContextKit } from 'kiro-memory';
 
 const ctx = createContextKit({ project: 'my-project' });
 

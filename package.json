@@ -1,6 +1,6 @@
 {
   "name": "kiro-memory",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Persistent cross-session memory for Kiro CLI. Automatically tracks context, observations, and summaries across coding sessions.",
   "keywords": [
     "kiro",
