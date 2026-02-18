@@ -49,8 +49,7 @@ async function build() {
   await esbuild.build({
     ...nodeCommon,
     entryPoints: [join(SRC_DIR, 'cli', 'contextkit.ts')],
-    outfile: join(DIST_DIR, 'cli', 'contextkit.js'),
-    banner: { js: '#!/usr/bin/env node' }
+    outfile: join(DIST_DIR, 'cli', 'contextkit.js')
   });
 
   // Build SDK
