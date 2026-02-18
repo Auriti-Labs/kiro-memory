@@ -1,6 +1,6 @@
 {
   "name": "kiro-memory",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Persistent cross-session memory for Kiro CLI. Automatically tracks context, observations, and summaries across coding sessions.",
   "keywords": [
     "kiro",
@@ -41,7 +41,7 @@
     "plugin"
   ],
   "bin": {
-    "contextkit": "./dist/cli/contextkit.js"
+    "kiro-memory": "./dist/cli/contextkit.js"
   },
   "engines": {
     "node": ">=18.0.0",

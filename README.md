@@ -1,4 +1,4 @@
-# ContextKit
+# Kiro Memory
 
 **Persistent cross-session memory for [Kiro CLI](https://kiro.dev/).**
 
@@ -9,14 +9,14 @@
 
 ---
 
-ContextKit gives your Kiro agent memory that persists across sessions. It automatically captures what happened -- files changed, tools used, decisions made -- and feeds relevant context back at the start of the next session. No manual bookkeeping. Your agent picks up exactly where it left off.
+Kiro Memory gives your Kiro agent memory that persists across sessions. It automatically captures what happened -- files changed, tools used, decisions made -- and feeds relevant context back at the start of the next session. No manual bookkeeping. Your agent picks up exactly where it left off.
 
 ## What Your Agent Sees
 
-When a new session starts, ContextKit automatically injects previous session context:
+When a new session starts, Kiro Memory automatically injects previous session context:
 
 ```
-# ContextKit: Previous Session Context
+# Kiro Memory: Previous Session Context
 
 ## Previous Sessions
 
@@ -51,19 +51,19 @@ When a new session starts, ContextKit automatically injects previous session con
 npm install -g kiro-memory
 
 # Install into Kiro CLI (hooks + MCP server + agent config)
-contextkit install
+kiro-memory install
 ```
 
 Or from source:
 
 ```bash
 git clone https://github.com/auriti-web-design/kiro-memory.git
-cd contextkit
+cd kiro-memory
 npm install && npm run build
 npm run install:kiro
 ```
 
-Start the worker, then use Kiro as usual -- ContextKit runs in the background:
+Start the worker, then use Kiro as usual -- Kiro Memory runs in the background:
 
 ```bash
 npm run worker:start
@@ -71,14 +71,14 @@ npm run worker:start
 
 ## Kiro Integration
 
-ContextKit registers **4 hooks** and an **MCP server** with Kiro CLI. The agent configuration is installed to `~/.kiro/agents/contextkit.json`:
+Kiro Memory registers **4 hooks** and an **MCP server** with Kiro CLI. The agent configuration is installed to `~/.kiro/agents/kiro-memory.json`:
 
 ```json
 {
-  "name": "contextkit-memory",
-  "tools": ["read", "write", "shell", "glob", "grep", "@contextkit"],
+  "name": "kiro-memory",
+  "tools": ["read", "write", "shell", "glob", "grep", "@kiro-memory"],
   "mcpServers": {
-    "contextkit": {
+    "kiro-memory": {
       "command": "node",
       "args": ["/path/to/dist/servers/mcp-server.js"]
     }
@@ -112,7 +112,7 @@ The hooks are fully automatic. No changes to your workflow required.
                  +------+------+
                         |
                    SQLite + FTS5
-               (~/.contextkit/contextkit.db)
+               (~/.kiro-memory/kiro-memory.db)
 ```
 
 ### Hooks
@@ -137,19 +137,19 @@ The hooks are fully automatic. No changes to your workflow required.
 
 | Component | Location |
 |-----------|----------|
-| Database | `~/.contextkit/contextkit.db` |
-| Logs | `~/.contextkit/logs/` |
-| Archives | `~/.contextkit/archives/` |
-| Backups | `~/.contextkit/backups/` |
+| Database | `~/.kiro-memory/kiro-memory.db` |
+| Logs | `~/.kiro-memory/logs/` |
+| Archives | `~/.kiro-memory/archives/` |
+| Backups | `~/.kiro-memory/backups/` |
 
 ## SDK
 
 The TypeScript SDK provides full programmatic access to the memory system.
 
 ```typescript
-import { createContextKit } from 'kiro-memory';
+import { createKiroMemory } from 'kiro-memory';
 
-const ctx = createContextKit({ project: 'my-project' });
+const ctx = createKiroMemory({ project: 'my-project' });
 
 // Retrieve context for the current project
 const context = await ctx.getContext();
@@ -203,32 +203,32 @@ ctx.close();
 ## CLI Reference
 
 ```bash
-contextkit <command> [options]
+kiro-memory <command> [options]
 ```
 
 | Command | Alias | Description |
 |---------|-------|-------------|
-| `contextkit context` | `ctx` | Display current project context |
-| `contextkit search <query>` | -- | Search across all stored context |
-| `contextkit observations [limit]` | `obs` | Show recent observations (default: 10) |
-| `contextkit summaries [limit]` | `sum` | Show recent summaries (default: 5) |
-| `contextkit add-observation <title> <content>` | `add-obs` | Manually add an observation |
-| `contextkit add-summary <content>` | `add-sum` | Manually add a summary |
+| `kiro-memory context` | `ctx` | Display current project context |
+| `kiro-memory search <query>` | -- | Search across all stored context |
+| `kiro-memory observations [limit]` | `obs` | Show recent observations (default: 10) |
+| `kiro-memory summaries [limit]` | `sum` | Show recent summaries (default: 5) |
+| `kiro-memory add-observation <title> <content>` | `add-obs` | Manually add an observation |
+| `kiro-memory add-summary <content>` | `add-sum` | Manually add a summary |
 
 ### Examples
 
 ```bash
-# View what ContextKit knows about your project
-contextkit context
+# View what Kiro Memory knows about your project
+kiro-memory context
 
 # Search for past work on authentication
-contextkit search "OAuth token refresh"
+kiro-memory search "OAuth token refresh"
 
 # Show the last 20 observations
-contextkit observations 20
+kiro-memory observations 20
 
 # Manually record a decision
-contextkit add-observation "Architecture Decision" "Chose PostgreSQL over MongoDB for ACID compliance"
+kiro-memory add-observation "Architecture Decision" "Chose PostgreSQL over MongoDB for ACID compliance"
 ```
 
 ## Configuration
@@ -237,10 +237,10 @@ contextkit add-observation "Architecture Decision" "Chose PostgreSQL over MongoD
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CONTEXTKIT_DATA_DIR` | `~/.contextkit` | Base directory for all ContextKit data |
-| `CONTEXTKIT_WORKER_HOST` | `127.0.0.1` | Worker service bind address |
-| `CONTEXTKIT_WORKER_PORT` | `3001` | Worker service port |
-| `CONTEXTKIT_LOG_LEVEL` | `INFO` | Log verbosity: `DEBUG`, `INFO`, `WARN`, `ERROR` |
+| `KIRO_MEMORY_DATA_DIR` | `~/.kiro-memory` | Base directory for all Kiro Memory data |
+| `KIRO_MEMORY_WORKER_HOST` | `127.0.0.1` | Worker service bind address |
+| `KIRO_MEMORY_WORKER_PORT` | `3001` | Worker service port |
+| `KIRO_MEMORY_LOG_LEVEL` | `INFO` | Log verbosity: `DEBUG`, `INFO`, `WARN`, `ERROR` |
 | `KIRO_CONFIG_DIR` | `~/.kiro` | Kiro CLI configuration directory |
 
 ### Worker Management
