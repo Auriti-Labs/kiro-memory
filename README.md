@@ -2,7 +2,6 @@
 
 **Persistent cross-session memory for [Kiro CLI](https://kiro.dev/).**
 
-![CI](https://github.com/auriti-web-design/kiro-memory/actions/workflows/ci.yml/badge.svg)
 ![npm](https://img.shields.io/npm/v/kiro-memory)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
 ![Node](https://img.shields.io/badge/node-%3E%3D18-green)
