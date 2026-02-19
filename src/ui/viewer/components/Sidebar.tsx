@@ -215,7 +215,7 @@ export function Sidebar({
 
       {/* Footer */}
       <div className="mt-auto px-4 py-4">
-        <div className="text-[10px] text-zinc-700 font-mono text-center">Kiro Memory v1.4.2</div>
+        <div className="text-[10px] text-zinc-700 font-mono text-center">Kiro Memory v1.5.0</div>
       </div>
     </aside>
   );
