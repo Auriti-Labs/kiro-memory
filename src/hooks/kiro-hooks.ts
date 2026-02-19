@@ -1,6 +1,6 @@
 /**
- * Hook system for Kiro CLI integration
- * 
+ * Kiro Memory — Hook system for Kiro CLI integration
+ *
  * Kiro uses a different hook format than Claude.
  * Hooks are triggered on file saves, completions, and other events.
  */
@@ -15,7 +15,7 @@ export interface KiroHookContext {
   data?: any;
 }
 
-export interface ContextKitHook {
+export interface KiroMemoryHook {
   name: string;
   description: string;
   trigger: string;
@@ -25,18 +25,18 @@ export interface ContextKitHook {
 /**
  * Auto-context hook - injects relevant context on session start
  */
-export const autoContextHook: ContextKitHook = {
-  name: 'contextkit-auto-context',
+export const autoContextHook: KiroMemoryHook = {
+  name: 'kiro-memory-auto-context',
   description: 'Automatically inject relevant context at session start',
   trigger: 'session-start',
   async action(context) {
-    const contextkit = createContextKit({ project: context.project });
-    
+    const sdk = createContextKit({ project: context.project });
+
     try {
-      const ctx = await contextkit.getContext();
-      
+      const ctx = await sdk.getContext();
+
       // Generate context summary for Kiro
-      let contextText = `# ContextKit: Previous Context\n\n`;
+      let contextText = `# Kiro Memory: Previous Context\n\n`;
       
       if (ctx.relevantSummaries.length > 0) {
         contextText += `## Recent Learnings\n\n`;
@@ -59,7 +59,7 @@ export const autoContextHook: ContextKitHook = {
       // Return context to be injected into Kiro
       console.log(contextText);
     } finally {
-      contextkit.close();
+      sdk.close();
     }
   }
 };
@@ -67,26 +67,26 @@ export const autoContextHook: ContextKitHook = {
 /**
  * File change tracker hook - tracks file modifications
  */
-export const fileChangeHook: ContextKitHook = {
-  name: 'contextkit-file-tracker',
+export const fileChangeHook: KiroMemoryHook = {
+  name: 'kiro-memory-file-tracker',
   description: 'Track file changes during development',
   trigger: 'file-save',
   async action(context) {
     if (!context.data?.filePath) return;
     
-    const contextkit = createContextKit({ project: context.project });
-    
+    const sdk = createContextKit({ project: context.project });
+
     try {
-      await contextkit.storeObservation({
+      await sdk.storeObservation({
         type: 'file-change',
         title: `Modified: ${context.data.filePath}`,
         content: `File was modified at ${new Date().toISOString()}`,
         files: [context.data.filePath]
       });
-      
+
       logger.debug('HOOK', `File change tracked: ${context.data.filePath}`);
     } finally {
-      contextkit.close();
+      sdk.close();
     }
   }
 };
@@ -94,29 +94,29 @@ export const fileChangeHook: ContextKitHook = {
 /**
  * Session summary hook - stores summary at session end
  */
-export const sessionSummaryHook: ContextKitHook = {
-  name: 'contextkit-session-summary',
+export const sessionSummaryHook: KiroMemoryHook = {
+  name: 'kiro-memory-session-summary',
   description: 'Store session summary when session ends',
   trigger: 'session-end',
   async action(context) {
     if (!context.data?.summary) return;
     
-    const contextkit = createContextKit({ project: context.project });
-    
+    const sdk = createContextKit({ project: context.project });
+
     try {
-      await contextkit.storeSummary({
+      await sdk.storeSummary({
         learned: context.data.summary
       });
-      
+
       logger.info('HOOK', `Session summary stored for project: ${context.project}`);
     } finally {
-      contextkit.close();
+      sdk.close();
     }
   }
 };
 
 // Export all hooks
-export const hooks: ContextKitHook[] = [
+export const hooks: KiroMemoryHook[] = [
   autoContextHook,
   fileChangeHook,
   sessionSummaryHook

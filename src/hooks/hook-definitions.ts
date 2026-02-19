@@ -1,6 +1,6 @@
 /**
- * ContextKit Hook Definitions for Kiro CLI
- * 
+ * Kiro Memory — Hook definitions for Kiro CLI
+ *
  * This file defines hooks in Kiro-compatible format
  */
 
@@ -8,7 +8,7 @@ export const kiroHookDefinitions = {
   version: '1.0.0',
   hooks: [
     {
-      name: 'contextkit-auto-context',
+      name: 'kiro-memory-auto-context',
       description: 'Automatically inject relevant context at session start',
       trigger: {
         type: 'session-start',
@@ -16,11 +16,11 @@ export const kiroHookDefinitions = {
       },
       action: {
         type: 'inject-context',
-        source: 'contextkit'
+        source: 'kiro-memory'
       }
     },
     {
-      name: 'contextkit-file-tracker',
+      name: 'kiro-memory-file-tracker',
       description: 'Track file changes during development',
       trigger: {
         type: 'file-save',
@@ -28,11 +28,11 @@ export const kiroHookDefinitions = {
       },
       action: {
         type: 'store-observation',
-        source: 'contextkit'
+        source: 'kiro-memory'
       }
     },
     {
-      name: 'contextkit-session-summary',
+      name: 'kiro-memory-session-summary',
       description: 'Store session summary when session ends',
       trigger: {
         type: 'session-end',
@@ -40,7 +40,7 @@ export const kiroHookDefinitions = {
       },
       action: {
         type: 'store-summary',
-        source: 'contextkit'
+        source: 'kiro-memory'
       }
     }
   ]
