@@ -2,8 +2,8 @@ import { Database } from 'bun:sqlite';
 import type { Observation, Summary, SearchFilters, TimelineEntry } from '../../types/worker-types.js';
 
 /**
- * Modulo di ricerca avanzata per ContextKit
- * Supporta FTS5 full-text search con fallback LIKE
+ * Advanced search module for Kiro Memory
+ * Supports FTS5 full-text search with LIKE fallback
  */
 
 /**

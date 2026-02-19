@@ -7,7 +7,7 @@
  */
 
 import { runHook, detectProject, notifyWorker } from './utils.js';
-import { createContextKit } from '../sdk/index.js';
+import { createKiroMemory } from '../sdk/index.js';
 
 runHook('postToolUse', async (input) => {
   if (!input.tool_name) return;
@@ -20,7 +20,7 @@ runHook('postToolUse', async (input) => {
   const readOnlyTools = ['glob', 'grep', 'fs_read', 'read'];
   if (readOnlyTools.includes(input.tool_name)) {
     const project = detectProject(input.cwd);
-    const sdk = createContextKit({ project });
+    const sdk = createKiroMemory({ project });
     try {
       const files = extractFiles(input.tool_input, input.tool_response);
       // Crea osservazione leggera solo se ci sono file o è una ricerca significativa
@@ -43,7 +43,7 @@ runHook('postToolUse', async (input) => {
   }
 
   const project = detectProject(input.cwd);
-  const sdk = createContextKit({ project });
+  const sdk = createKiroMemory({ project });
 
   try {
     // Costruisci titolo descrittivo

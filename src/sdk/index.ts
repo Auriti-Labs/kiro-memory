@@ -1,10 +1,10 @@
 /**
- * ContextKit SDK for Kiro CLI Integration
- * 
- * Provides programmatic access to ContextKit memory system
+ * Kiro Memory SDK for Kiro CLI Integration
+ *
+ * Provides programmatic access to Kiro Memory system
  */
 
-import { ContextKitDatabase } from '../services/sqlite/index.js';
+import { KiroMemoryDatabase } from '../services/sqlite/index.js';
 import type {
   Observation,
   Summary,
@@ -15,17 +15,17 @@ import type {
   TimelineEntry
 } from '../types/worker-types.js';
 
-export interface ContextKitConfig {
+export interface KiroMemoryConfig {
   dataDir?: string;
   project?: string;
 }
 
-export class ContextKitSDK {
-  private db: ContextKitDatabase;
+export class KiroMemorySDK {
+  private db: KiroMemoryDatabase;
   private project: string;
 
-  constructor(config: ContextKitConfig = {}) {
-    this.db = new ContextKitDatabase(config.dataDir);
+  constructor(config: KiroMemoryConfig = {}) {
+    this.db = new KiroMemoryDatabase(config.dataDir);
     this.project = config.project || this.detectProject();
   }
 
@@ -145,7 +145,7 @@ export class ContextKitSDK {
   }
 
   /**
-   * Ricerca avanzata con FTS5 e filtri
+   * Advanced search with FTS5 and filters
    */
   async searchAdvanced(query: string, filters: SearchFilters = {}): Promise<{
     observations: Observation[];
@@ -163,7 +163,7 @@ export class ContextKitSDK {
   }
 
   /**
-   * Recupera osservazioni per ID (batch)
+   * Retrieve observations by ID (batch)
    */
   async getObservationsByIds(ids: number[]): Promise<Observation[]> {
     const { getObservationsByIds } = await import('../services/sqlite/Search.js');
@@ -171,7 +171,7 @@ export class ContextKitSDK {
   }
 
   /**
-   * Timeline: contesto cronologico attorno a un'osservazione
+   * Timeline: chronological context around an observation
    */
   async getTimeline(anchorId: number, depthBefore: number = 5, depthAfter: number = 5): Promise<TimelineEntry[]> {
     const { getTimeline } = await import('../services/sqlite/Search.js');
@@ -179,7 +179,7 @@ export class ContextKitSDK {
   }
 
   /**
-   * Crea o recupera una sessione per il progetto corrente
+   * Create or retrieve a session for the current project
    */
   async getOrCreateSession(contentSessionId: string): Promise<DBSession> {
     const { getSessionByContentId, createSession } = await import('../services/sqlite/Sessions.js');
@@ -198,7 +198,7 @@ export class ContextKitSDK {
   }
 
   /**
-   * Salva un prompt utente
+   * Store a user prompt
    */
   async storePrompt(contentSessionId: string, promptNumber: number, text: string): Promise<number> {
     const { createPrompt } = await import('../services/sqlite/Prompts.js');
@@ -206,7 +206,7 @@ export class ContextKitSDK {
   }
 
   /**
-   * Completa una sessione
+   * Complete a session
    */
   async completeSession(sessionId: number): Promise<void> {
     const { completeSession } = await import('../services/sqlite/Sessions.js');
@@ -214,14 +214,14 @@ export class ContextKitSDK {
   }
 
   /**
-   * Getter per il nome progetto corrente
+   * Getter for current project name
    */
   getProject(): string {
     return this.project;
   }
 
   /**
-   * Getter per accesso diretto al database (per route API)
+   * Getter for direct database access (for API routes)
    */
   getDb(): any {
     return this.db.db;
@@ -236,9 +236,17 @@ export class ContextKitSDK {
 }
 
 // Export convenience function
-export function createContextKit(config?: ContextKitConfig): ContextKitSDK {
-  return new ContextKitSDK(config);
+export function createKiroMemory(config?: KiroMemoryConfig): KiroMemorySDK {
+  return new KiroMemorySDK(config);
 }
+
+// Backward-compatible aliases
+/** @deprecated Use KiroMemorySDK instead */
+export const ContextKitSDK = KiroMemorySDK;
+/** @deprecated Use KiroMemoryConfig instead */
+export type ContextKitConfig = KiroMemoryConfig;
+/** @deprecated Use createKiroMemory instead */
+export const createContextKit = createKiroMemory;
 
 // Re-export types
 export type {

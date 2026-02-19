@@ -1,5 +1,5 @@
 /**
- * Shared types for ContextKit Worker Service
+ * Shared types for Kiro Memory Worker Service
  */
 
 import type { Response } from 'express';

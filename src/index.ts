@@ -1,22 +1,27 @@
 /**
- * ContextKit - Memoria e contesto persistente per Kiro CLI
+ * Kiro Memory - Persistent cross-session memory for Kiro CLI
  *
  * @packageDocumentation
  */
 
-// Export SDK
+// Export SDK (new names)
+export { KiroMemorySDK, createKiroMemory } from './sdk/index.js';
+export type { KiroMemoryConfig } from './sdk/index.js';
+
+// Backward-compatible aliases
 export { ContextKitSDK, createContextKit } from './sdk/index.js';
 export type { ContextKitConfig } from './sdk/index.js';
 
 // Export database
 export {
+  KiroMemoryDatabase,
   ContextKitDatabase,
   DatabaseManager,
   getDatabase,
   initializeDatabase
 } from './services/sqlite/index.js';
 
-// Export ricerca avanzata
+// Export advanced search
 export {
   searchObservationsFTS,
   searchObservationsLIKE,
@@ -26,7 +31,7 @@ export {
   getProjectStats
 } from './services/sqlite/Search.js';
 
-// Export tipi
+// Export types
 export type {
   Observation,
   Summary,
@@ -41,12 +46,12 @@ export type {
   TimelineEntry
 } from './types/worker-types.js';
 
-// Export utility condivise hook
+// Export shared hook utilities
 export { readStdin, detectProject, formatContext, runHook } from './hooks/utils.js';
 
 // Export utilities
 export { logger, LogLevel } from './utils/logger.js';
 export type { Component } from './utils/logger.js';
 
-// Versione
+// Version
 export const VERSION = '1.0.0';

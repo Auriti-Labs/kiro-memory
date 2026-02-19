@@ -7,7 +7,7 @@
  */
 
 import { runHook, detectProject, formatContext } from './utils.js';
-import { createContextKit } from '../sdk/index.js';
+import { createKiroMemory } from '../sdk/index.js';
 import { spawn } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -66,7 +66,7 @@ runHook('agentSpawn', async (input) => {
   await ensureWorkerRunning().catch(() => {});
 
   const project = detectProject(input.cwd);
-  const sdk = createContextKit({ project });
+  const sdk = createKiroMemory({ project });
 
   try {
     const ctx = await sdk.getContext();

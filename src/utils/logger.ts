@@ -1,5 +1,5 @@
 /**
- * Structured Logger for ContextKit Worker Service
+ * Structured Logger for Kiro Memory Worker Service
  * Provides readable, traceable logging with correlation IDs and data flow tracking
  */
 
@@ -24,7 +24,7 @@ interface LogContext {
   [key: string]: any;
 }
 
-// Default data directory for ContextKit
+// Default data directory for Kiro Memory
 const DEFAULT_DATA_DIR = join(homedir(), '.contextkit');
 
 class Logger {
@@ -55,7 +55,7 @@ class Logger {
 
       // Create log file path with date
       const date = new Date().toISOString().split('T')[0];
-      this.logFilePath = join(logsDir, `contextkit-${date}.log`);
+      this.logFilePath = join(logsDir, `kiro-memory-${date}.log`);
     } catch (error) {
       console.error('[LOGGER] Failed to initialize log file:', error);
       this.logFilePath = null;
@@ -72,7 +72,7 @@ class Logger {
         if (existsSync(settingsPath)) {
           const settingsData = readFileSync(settingsPath, 'utf-8');
           const settings = JSON.parse(settingsData);
-          const envLevel = (settings.CONTEXTKIT_LOG_LEVEL || 'INFO').toUpperCase();
+          const envLevel = (settings.KIRO_MEMORY_LOG_LEVEL || settings.CONTEXTKIT_LOG_LEVEL || 'INFO').toUpperCase();
           this.level = LogLevel[envLevel as keyof typeof LogLevel] ?? LogLevel.INFO;
         } else {
           this.level = LogLevel.INFO;

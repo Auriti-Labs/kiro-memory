@@ -1,10 +1,13 @@
 // Export database components
 export {
-  ContextKitDatabase,
+  KiroMemoryDatabase,
   DatabaseManager,
   getDatabase,
   initializeDatabase
 } from './Database.js';
+
+// Backward-compatible alias
+export { KiroMemoryDatabase as ContextKitDatabase } from './Database.js';
 
 // Export CRUD operations
 export * from './Sessions.js';
@@ -12,5 +15,5 @@ export * from './Observations.js';
 export * from './Summaries.js';
 export * from './Prompts.js';
 
-// Export ricerca avanzata
+// Export advanced search
 export * from './Search.js';

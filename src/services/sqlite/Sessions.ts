@@ -2,7 +2,7 @@ import { Database } from 'bun:sqlite';
 import type { DBSession } from '../../types/worker-types.js';
 
 /**
- * Session operations for ContextKit database
+ * Session operations for Kiro Memory database
  */
 
 export function createSession(

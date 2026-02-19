@@ -15,16 +15,16 @@ export interface Migration {
 let dbInstance: Database | null = null;
 
 /**
- * ContextKitDatabase - Main entry point for the sqlite module
+ * KiroMemoryDatabase - Main entry point for the sqlite module
  *
  * Sets up bun:sqlite with optimized settings and runs all migrations.
  *
  * Usage:
- *   const db = new ContextKitDatabase();  // uses default DB_PATH
- *   const db = new ContextKitDatabase('/path/to/db.sqlite');
- *   const db = new ContextKitDatabase(':memory:');  // for tests
+ *   const db = new KiroMemoryDatabase();  // uses default DB_PATH
+ *   const db = new KiroMemoryDatabase('/path/to/db.sqlite');
+ *   const db = new KiroMemoryDatabase(':memory:');  // for tests
  */
-export class ContextKitDatabase {
+export class KiroMemoryDatabase {
   public db: Database;
 
   constructor(dbPath: string = DB_PATH) {
@@ -59,7 +59,7 @@ export class ContextKitDatabase {
 
 /**
  * SQLite Database singleton with migration support
- * @deprecated Use ContextKitDatabase instead for new code
+ * @deprecated Use KiroMemoryDatabase instead for new code
  */
 export class DatabaseManager {
   private static instance: DatabaseManager;
@@ -198,7 +198,7 @@ export class DatabaseManager {
 }
 
 /**
- * Migration runner for ContextKit
+ * Migration runner for Kiro Memory
  */
 class MigrationRunner {
   private db: Database;

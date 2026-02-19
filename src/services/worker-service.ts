@@ -1,6 +1,6 @@
 /**
- * ContextKit Worker Service
- * 
+ * Kiro Memory Worker Service
+ *
  * Lightweight worker for processing context operations in background.
  * Manages queue, health checks, and SSE broadcasting.
  */
@@ -11,15 +11,15 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
-import { ContextKitDatabase } from './sqlite/Database.js';
+import { KiroMemoryDatabase } from './sqlite/Database.js';
 import { logger } from '../utils/logger.js';
 import { DATA_DIR } from '../shared/paths.js';
 
 // Directory del file compilato (per servire asset statici)
 const __worker_dirname = dirname(fileURLToPath(import.meta.url));
 
-const PORT = process.env.CONTEXTKIT_WORKER_PORT || 3001;
-const HOST = process.env.CONTEXTKIT_WORKER_HOST || '127.0.0.1';
+const PORT = process.env.KIRO_MEMORY_WORKER_PORT || process.env.CONTEXTKIT_WORKER_PORT || 3001;
+const HOST = process.env.KIRO_MEMORY_WORKER_HOST || process.env.CONTEXTKIT_WORKER_HOST || '127.0.0.1';
 const PID_FILE = join(DATA_DIR, 'worker.pid');
 
 // Ensure data directory exists
@@ -28,7 +28,7 @@ if (!existsSync(DATA_DIR)) {
 }
 
 // Initialize database
-const db = new ContextKitDatabase();
+const db = new KiroMemoryDatabase();
 logger.info('WORKER', 'Database initialized');
 
 // Express app

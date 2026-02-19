@@ -2,7 +2,7 @@ import { Database } from 'bun:sqlite';
 import type { Observation } from '../../types/worker-types.js';
 
 /**
- * Observation operations for ContextKit database
+ * Observation operations for Kiro Memory database
  */
 
 export function createObservation(

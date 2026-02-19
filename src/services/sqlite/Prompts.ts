@@ -2,7 +2,7 @@ import { Database } from 'bun:sqlite';
 import type { UserPrompt } from '../../types/worker-types.js';
 
 /**
- * Prompt operations for ContextKit database
+ * Prompt operations for Kiro Memory database
  */
 
 export function createPrompt(

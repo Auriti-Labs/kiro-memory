@@ -12,7 +12,7 @@ export function useSettings() {
 
   useEffect(() => {
     // Load settings from localStorage
-    const saved = localStorage.getItem('contextkit-settings');
+    const saved = localStorage.getItem('kiro-memory-settings') || localStorage.getItem('contextkit-settings');
     if (saved) {
       try {
         setSettings(JSON.parse(saved));
@@ -25,7 +25,7 @@ export function useSettings() {
   const saveSettings = async (newSettings: ViewerSettings) => {
     setIsSaving(true);
     try {
-      localStorage.setItem('contextkit-settings', JSON.stringify(newSettings));
+      localStorage.setItem('kiro-memory-settings', JSON.stringify(newSettings));
       setSettings(newSettings);
       setSaveStatus('success');
       setTimeout(() => setSaveStatus('idle'), 2000);

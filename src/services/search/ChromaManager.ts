@@ -1,6 +1,6 @@
 /**
- * ChromaDB integration for ContextKit
- * 
+ * ChromaDB integration for Kiro Memory
+ *
  * Provides vector search capabilities for observations.
  */
 
@@ -38,8 +38,8 @@ export class ChromaManager {
       
       // Get or create collection
       this.collection = await this.client.getOrCreateCollection({
-        name: 'contextkit-observations',
-        metadata: { description: 'ContextKit observation embeddings' }
+        name: 'kiro-memory-observations',
+        metadata: { description: 'Kiro Memory observation embeddings' }
       });
       
       this.isAvailable = true;

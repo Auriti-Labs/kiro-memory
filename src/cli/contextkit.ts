@@ -3,7 +3,7 @@
  * (shebang aggiunto automaticamente dal build)
  */
 
-import { createContextKit } from '../sdk/index.js';
+import { createKiroMemory } from '../sdk/index.js';
 import { execSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -24,12 +24,12 @@ const DIST_DIR = dirname(__dirname);
 
 /** Agent config template — __DIST_DIR__ is replaced at install time */
 const AGENT_TEMPLATE = JSON.stringify({
-  name: "contextkit-memory",
-  description: "Agent with persistent cross-session memory. Uses ContextKit to remember context from previous sessions and automatically save what it learns.",
+  name: "kiro-memory",
+  description: "Agent with persistent cross-session memory. Uses Kiro Memory to remember context from previous sessions and automatically save what it learns.",
   model: "claude-sonnet-4",
-  tools: ["read", "write", "shell", "glob", "grep", "web_search", "web_fetch", "@contextkit"],
+  tools: ["read", "write", "shell", "glob", "grep", "web_search", "web_fetch", "@kiro-memory"],
   mcpServers: {
-    contextkit: {
+    "kiro-memory": {
       command: "node",
       args: ["__DIST_DIR__/servers/mcp-server.js"]
     }
@@ -40,29 +40,29 @@ const AGENT_TEMPLATE = JSON.stringify({
     postToolUse: [{ command: "node __DIST_DIR__/hooks/postToolUse.js", matcher: "*", timeout_ms: 5000 }],
     stop: [{ command: "node __DIST_DIR__/hooks/stop.js", timeout_ms: 10000 }]
   },
-  resources: ["file://.kiro/steering/contextkit.md"]
+  resources: ["file://.kiro/steering/kiro-memory.md"]
 }, null, 2);
 
 /** Steering file content — embedded directly */
-const STEERING_CONTENT = `# ContextKit - Persistent Memory
+const STEERING_CONTENT = `# Kiro Memory - Persistent Memory
 
-You have access to ContextKit, a persistent cross-session memory system.
+You have access to Kiro Memory, a persistent cross-session memory system.
 
 ## Available MCP Tools
 
-### @contextkit/search
+### @kiro-memory/search
 Search previous session memory. Use when:
 - The user mentions past work
 - You need context on previous decisions
 - You want to check if a problem was already addressed
 
-### @contextkit/get_context
+### @kiro-memory/get_context
 Retrieve recent context for the current project. Use at the start of complex tasks to understand what was done before.
 
-### @contextkit/timeline
+### @kiro-memory/timeline
 Show chronological context around an observation. Use to understand the sequence of events.
 
-### @contextkit/get_observations
+### @kiro-memory/get_observations
 Retrieve full details of specific observations. Use after \`search\` to drill down.
 
 ## Behavior
@@ -478,18 +478,18 @@ async function installKiro() {
   const agentsDir = join(kiroDir, 'agents');
   const settingsDir = join(kiroDir, 'settings');
   const steeringDir = join(kiroDir, 'steering');
-  const dataDir = process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.contextkit');
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.contextkit');
 
   console.log('[2/4] Installing Kiro configuration...\n');
 
-  // Crea directory
+  // Create directories
   for (const dir of [agentsDir, settingsDir, steeringDir, dataDir]) {
     mkdirSync(dir, { recursive: true });
   }
 
-  // Genera agent config con path assoluti (da template embedded)
+  // Generate agent config with absolute paths (from embedded template)
   const agentConfig = AGENT_TEMPLATE.replace(/__DIST_DIR__/g, distDir);
-  const agentDestPath = join(agentsDir, 'contextkit.json');
+  const agentDestPath = join(agentsDir, 'kiro-memory.json');
   writeFileSync(agentDestPath, agentConfig, 'utf8');
   console.log(`  → Agent config: ${agentDestPath}`);
 
@@ -506,7 +506,7 @@ async function installKiro() {
     }
   }
 
-  mcpConfig.mcpServers.contextkit = {
+  mcpConfig.mcpServers['kiro-memory'] = {
     command: 'node',
     args: [join(distDir, 'servers', 'mcp-server.js')]
   };
@@ -514,7 +514,7 @@ async function installKiro() {
   console.log(`  → MCP config:   ${mcpFilePath}`);
 
   // Scrivi steering file (da contenuto embedded)
-  const steeringDestPath = join(steeringDir, 'contextkit.md');
+  const steeringDestPath = join(steeringDir, 'kiro-memory.md');
   writeFileSync(steeringDestPath, STEERING_CONTENT, 'utf8');
   console.log(`  → Steering:     ${steeringDestPath}`);
 
@@ -524,13 +524,13 @@ async function installKiro() {
   console.log('\n[3/4] Shell alias setup\n');
 
   const { rcFile } = detectShellRc();
-  const aliasLine = 'alias kiro="kiro-cli --agent contextkit-memory"';
+  const aliasLine = 'alias kiro="kiro-cli --agent kiro-memory"';
 
-  // Controlla se l'alias è già presente
+  // Check if alias is already set
   let aliasAlreadySet = false;
   if (existsSync(rcFile)) {
     const rcContent = readFileSync(rcFile, 'utf8');
-    aliasAlreadySet = rcContent.includes('alias kiro=') && rcContent.includes('contextkit-memory');
+    aliasAlreadySet = rcContent.includes('alias kiro=') && rcContent.includes('kiro-memory');
   }
 
   if (aliasAlreadySet) {
@@ -539,7 +539,7 @@ async function installKiro() {
     // Box evidenziato per l'alias
     console.log('  \x1b[36m┌─────────────────────────────────────────────────────────┐\x1b[0m');
     console.log('  \x1b[36m│\x1b[0m  Without an alias, you must type every time:            \x1b[36m│\x1b[0m');
-    console.log('  \x1b[36m│\x1b[0m    \x1b[2mkiro-cli --agent contextkit-memory\x1b[0m                    \x1b[36m│\x1b[0m');
+    console.log('  \x1b[36m│\x1b[0m    \x1b[2mkiro-cli --agent kiro-memory\x1b[0m                          \x1b[36m│\x1b[0m');
     console.log('  \x1b[36m│\x1b[0m                                                         \x1b[36m│\x1b[0m');
     console.log('  \x1b[36m│\x1b[0m  With the alias, just type:                              \x1b[36m│\x1b[0m');
     console.log('  \x1b[36m│\x1b[0m    \x1b[1m\x1b[32mkiro\x1b[0m                                                 \x1b[36m│\x1b[0m');
@@ -570,7 +570,7 @@ async function installKiro() {
   if (aliasAlreadySet) {
     console.log('    \x1b[1mkiro\x1b[0m');
   } else {
-    console.log('    \x1b[1mkiro-cli --agent contextkit-memory\x1b[0m');
+    console.log('    \x1b[1mkiro-cli --agent kiro-memory\x1b[0m');
   }
   console.log('');
   console.log('  The worker starts automatically when a Kiro session begins.');
@@ -586,9 +586,9 @@ async function runDoctor() {
 
   // Additional checks on installation status
   const kiroDir = process.env.KIRO_CONFIG_DIR || join(homedir(), '.kiro');
-  const agentPath = join(kiroDir, 'agents', 'contextkit.json');
+  const agentPath = join(kiroDir, 'agents', 'kiro-memory.json');
   const mcpPath = join(kiroDir, 'settings', 'mcp.json');
-  const dataDir = process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.contextkit');
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.contextkit');
 
   checks.push({
     name: 'Kiro agent config',
@@ -601,13 +601,13 @@ async function runDoctor() {
   if (existsSync(mcpPath)) {
     try {
       const mcp = JSON.parse(readFileSync(mcpPath, 'utf8'));
-      mcpOk = !!mcp.mcpServers?.contextkit;
+      mcpOk = !!mcp.mcpServers?.['kiro-memory'] || !!mcp.mcpServers?.contextkit;
     } catch {}
   }
   checks.push({
     name: 'MCP server configured',
     ok: mcpOk,
-    message: mcpOk ? 'contextkit registered in mcp.json' : 'Not configured',
+    message: mcpOk ? 'kiro-memory registered in mcp.json' : 'Not configured',
     fix: !mcpOk ? 'Run: kiro-memory install' : undefined,
   });
 
@@ -656,37 +656,37 @@ async function main() {
     return;
   }
 
-  const contextkit = createContextKit();
+  const sdk = createKiroMemory();
 
   try {
     switch (command) {
       case 'context':
       case 'ctx':
-        await showContext(contextkit);
+        await showContext(sdk);
         break;
 
       case 'search':
-        await searchContext(contextkit, args[1]);
+        await searchContext(sdk, args[1]);
         break;
 
       case 'observations':
       case 'obs':
-        await showObservations(contextkit, parseInt(args[1]) || 10);
+        await showObservations(sdk, parseInt(args[1]) || 10);
         break;
 
       case 'summaries':
       case 'sum':
-        await showSummaries(contextkit, parseInt(args[1]) || 5);
+        await showSummaries(sdk, parseInt(args[1]) || 5);
         break;
 
       case 'add-observation':
       case 'add-obs':
-        await addObservation(contextkit, args[1], args.slice(2).join(' '));
+        await addObservation(sdk, args[1], args.slice(2).join(' '));
         break;
 
       case 'add-summary':
       case 'add-sum':
-        await addSummary(contextkit, args.slice(1).join(' '));
+        await addSummary(sdk, args.slice(1).join(' '));
         break;
 
       case 'help':
@@ -696,17 +696,17 @@ async function main() {
         break;
 
       default:
-        console.log('ContextKit CLI\n');
+        console.log('Kiro Memory CLI\n');
         showHelp();
         process.exit(1);
     }
   } finally {
-    contextkit.close();
+    sdk.close();
   }
 }
 
-async function showContext(contextkit: ReturnType<typeof createContextKit>) {
-  const context = await contextkit.getContext();
+async function showContext(sdk: ReturnType<typeof createKiroMemory>) {
+  const context = await sdk.getContext();
   
   console.log(`\n📁 Project: ${context.project}\n`);
   
@@ -729,13 +729,13 @@ async function showContext(contextkit: ReturnType<typeof createContextKit>) {
   console.log('');
 }
 
-async function searchContext(contextkit: ReturnType<typeof createContextKit>, query: string) {
+async function searchContext(sdk: ReturnType<typeof createKiroMemory>, query: string) {
   if (!query) {
     console.error('Error: Please provide a search query');
     process.exit(1);
   }
   
-  const results = await contextkit.search(query);
+  const results = await sdk.search(query);
   
   console.log(`\n🔍 Search results for: "${query}"\n`);
   
@@ -766,8 +766,8 @@ async function searchContext(contextkit: ReturnType<typeof createContextKit>, qu
   }
 }
 
-async function showObservations(contextkit: ReturnType<typeof createContextKit>, limit: number) {
-  const observations = await contextkit.getRecentObservations(limit);
+async function showObservations(sdk: ReturnType<typeof createKiroMemory>, limit: number) {
+  const observations = await sdk.getRecentObservations(limit);
   
   console.log(`\n📋 Last ${limit} Observations:\n`);
   
@@ -781,8 +781,8 @@ async function showObservations(contextkit: ReturnType<typeof createContextKit>,
   });
 }
 
-async function showSummaries(contextkit: ReturnType<typeof createContextKit>, limit: number) {
-  const summaries = await contextkit.getRecentSummaries(limit);
+async function showSummaries(sdk: ReturnType<typeof createKiroMemory>, limit: number) {
+  const summaries = await sdk.getRecentSummaries(limit);
   
   console.log(`\n📊 Last ${limit} Summaries:\n`);
   
@@ -803,8 +803,8 @@ async function showSummaries(contextkit: ReturnType<typeof createContextKit>, li
 }
 
 async function addObservation(
-  contextkit: ReturnType<typeof createContextKit>, 
-  title: string, 
+  sdk: ReturnType<typeof createKiroMemory>,
+  title: string,
   content: string
 ) {
   if (!title || !content) {
@@ -812,7 +812,7 @@ async function addObservation(
     process.exit(1);
   }
   
-  const id = await contextkit.storeObservation({
+  const id = await sdk.storeObservation({
     type: 'manual',
     title,
     content
@@ -821,13 +821,13 @@ async function addObservation(
   console.log(`✅ Observation stored with ID: ${id}\n`);
 }
 
-async function addSummary(contextkit: ReturnType<typeof createContextKit>, content: string) {
+async function addSummary(sdk: ReturnType<typeof createKiroMemory>, content: string) {
   if (!content) {
     console.error('Error: Please provide summary content');
     process.exit(1);
   }
   
-  const id = await contextkit.storeSummary({
+  const id = await sdk.storeSummary({
     learned: content
   });
   

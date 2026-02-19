@@ -16,17 +16,17 @@ function getDirname(): string {
 const _dirname = getDirname();
 
 /**
- * Simple path configuration for ContextKit
+ * Simple path configuration for Kiro Memory
  */
 
-// Base directory - ContextKit data in home directory
-export const DATA_DIR = process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.contextkit');
+// Base directory - Kiro Memory data in home directory
+export const DATA_DIR = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.contextkit');
 
 // Kiro config directory
 export const KIRO_CONFIG_DIR = process.env.KIRO_CONFIG_DIR || join(homedir(), '.kiro');
 
 // Plugin installation directory
-export const PLUGIN_ROOT = join(KIRO_CONFIG_DIR, 'plugins', 'contextkit');
+export const PLUGIN_ROOT = join(KIRO_CONFIG_DIR, 'plugins', 'kiro-memory');
 
 // Data subdirectories
 export const ARCHIVES_DIR = join(DATA_DIR, 'archives');

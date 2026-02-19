@@ -2,7 +2,7 @@ import { Database } from 'bun:sqlite';
 import type { Summary } from '../../types/worker-types.js';
 
 /**
- * Summary operations for ContextKit database
+ * Summary operations for Kiro Memory database
  */
 
 export function createSummary(

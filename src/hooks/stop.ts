@@ -7,11 +7,11 @@
  */
 
 import { runHook, detectProject, notifyWorker } from './utils.js';
-import { createContextKit } from '../sdk/index.js';
+import { createKiroMemory } from '../sdk/index.js';
 
 runHook('stop', async (input) => {
   const project = detectProject(input.cwd);
-  const sdk = createContextKit({ project });
+  const sdk = createKiroMemory({ project });
 
   try {
     // Recupera le osservazioni recenti della sessione corrente (ultime ore)

@@ -7,7 +7,7 @@
  */
 
 import { runHook, detectProject, notifyWorker } from './utils.js';
-import { createContextKit } from '../sdk/index.js';
+import { createKiroMemory } from '../sdk/index.js';
 
 runHook('userPromptSubmit', async (input) => {
   // Il prompt è un campo top-level, NON dentro tool_input
@@ -19,7 +19,7 @@ runHook('userPromptSubmit', async (input) => {
   if (!promptText || typeof promptText !== 'string' || promptText.trim().length === 0) return;
 
   const project = detectProject(input.cwd);
-  const sdk = createContextKit({ project });
+  const sdk = createKiroMemory({ project });
 
   try {
     // Usa session_id da Kiro se disponibile, altrimenti genera uno

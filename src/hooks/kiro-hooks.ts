@@ -5,7 +5,7 @@
  * Hooks are triggered on file saves, completions, and other events.
  */
 
-import { createContextKit } from '../sdk/index.js';
+import { createKiroMemory } from '../sdk/index.js';
 import { logger } from '../utils/logger.js';
 import { getCurrentProjectName } from '../shared/paths.js';
 
@@ -30,7 +30,7 @@ export const autoContextHook: KiroMemoryHook = {
   description: 'Automatically inject relevant context at session start',
   trigger: 'session-start',
   async action(context) {
-    const sdk = createContextKit({ project: context.project });
+    const sdk = createKiroMemory({ project: context.project });
 
     try {
       const ctx = await sdk.getContext();
@@ -74,7 +74,7 @@ export const fileChangeHook: KiroMemoryHook = {
   async action(context) {
     if (!context.data?.filePath) return;
     
-    const sdk = createContextKit({ project: context.project });
+    const sdk = createKiroMemory({ project: context.project });
 
     try {
       await sdk.storeObservation({
@@ -101,7 +101,7 @@ export const sessionSummaryHook: KiroMemoryHook = {
   async action(context) {
     if (!context.data?.summary) return;
     
-    const sdk = createContextKit({ project: context.project });
+    const sdk = createKiroMemory({ project: context.project });
 
     try {
       await sdk.storeSummary({
