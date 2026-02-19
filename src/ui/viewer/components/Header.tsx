@@ -20,7 +20,7 @@ export function Header({ isConnected, resolvedTheme, onThemeToggle }: HeaderProp
           </svg>
         </div>
         <div>
-          <h1 className="text-[15px] font-bold text-zinc-100 leading-none">ContextKit</h1>
+          <h1 className="text-[15px] font-bold text-zinc-100 leading-none">Kiro Memory</h1>
           <span className="text-[11px] text-zinc-500 mt-0.5 block">Memory Dashboard</span>
         </div>
       </div>

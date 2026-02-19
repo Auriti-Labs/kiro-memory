@@ -26,13 +26,13 @@ runHook('postToolUse', async (input) => {
       // Crea osservazione leggera solo se ci sono file o è una ricerca significativa
       const query = input.tool_input?.pattern || input.tool_input?.regex || input.tool_input?.query || '';
       const title = input.tool_name === 'grep' || input.tool_name === 'glob'
-        ? `Cercato: ${query}`.substring(0, 100)
-        : `Letto: ${files[0] || input.tool_input?.path || input.tool_input?.file_path || 'file'}`;
+        ? `Searched: ${query}`.substring(0, 100)
+        : `Read: ${files[0] || input.tool_input?.path || input.tool_input?.file_path || 'file'}`;
 
       await sdk.storeObservation({
         type: 'file-read',
         title,
-        content: files.length > 0 ? `File: ${files.join(', ')}` : `Tool ${input.tool_name} eseguito`,
+        content: files.length > 0 ? `Files: ${files.join(', ')}` : `Tool ${input.tool_name} executed`,
         files
       });
       await notifyWorker('observation-created', { project, title, type: 'file-read' });
@@ -78,17 +78,17 @@ function buildTitle(toolName: string, toolInput: any): string {
   switch (toolName) {
     case 'fs_write':
     case 'write':
-      return `Scritto: ${toolInput.path || toolInput.file_path || 'file'}`;
+      return `Written: ${toolInput.path || toolInput.file_path || 'file'}`;
     case 'execute_bash':
     case 'shell':
-      return `Eseguito: ${(toolInput.command || '').substring(0, 80)}`;
+      return `Executed: ${(toolInput.command || '').substring(0, 80)}`;
     case 'web_search':
-      return `Cercato: ${toolInput.query || ''}`;
+      return `Searched: ${toolInput.query || ''}`;
     case 'web_fetch':
       return `Fetch: ${toolInput.url || ''}`;
     case 'delegate':
     case 'use_subagent':
-      return `Delegato: ${toolInput.task || toolInput.prompt || ''}`.substring(0, 100);
+      return `Delegated: ${toolInput.task || toolInput.prompt || ''}`.substring(0, 100);
     default:
       return `${toolName}: ${JSON.stringify(toolInput).substring(0, 80)}`;
   }
@@ -107,7 +107,7 @@ function buildContent(toolName: string, toolInput: any, toolResponse: any): stri
     content += `Output: ${respStr.substring(0, 500)}`;
   }
 
-  return content || `Tool ${toolName} eseguito`;
+  return content || `Tool ${toolName} executed`;
 }
 
 function categorizeToolUse(toolName: string): string {
