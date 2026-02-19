@@ -1,5 +1,5 @@
 /**
- * ContextKit build configuration
+ * Kiro Memory build configuration
  *
  * Usa lo shim bun:sqlite → better-sqlite3 per compatibilità Node.js puro.
  */
@@ -46,7 +46,7 @@ function ensureDir(dir) {
 }
 
 async function build() {
-  console.log('Building ContextKit...\n');
+  console.log('Building Kiro Memory...\n');
 
   ensureDir(DIST_DIR);
 
