@@ -1,13 +1,26 @@
 /**
  * Ricerca ibrida: combina vector search locale (SQLite BLOB) con keyword search (FTS5)
  *
- * Se il servizio di embedding è disponibile, esegue ricerca semantica + keyword
- * e fonde i risultati con scoring ibrido. Altrimenti, fallback a solo FTS5.
+ * Scoring a 4 segnali:
+ * - semantic: cosine similarity dall'embedding
+ * - fts5: rank FTS5 normalizzato
+ * - recency: decadimento esponenziale
+ * - projectMatch: corrispondenza progetto
+ *
+ * Se il servizio di embedding non e disponibile, fallback a solo FTS5.
  */
 
 import { getEmbeddingService } from './EmbeddingService.js';
 import { getVectorSearch } from './VectorSearch.js';
+import {
+  recencyScore,
+  normalizeFTS5Rank,
+  projectMatchScore,
+  computeCompositeScore,
+  SEARCH_WEIGHTS
+} from './ScoringEngine.js';
 import type { Database } from 'bun:sqlite';
+import type { ScoringWeights } from '../../types/worker-types.js';
 import { logger } from '../../utils/logger.js';
 
 export interface SearchResult {
@@ -17,8 +30,15 @@ export interface SearchResult {
   type: string;
   project: string;
   created_at: string;
+  created_at_epoch: number;
   score: number;
   source: 'vector' | 'keyword' | 'hybrid';
+  signals: {
+    semantic: number;
+    fts5: number;
+    recency: number;
+    projectMatch: number;
+  };
 }
 
 export class HybridSearch {
@@ -40,7 +60,7 @@ export class HybridSearch {
   }
 
   /**
-   * Ricerca ibrida: vector + keyword
+   * Ricerca ibrida con scoring a 4 segnali
    */
   async search(
     db: Database,
@@ -48,10 +68,26 @@ export class HybridSearch {
     options: {
       project?: string;
       limit?: number;
+      weights?: ScoringWeights;
     } = {}
   ): Promise<SearchResult[]> {
     const limit = options.limit || 10;
-    const results: SearchResult[] = [];
+    const weights = options.weights || SEARCH_WEIGHTS;
+    const targetProject = options.project || '';
+
+    // Raccogliamo risultati grezzi da entrambe le sorgenti
+    const rawItems = new Map<string, {
+      id: string;
+      title: string;
+      content: string;
+      type: string;
+      project: string;
+      created_at: string;
+      created_at_epoch: number;
+      semanticScore: number;
+      fts5Rank: number | null; // rank grezzo, da normalizzare dopo
+      source: 'vector' | 'keyword';
+    }>();
 
     // Ricerca vettoriale (se embedding disponibile)
     if (this.embeddingInitialized) {
@@ -63,19 +99,21 @@ export class HybridSearch {
           const vectorSearch = getVectorSearch();
           const vectorResults = await vectorSearch.search(db, queryEmbedding, {
             project: options.project,
-            limit: Math.ceil(limit / 2),
+            limit: limit * 2, // Prendiamo piu risultati per il ranking
             threshold: 0.3
           });
 
           for (const hit of vectorResults) {
-            results.push({
+            rawItems.set(String(hit.observationId), {
               id: String(hit.observationId),
               title: hit.title,
               content: hit.text || '',
               type: hit.type,
               project: hit.project,
               created_at: hit.created_at,
-              score: hit.similarity, // Cosine similarity 0-1
+              created_at_epoch: hit.created_at_epoch,
+              semanticScore: hit.similarity,
+              fts5Rank: null,
               source: 'vector'
             });
           }
@@ -87,22 +125,36 @@ export class HybridSearch {
       }
     }
 
-    // Ricerca keyword FTS5 (sempre attiva)
+    // Ricerca keyword FTS5 con rank (sempre attiva)
     try {
-      const { searchObservations } = await import('../sqlite/Observations.js');
-      const keywordResults = searchObservations(db, query, options.project);
+      const { searchObservationsFTSWithRank } = await import('../sqlite/Search.js');
+      const keywordResults = searchObservationsFTSWithRank(db, query, {
+        project: options.project,
+        limit: limit * 2
+      });
 
-      for (const obs of keywordResults.slice(0, Math.ceil(limit / 2))) {
-        results.push({
-          id: String(obs.id),
-          title: obs.title,
-          content: obs.text || obs.narrative || '',
-          type: obs.type,
-          project: obs.project,
-          created_at: obs.created_at,
-          score: 0.5, // Score di default per keyword match
-          source: 'keyword'
-        });
+      for (const obs of keywordResults) {
+        const id = String(obs.id);
+        const existing = rawItems.get(id);
+
+        if (existing) {
+          // Presente in entrambe le sorgenti: aggiungi rank FTS5
+          existing.fts5Rank = obs.fts5_rank;
+          existing.source = 'vector'; // Manteniamo vector come sorgente primaria
+        } else {
+          rawItems.set(id, {
+            id,
+            title: obs.title,
+            content: obs.text || obs.narrative || '',
+            type: obs.type,
+            project: obs.project,
+            created_at: obs.created_at,
+            created_at_epoch: obs.created_at_epoch,
+            semanticScore: 0,
+            fts5Rank: obs.fts5_rank,
+            source: 'keyword'
+          });
+        }
       }
 
       logger.debug('SEARCH', `Keyword search: ${keywordResults.length} risultati`);
@@ -110,35 +162,48 @@ export class HybridSearch {
       logger.error('SEARCH', 'Ricerca keyword fallita', {}, error as Error);
     }
 
-    // Deduplicazione e ordinamento per score
-    return this.deduplicateAndSort(results, limit);
-  }
+    // Nessun risultato
+    if (rawItems.size === 0) return [];
 
-  /**
-   * Rimuovi duplicati e ordina per score decrescente
-   */
-  private deduplicateAndSort(results: SearchResult[], limit: number): SearchResult[] {
-    const seen = new Map<string, SearchResult>();
+    // Normalizza i rank FTS5
+    const allFTS5Ranks = Array.from(rawItems.values())
+      .filter(item => item.fts5Rank !== null)
+      .map(item => item.fts5Rank as number);
 
-    for (const result of results) {
-      const existing = seen.get(result.id);
-      if (!existing) {
-        seen.set(result.id, result);
-      } else if (result.score > existing.score) {
-        // Se presente in entrambe le sorgenti, prendi lo score migliore
-        seen.set(result.id, {
-          ...result,
-          source: 'hybrid',
-          // Scoring ibrido: boost per risultati presenti in entrambe le sorgenti
-          score: Math.min(1, result.score * 1.2)
-        });
-      }
+    // Calcola score composito per ogni item
+    const scored: SearchResult[] = [];
+
+    for (const item of rawItems.values()) {
+      const signals = {
+        semantic: item.semanticScore,
+        fts5: item.fts5Rank !== null ? normalizeFTS5Rank(item.fts5Rank, allFTS5Ranks) : 0,
+        recency: recencyScore(item.created_at_epoch),
+        projectMatch: targetProject ? projectMatchScore(item.project, targetProject) : 0
+      };
+
+      const score = computeCompositeScore(signals, weights);
+
+      // Boost per item presenti in entrambe le sorgenti
+      const isHybrid = item.semanticScore > 0 && item.fts5Rank !== null;
+      const finalScore = isHybrid ? Math.min(1, score * 1.15) : score;
+
+      scored.push({
+        id: item.id,
+        title: item.title,
+        content: item.content,
+        type: item.type,
+        project: item.project,
+        created_at: item.created_at,
+        created_at_epoch: item.created_at_epoch,
+        score: finalScore,
+        source: isHybrid ? 'hybrid' : item.source,
+        signals
+      });
     }
 
-    const unique = Array.from(seen.values());
-    unique.sort((a, b) => b.score - a.score);
-
-    return unique.slice(0, limit);
+    // Ordina per score decrescente e limita
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, limit);
   }
 }
 

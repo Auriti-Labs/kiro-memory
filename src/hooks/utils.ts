@@ -9,7 +9,8 @@
 
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import type { KiroHookInput } from '../types/worker-types.js';
+import type { KiroHookInput, ScoredItem, Summary } from '../types/worker-types.js';
+import { estimateTokens } from '../services/search/ScoringEngine.js';
 
 // Percorso del token condiviso con il worker
 const DATA_DIR = process.env.KIRO_MEMORY_DATA_DIR
@@ -161,6 +162,84 @@ export async function notifyWorker(event: string, data?: Record<string, unknown>
   } catch {
     // Worker non attivo — ignora silenziosamente
   }
+}
+
+/**
+ * Formatta contesto smart con budget token.
+ * Riempie il budget con item ordinati per score decrescente.
+ * Sommari sempre inclusi (max 3). Item troncati se necessario.
+ */
+export function formatSmartContext(data: {
+  items: ScoredItem[];
+  summaries: Summary[];
+  project: string;
+  tokenBudget?: number;
+}): string {
+  const budget = data.tokenBudget
+    || parseInt(process.env.KIRO_MEMORY_CONTEXT_TOKENS || '0', 10)
+    || 2000;
+
+  let output = '';
+  let tokensUsed = 0;
+
+  // Header
+  const header = '# Kiro Memory: Contesto Sessioni Precedenti\n\n';
+  tokensUsed += estimateTokens(header);
+  output += header;
+
+  // Sommari (sempre inclusi, max 3)
+  if (data.summaries && data.summaries.length > 0) {
+    let sumSection = '## Sessioni Precedenti\n\n';
+    for (const sum of data.summaries.slice(0, 3)) {
+      if (sum.learned) sumSection += `- **Appreso**: ${sum.learned}\n`;
+      if (sum.completed) sumSection += `- **Completato**: ${sum.completed}\n`;
+      if (sum.next_steps) sumSection += `- **Prossimi passi**: ${sum.next_steps}\n`;
+      sumSection += '\n';
+    }
+    tokensUsed += estimateTokens(sumSection);
+    output += sumSection;
+  }
+
+  // Osservazioni ordinate per score (riempimento greedy)
+  if (data.items && data.items.length > 0) {
+    let obsSection = '## Osservazioni Rilevanti\n\n';
+    tokensUsed += estimateTokens(obsSection);
+
+    // Ordina per score decrescente (dovrebbero gia essere ordinati, ma assicuriamoci)
+    const sorted = [...data.items].sort((a, b) => b.score - a.score);
+
+    for (const item of sorted) {
+      // Riga base: tipo + titolo
+      const linePrefix = `- **[${item.type}] ${item.title}**: `;
+      const linePrefixTokens = estimateTokens(linePrefix);
+
+      // Budget rimanente per il contenuto
+      const remainingTokens = budget - tokensUsed - linePrefixTokens - 1; // 1 per \n
+
+      if (remainingTokens <= 0) break; // Budget esaurito
+
+      // Tronca contenuto al budget rimanente
+      const maxContentChars = remainingTokens * 4; // 1 token ≈ 4 char
+      const content = item.content
+        ? item.content.substring(0, Math.min(maxContentChars, 300))
+        : '';
+
+      const line = `${linePrefix}${content}\n`;
+      tokensUsed += estimateTokens(line);
+      obsSection += line;
+
+      // Se abbiamo superato il budget, fermiamoci
+      if (tokensUsed >= budget) break;
+    }
+
+    output += obsSection;
+  }
+
+  // Footer con stats
+  const footer = `\n> Progetto: ${data.project} | Items: ${data.items?.length || 0} | Token usati: ~${tokensUsed}/${budget}\n`;
+  output += footer;
+
+  return output;
 }
 
 /**

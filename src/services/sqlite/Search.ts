@@ -81,6 +81,57 @@ export function searchObservationsFTS(
 }
 
 /**
+ * Ricerca FTS5 che espone il rank grezzo per scoring.
+ * Il rank FTS5 e negativo: piu negativo = piu rilevante.
+ * Usa sanitizeFTS5Query per sicurezza, fallback a LIKE senza rank.
+ */
+export function searchObservationsFTSWithRank(
+  db: Database,
+  query: string,
+  filters: SearchFilters = {}
+): Array<Observation & { fts5_rank: number }> {
+  const limit = filters.limit || 50;
+
+  try {
+    const safeQuery = sanitizeFTS5Query(query);
+    if (!safeQuery) return [];
+
+    let sql = `
+      SELECT o.*, rank as fts5_rank FROM observations o
+      JOIN observations_fts fts ON o.id = fts.rowid
+      WHERE observations_fts MATCH ?
+    `;
+    const params: (string | number)[] = [safeQuery];
+
+    if (filters.project) {
+      sql += ' AND o.project = ?';
+      params.push(filters.project);
+    }
+    if (filters.type) {
+      sql += ' AND o.type = ?';
+      params.push(filters.type);
+    }
+    if (filters.dateStart) {
+      sql += ' AND o.created_at_epoch >= ?';
+      params.push(filters.dateStart);
+    }
+    if (filters.dateEnd) {
+      sql += ' AND o.created_at_epoch <= ?';
+      params.push(filters.dateEnd);
+    }
+
+    sql += ' ORDER BY rank LIMIT ?';
+    params.push(limit);
+
+    const stmt = db.query(sql);
+    return stmt.all(...params) as Array<Observation & { fts5_rank: number }>;
+  } catch {
+    // Fallback: nessun rank disponibile
+    return [];
+  }
+}
+
+/**
  * Fallback: ricerca LIKE sulle osservazioni
  */
 export function searchObservationsLIKE(

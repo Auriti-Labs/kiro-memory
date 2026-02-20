@@ -14,6 +14,12 @@ import { getHybridSearch, type SearchResult } from '../services/search/HybridSea
 import { getEmbeddingService } from '../services/search/EmbeddingService.js';
 import { getVectorSearch } from '../services/search/VectorSearch.js';
 import { logger } from '../utils/logger.js';
+import {
+  recencyScore,
+  projectMatchScore,
+  computeCompositeScore,
+  CONTEXT_WEIGHTS
+} from '../services/search/ScoringEngine.js';
 import type {
   Observation,
   Summary,
@@ -21,7 +27,9 @@ import type {
   DBSession,
   ContextContext,
   SearchFilters,
-  TimelineEntry
+  TimelineEntry,
+  ScoredItem,
+  SmartContext
 } from '../types/worker-types.js';
 
 export interface KiroMemoryConfig {
@@ -314,8 +322,15 @@ export class KiroMemorySDK {
       type: r.type,
       project: r.project,
       created_at: r.created_at,
+      created_at_epoch: r.created_at_epoch,
       score: r.similarity,
-      source: 'vector' as const
+      source: 'vector' as const,
+      signals: {
+        semantic: r.similarity,
+        fts5: 0,
+        recency: recencyScore(r.created_at_epoch),
+        projectMatch: projectMatchScore(r.project, this.project)
+      }
     }));
   }
 
@@ -342,6 +357,89 @@ export class KiroMemorySDK {
     const hybridSearch = getHybridSearch();
     await hybridSearch.initialize();
     return getEmbeddingService().isAvailable();
+  }
+
+  /**
+   * Contesto smart con ranking a 4 segnali e budget token.
+   *
+   * Se query presente: usa HybridSearch con SEARCH_WEIGHTS.
+   * Se senza query: ranking per recency + project match (CONTEXT_WEIGHTS).
+   */
+  async getSmartContext(options: {
+    tokenBudget?: number;
+    query?: string;
+  } = {}): Promise<SmartContext> {
+    const tokenBudget = options.tokenBudget
+      || parseInt(process.env.KIRO_MEMORY_CONTEXT_TOKENS || '0', 10)
+      || 2000;
+
+    // Sommari sempre inclusi
+    const summaries = getSummariesByProject(this.db.db, this.project, 5);
+
+    let items: ScoredItem[];
+
+    if (options.query) {
+      // Modalita SEARCH: usa HybridSearch con scoring completo
+      const hybridSearch = getHybridSearch();
+      const results = await hybridSearch.search(this.db.db, options.query, {
+        project: this.project,
+        limit: 30
+      });
+
+      items = results.map(r => ({
+        id: parseInt(r.id, 10) || 0,
+        title: r.title,
+        content: r.content,
+        type: r.type,
+        project: r.project,
+        created_at: r.created_at,
+        created_at_epoch: r.created_at_epoch,
+        score: r.score,
+        signals: r.signals
+      }));
+    } else {
+      // Modalita CONTEXT: ranking per recency + project match
+      const observations = getObservationsByProject(this.db.db, this.project, 30);
+
+      items = observations.map(obs => {
+        const signals = {
+          semantic: 0,
+          fts5: 0,
+          recency: recencyScore(obs.created_at_epoch),
+          projectMatch: projectMatchScore(obs.project, this.project)
+        };
+
+        return {
+          id: obs.id,
+          title: obs.title,
+          content: obs.text || obs.narrative || '',
+          type: obs.type,
+          project: obs.project,
+          created_at: obs.created_at,
+          created_at_epoch: obs.created_at_epoch,
+          score: computeCompositeScore(signals, CONTEXT_WEIGHTS),
+          signals
+        };
+      });
+
+      // Ordina per score decrescente
+      items.sort((a, b) => b.score - a.score);
+    }
+
+    // Calcola token usati (stima approssimativa)
+    let tokensUsed = 0;
+    for (const item of items) {
+      tokensUsed += Math.ceil((item.title.length + item.content.length) / 4);
+      if (tokensUsed > tokenBudget) break;
+    }
+
+    return {
+      project: this.project,
+      items,
+      summaries,
+      tokenBudget,
+      tokensUsed: Math.min(tokensUsed, tokenBudget)
+    };
   }
 
   /**
@@ -380,7 +478,10 @@ export type {
   DBSession,
   ContextContext,
   SearchFilters,
-  TimelineEntry
+  TimelineEntry,
+  ScoredItem,
+  SmartContext,
+  ScoringWeights
 } from '../types/worker-types.js';
 
 export type { SearchResult } from '../services/search/HybridSearch.js';

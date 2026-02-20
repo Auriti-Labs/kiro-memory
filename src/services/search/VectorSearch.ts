@@ -18,6 +18,7 @@ export interface VectorSearchResult {
   type: string;
   project: string;
   created_at: string;
+  created_at_epoch: number;
 }
 
 /**
@@ -79,7 +80,7 @@ export class VectorSearch {
       // Query per caricare embeddings con dati osservazione
       let sql = `
         SELECT e.observation_id, e.embedding,
-               o.title, o.text, o.type, o.project, o.created_at
+               o.title, o.text, o.type, o.project, o.created_at, o.created_at_epoch
         FROM observation_embeddings e
         JOIN observations o ON o.id = e.observation_id
       `;
@@ -98,6 +99,7 @@ export class VectorSearch {
         type: string;
         project: string;
         created_at: string;
+        created_at_epoch: number;
       }>;
 
       // Calcola similarity per ogni embedding
@@ -116,7 +118,8 @@ export class VectorSearch {
             text: row.text,
             type: row.type,
             project: row.project,
-            created_at: row.created_at
+            created_at: row.created_at,
+            created_at_epoch: row.created_at_epoch
           });
         }
       }

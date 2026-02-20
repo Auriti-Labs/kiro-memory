@@ -130,7 +130,8 @@ async function build() {
       join(SRC_DIR, 'services', 'search', 'ChromaManager.ts'),
       join(SRC_DIR, 'services', 'search', 'HybridSearch.ts'),
       join(SRC_DIR, 'services', 'search', 'EmbeddingService.ts'),
-      join(SRC_DIR, 'services', 'search', 'VectorSearch.ts')
+      join(SRC_DIR, 'services', 'search', 'VectorSearch.ts'),
+      join(SRC_DIR, 'services', 'search', 'ScoringEngine.ts')
     ],
     outdir: join(DIST_DIR, 'services', 'search'),
     external: ['better-sqlite3', 'chromadb', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']

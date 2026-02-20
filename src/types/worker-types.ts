@@ -291,3 +291,42 @@ export interface TimelineEntry {
   created_at: string;
   created_at_epoch: number;
 }
+
+// ============================================================================
+// Smart Ranking Types (Phase 2B)
+// ============================================================================
+
+/** Pesi per i 4 segnali di scoring */
+export interface ScoringWeights {
+  semantic: number;
+  fts5: number;
+  recency: number;
+  projectMatch: number;
+}
+
+/** Item con score composito e segnali individuali */
+export interface ScoredItem {
+  id: number;
+  title: string;
+  content: string;
+  type: string;
+  project: string;
+  created_at: string;
+  created_at_epoch: number;
+  score: number;
+  signals: {
+    semantic: number;
+    fts5: number;
+    recency: number;
+    projectMatch: number;
+  };
+}
+
+/** Contesto smart con budget token */
+export interface SmartContext {
+  project: string;
+  items: ScoredItem[];
+  summaries: Summary[];
+  tokenBudget: number;
+  tokensUsed: number;
+}

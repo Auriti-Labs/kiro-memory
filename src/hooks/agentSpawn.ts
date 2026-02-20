@@ -6,7 +6,7 @@
  * Funzione: avvia il worker (se non attivo) e inietta contesto su stdout
  */
 
-import { runHook, detectProject, formatContext } from './utils.js';
+import { runHook, detectProject, formatSmartContext } from './utils.js';
 import { createKiroMemory } from '../sdk/index.js';
 import { spawn } from 'child_process';
 import { dirname, join } from 'path';
@@ -69,21 +69,19 @@ runHook('agentSpawn', async (input) => {
   const sdk = createKiroMemory({ project });
 
   try {
-    const ctx = await sdk.getContext();
+    const smartCtx = await sdk.getSmartContext();
 
-    // Se non c'è contesto, esci silenziosamente
-    if (ctx.relevantObservations.length === 0 && ctx.relevantSummaries.length === 0) {
+    // Se non c'e contesto, esci silenziosamente
+    if (smartCtx.items.length === 0 && smartCtx.summaries.length === 0) {
       return;
     }
 
-    let output = '# Kiro Memory: Contesto Sessioni Precedenti\n\n';
-    output += formatContext({
-      observations: ctx.relevantObservations,
-      summaries: ctx.relevantSummaries,
-      prompts: ctx.recentPrompts
+    let output = formatSmartContext({
+      items: smartCtx.items,
+      summaries: smartCtx.summaries,
+      project
     });
 
-    output += `\n> Progetto: ${project} | Osservazioni: ${ctx.relevantObservations.length} | Sommari: ${ctx.relevantSummaries.length}\n`;
     output += `> UI disponibile su http://127.0.0.1:${process.env.KIRO_MEMORY_WORKER_PORT || '3001'}\n`;
 
     // Stdout viene iniettato nel contesto dell'agente Kiro
