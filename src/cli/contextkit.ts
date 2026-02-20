@@ -581,6 +581,170 @@ async function installKiro() {
   console.log(`  Web dashboard: \x1b[4mhttp://localhost:3001\x1b[0m\n`);
 }
 
+// ─── Install Claude Code command ───
+
+/** Contenuto steering per Claude Code (iniettato in ~/.claude/CLAUDE.md) */
+const CLAUDE_CODE_STEERING = `# Kiro Memory - Persistent Cross-Session Memory
+
+You have access to Kiro Memory, a persistent cross-session memory system that remembers context across sessions.
+
+## Available MCP Tools
+
+### kiro-memory/search
+Search previous session memory. Use when:
+- The user mentions past work or previous sessions
+- You need context on previous decisions
+- You want to check if a problem was already addressed
+
+### kiro-memory/get_context
+Retrieve recent context for the current project. Use at the start of complex tasks.
+
+### kiro-memory/timeline
+Show chronological context around an observation. Use to understand sequences of events.
+
+### kiro-memory/get_observations
+Retrieve full details of specific observations by ID. Use after search to drill down.
+
+## Behavior
+
+- Previous session context is automatically injected at startup via hooks
+- Your actions (files written, commands run, searches) are tracked automatically
+- A summary is generated at the end of each session
+- No manual saving needed: the system is fully automatic
+`;
+
+async function installClaudeCode() {
+  console.log('\n=== Kiro Memory - Claude Code Installation ===\n');
+  console.log('[1/3] Running environment checks...');
+
+  const checks = runEnvironmentChecks();
+  const { hasErrors } = printChecks(checks);
+
+  if (hasErrors) {
+    const { fixed, needsRestart } = await tryAutoFix(checks);
+
+    if (needsRestart) {
+      console.log('  \x1b[33mRestart your terminal and re-run: kiro-memory install --claude-code\x1b[0m\n');
+      process.exit(0);
+    }
+
+    if (fixed) {
+      console.log('  Re-running checks...\n');
+      const reChecks = runEnvironmentChecks();
+      const reResult = printChecks(reChecks);
+      if (reResult.hasErrors) {
+        console.log('\x1b[31mInstallation aborted.\x1b[0m Fix the remaining issues and retry.\n');
+        process.exit(1);
+      }
+    } else if (hasErrors) {
+      console.log('\x1b[31mInstallation aborted.\x1b[0m Fix the issues and retry.\n');
+      process.exit(1);
+    }
+  }
+
+  const distDir = DIST_DIR;
+  const claudeDir = join(homedir(), '.claude');
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.kiro-memory');
+
+  console.log('[2/3] Installing Claude Code configuration...\n');
+
+  // Crea directory
+  mkdirSync(claudeDir, { recursive: true });
+  mkdirSync(dataDir, { recursive: true });
+
+  // --- settings.json con hooks ---
+  const settingsPath = join(claudeDir, 'settings.json');
+  let settings: any = {};
+
+  if (existsSync(settingsPath)) {
+    try {
+      settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+    } catch {
+      // File corrotto, lo ricreiamo
+    }
+  }
+
+  if (!settings.hooks) settings.hooks = {};
+
+  // Mappa hook events → script
+  const hookMap: Record<string, { script: string; timeout: number }> = {
+    'SessionStart': { script: 'hooks/agentSpawn.js', timeout: 10000 },
+    'UserPromptSubmit': { script: 'hooks/userPromptSubmit.js', timeout: 5000 },
+    'PostToolUse': { script: 'hooks/postToolUse.js', timeout: 5000 },
+    'Stop': { script: 'hooks/stop.js', timeout: 10000 }
+  };
+
+  for (const [event, config] of Object.entries(hookMap)) {
+    const hookEntry = {
+      type: 'command',
+      command: `node ${join(distDir, config.script)}`,
+      timeout: config.timeout
+    };
+
+    if (!settings.hooks[event]) {
+      settings.hooks[event] = [hookEntry];
+    } else if (Array.isArray(settings.hooks[event])) {
+      // Rimuovi eventuali hook kiro-memory precedenti e aggiungi il nuovo
+      settings.hooks[event] = settings.hooks[event].filter(
+        (h: any) => !h.command?.includes('kiro-memory') && !h.command?.includes('contextkit')
+      );
+      settings.hooks[event].push(hookEntry);
+    }
+  }
+
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+  console.log(`  → Hooks config: ${settingsPath}`);
+
+  // --- .mcp.json nella home (scope globale) ---
+  const mcpPath = join(homedir(), '.mcp.json');
+  let mcpConfig: any = {};
+
+  if (existsSync(mcpPath)) {
+    try {
+      mcpConfig = JSON.parse(readFileSync(mcpPath, 'utf8'));
+    } catch {
+      // File corrotto
+    }
+  }
+
+  if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
+
+  mcpConfig.mcpServers['kiro-memory'] = {
+    command: 'node',
+    args: [join(distDir, 'servers', 'mcp-server.js')]
+  };
+
+  writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
+  console.log(`  → MCP config:   ${mcpPath}`);
+
+  // --- CLAUDE.md steering file ---
+  const steeringPath = join(claudeDir, 'CLAUDE.md');
+  let existingSteering = '';
+
+  if (existsSync(steeringPath)) {
+    existingSteering = readFileSync(steeringPath, 'utf8');
+  }
+
+  // Aggiungi steering solo se non è già presente
+  if (!existingSteering.includes('Kiro Memory')) {
+    const separator = existingSteering.length > 0 ? '\n\n---\n\n' : '';
+    writeFileSync(steeringPath, existingSteering + separator + CLAUDE_CODE_STEERING, 'utf8');
+    console.log(`  → Steering:     ${steeringPath}`);
+  } else {
+    console.log(`  → Steering:     ${steeringPath} (already configured)`);
+  }
+
+  console.log(`  → Data dir:     ${dataDir}`);
+
+  // 3. Riepilogo finale
+  console.log('\n[3/3] Done!\n');
+  console.log('  \x1b[32m═══ Claude Code integration complete! ═══\x1b[0m\n');
+  console.log('  Memory hooks are now active for Claude Code.');
+  console.log('  Start a new Claude Code session to begin tracking context.\n');
+  console.log('  The worker starts automatically on first session.');
+  console.log(`  Web dashboard: \x1b[4mhttp://localhost:3001\x1b[0m\n`);
+}
+
 // ─── Doctor command ───
 
 async function runDoctor() {
@@ -621,6 +785,47 @@ async function runDoctor() {
     message: existsSync(dataDir) ? dataDir : 'Not created (will be created on first use)',
   });
 
+  // Claude Code integration check
+  const claudeDir = join(homedir(), '.claude');
+  const claudeSettingsPath = join(claudeDir, 'settings.json');
+  let claudeHooksOk = false;
+  if (existsSync(claudeSettingsPath)) {
+    try {
+      const claudeSettings = JSON.parse(readFileSync(claudeSettingsPath, 'utf8'));
+      claudeHooksOk = !!(claudeSettings.hooks?.SessionStart || claudeSettings.hooks?.PostToolUse);
+      // Verifica che i hook puntino a kiro-memory
+      if (claudeHooksOk) {
+        const allHooks = JSON.stringify(claudeSettings.hooks);
+        claudeHooksOk = allHooks.includes('kiro-memory') || allHooks.includes('agentSpawn');
+      }
+    } catch {}
+  }
+
+  const claudeMcpPath = join(homedir(), '.mcp.json');
+  let claudeMcpOk = false;
+  if (existsSync(claudeMcpPath)) {
+    try {
+      const claudeMcp = JSON.parse(readFileSync(claudeMcpPath, 'utf8'));
+      claudeMcpOk = !!claudeMcp.mcpServers?.['kiro-memory'];
+    } catch {}
+  }
+
+  checks.push({
+    name: 'Claude Code hooks',
+    ok: true, // Non-blocking: installazione opzionale
+    message: claudeHooksOk
+      ? 'Configured in ~/.claude/settings.json'
+      : 'Not configured (optional: run kiro-memory install --claude-code)',
+  });
+
+  checks.push({
+    name: 'Claude Code MCP',
+    ok: true, // Non-blocking: installazione opzionale
+    message: claudeMcpOk
+      ? 'kiro-memory registered in ~/.mcp.json'
+      : 'Not configured (optional: run kiro-memory install --claude-code)',
+  });
+
   // Worker status check (informational, non-blocking)
   let workerOk = false;
   try {
@@ -652,7 +857,11 @@ async function runDoctor() {
 async function main() {
   // Comandi che non richiedono database
   if (command === 'install') {
-    await installKiro();
+    if (args.includes('--claude-code')) {
+      await installClaudeCode();
+    } else {
+      await installKiro();
+    }
     return;
   }
   if (command === 'doctor') {
@@ -842,7 +1051,8 @@ function showHelp() {
   console.log(`Usage: kiro-memory <command> [options]
 
 Setup:
-  install                   Install hooks, MCP server, and agent config into Kiro CLI
+  install                   Install for Kiro CLI (default)
+  install --claude-code     Install hooks and MCP server for Claude Code
   doctor                    Run environment diagnostics (checks Node, build tools, WSL, etc.)
 
 Commands:

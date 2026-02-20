@@ -13,11 +13,13 @@ runHook('postToolUse', async (input) => {
   if (!input.tool_name) return;
 
   // Tool completamente ignorati (nessun valore informativo)
-  const ignoredTools = ['introspect', 'thinking', 'todo'];
+  // Include nomi Kiro CLI (lowercase) e Claude Code (PascalCase)
+  const ignoredTools = ['introspect', 'thinking', 'todo', 'TodoWrite'];
   if (ignoredTools.includes(input.tool_name)) return;
 
   // Tool di lettura: traccia in modo leggero (solo file, no contenuto)
-  const readOnlyTools = ['glob', 'grep', 'fs_read', 'read'];
+  // Include nomi Kiro CLI (lowercase) e Claude Code (PascalCase)
+  const readOnlyTools = ['glob', 'grep', 'fs_read', 'read', 'Read', 'Glob', 'Grep'];
   if (readOnlyTools.includes(input.tool_name)) {
     const project = detectProject(input.cwd);
     const sdk = createKiroMemory({ project, skipMigrations: true });
@@ -76,19 +78,30 @@ function buildTitle(toolName: string, toolInput: any): string {
   if (!toolInput) return `Tool: ${toolName}`;
 
   switch (toolName) {
+    // Kiro CLI + Claude Code: scrittura file
     case 'fs_write':
     case 'write':
-      return `Written: ${toolInput.path || toolInput.file_path || 'file'}`;
+    case 'Write':
+    case 'Edit':
+    case 'NotebookEdit':
+      return `Written: ${toolInput.path || toolInput.file_path || toolInput.notebook_path || 'file'}`;
+    // Kiro CLI + Claude Code: comandi shell
     case 'execute_bash':
     case 'shell':
+    case 'Bash':
       return `Executed: ${(toolInput.command || '').substring(0, 80)}`;
+    // Kiro CLI + Claude Code: ricerca web
     case 'web_search':
+    case 'WebSearch':
       return `Searched: ${toolInput.query || ''}`;
     case 'web_fetch':
+    case 'WebFetch':
       return `Fetch: ${toolInput.url || ''}`;
+    // Kiro CLI + Claude Code: delegazione
     case 'delegate':
     case 'use_subagent':
-      return `Delegated: ${toolInput.task || toolInput.prompt || ''}`.substring(0, 100);
+    case 'Task':
+      return `Delegated: ${toolInput.task || toolInput.prompt || toolInput.description || ''}`.substring(0, 100);
     default:
       return `${toolName}: ${JSON.stringify(toolInput).substring(0, 80)}`;
   }
@@ -112,6 +125,7 @@ function buildContent(toolName: string, toolInput: any, toolResponse: any): stri
 
 function categorizeToolUse(toolName: string): string {
   const categories: Record<string, string> = {
+    // Kiro CLI tool names
     'fs_write': 'file-write',
     'write': 'file-write',
     'fs_read': 'file-read',
@@ -126,7 +140,18 @@ function categorizeToolUse(toolName: string): string {
     'use_subagent': 'delegation',
     'use_aws': 'cloud-operation',
     'aws': 'cloud-operation',
-    'code': 'code-intelligence'
+    'code': 'code-intelligence',
+    // Claude Code tool names (PascalCase)
+    'Write': 'file-write',
+    'Edit': 'file-write',
+    'NotebookEdit': 'file-write',
+    'Read': 'file-read',
+    'Glob': 'file-read',
+    'Grep': 'file-read',
+    'Bash': 'command',
+    'WebSearch': 'research',
+    'WebFetch': 'research',
+    'Task': 'delegation'
   };
   return categories[toolName] || 'tool-use';
 }
