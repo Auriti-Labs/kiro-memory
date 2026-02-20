@@ -11,6 +11,7 @@ import { getPromptsByProject, createPrompt } from '../services/sqlite/Prompts.js
 import { getSessionByContentId, createSession, completeSession as dbCompleteSession } from '../services/sqlite/Sessions.js';
 import { searchObservationsFTS, searchSummariesFiltered, getObservationsByIds as dbGetObservationsByIds, getTimeline as dbGetTimeline, getStaleObservations as dbGetStaleObservations, markObservationsStale as dbMarkObservationsStale } from '../services/sqlite/Search.js';
 import { createCheckpoint as dbCreateCheckpoint, getLatestCheckpoint as dbGetLatestCheckpoint, getLatestCheckpointByProject as dbGetLatestCheckpointByProject } from '../services/sqlite/Checkpoints.js';
+import { getReportData as dbGetReportData } from '../services/sqlite/Reports.js';
 import { getHybridSearch, type SearchResult } from '../services/search/HybridSearch.js';
 import { getEmbeddingService } from '../services/search/EmbeddingService.js';
 import { getVectorSearch } from '../services/search/VectorSearch.js';
@@ -35,7 +36,8 @@ import type {
   SmartContext,
   StoreKnowledgeInput,
   KnowledgeType,
-  KnowledgeMetadata
+  KnowledgeMetadata,
+  ReportData
 } from '../types/worker-types.js';
 import { KNOWLEDGE_TYPES } from '../types/worker-types.js';
 
@@ -611,6 +613,31 @@ export class KiroMemorySDK {
   }
 
   /**
+   * Genera un report di attività per il progetto corrente.
+   * Aggrega osservazioni, sessioni, summaries e file per un periodo temporale.
+   */
+  async generateReport(options?: {
+    period?: 'weekly' | 'monthly';
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<ReportData> {
+    const now = new Date();
+    let startEpoch: number;
+    let endEpoch: number = now.getTime();
+
+    if (options?.startDate && options?.endDate) {
+      startEpoch = options.startDate.getTime();
+      endEpoch = options.endDate.getTime();
+    } else {
+      const period = options?.period || 'weekly';
+      const daysBack = period === 'monthly' ? 30 : 7;
+      startEpoch = endEpoch - (daysBack * 24 * 60 * 60 * 1000);
+    }
+
+    return dbGetReportData(this.db.db, this.project, startEpoch, endEpoch);
+  }
+
+  /**
    * Getter for direct database access (for API routes)
    */
   getDb(): any {
@@ -653,7 +680,8 @@ export type {
   ScoringWeights,
   StoreKnowledgeInput,
   KnowledgeType,
-  KnowledgeMetadata
+  KnowledgeMetadata,
+  ReportData
 } from '../types/worker-types.js';
 export { KNOWLEDGE_TYPES } from '../types/worker-types.js';
 

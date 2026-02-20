@@ -4,6 +4,7 @@
  */
 
 import { createKiroMemory } from '../sdk/index.js';
+import { formatReportText, formatReportMarkdown, formatReportJson } from '../services/report-formatter.js';
 import { execSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -1294,6 +1295,10 @@ async function main() {
         await resumeSession(sdk, args[1] ? parseInt(args[1]) : undefined);
         break;
 
+      case 'report':
+        await generateReportCli(sdk, args.slice(1));
+        break;
+
       case 'help':
       case '--help':
       case '-h':
@@ -1623,6 +1628,39 @@ async function handleDecay(sdk: ReturnType<typeof createKiroMemory>, subcommand:
   }
 }
 
+async function generateReportCli(sdk: ReturnType<typeof createKiroMemory>, cliArgs: string[]) {
+  // Parse opzioni
+  const periodArg = cliArgs.find(a => a.startsWith('--period='))?.split('=')[1];
+  const formatArg = cliArgs.find(a => a.startsWith('--format='))?.split('=')[1];
+  const outputArg = cliArgs.find(a => a.startsWith('--output='))?.split('=')[1];
+
+  const period = (periodArg === 'monthly' ? 'monthly' : 'weekly') as 'weekly' | 'monthly';
+  const format = formatArg === 'md' || formatArg === 'markdown' ? 'markdown'
+    : formatArg === 'json' ? 'json'
+    : 'text';
+
+  const data = await sdk.generateReport({ period });
+
+  let output: string;
+  switch (format) {
+    case 'markdown':
+      output = formatReportMarkdown(data);
+      break;
+    case 'json':
+      output = formatReportJson(data);
+      break;
+    default:
+      output = formatReportText(data);
+  }
+
+  if (outputArg) {
+    writeFileSync(outputArg, output, 'utf8');
+    console.log(`\n  Report saved to: ${outputArg}\n`);
+  } else {
+    console.log(output);
+  }
+}
+
 async function resumeSession(sdk: ReturnType<typeof createKiroMemory>, sessionId?: number) {
   const checkpoint = sessionId
     ? await sdk.getCheckpoint(sessionId)
@@ -1690,6 +1728,10 @@ Setup:
 Commands:
   context, ctx              Show current project context
   resume [session-id]       Resume previous session (shows checkpoint)
+  report [options]          Generate activity report
+    --period=weekly|monthly   Time period (default: weekly)
+    --format=text|md|json     Output format (default: text)
+    --output=<file>           Write to file instead of stdout
   search <query>            Search across all context (keyword FTS5)
   semantic-search <query>   Hybrid search: vector + keyword (semantic)
   observations [limit]      Show recent observations (default: 10)
@@ -1714,6 +1756,8 @@ Examples:
   kiro-memory context
   kiro-memory resume
   kiro-memory resume 42
+  kiro-memory report
+  kiro-memory report --period=monthly --format=md --output=report.md
   kiro-memory search "authentication"
   kiro-memory semantic-search "how did I fix the auth bug"
   kiro-memory add-knowledge constraint "No any in TypeScript" "Never use any type" --severity=hard

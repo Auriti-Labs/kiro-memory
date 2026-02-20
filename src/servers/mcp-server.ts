@@ -166,6 +166,18 @@ const TOOLS = [
       },
       required: []
     }
+  },
+  {
+    name: 'generate_report',
+    description: 'Generate an activity report for a project. Returns a markdown summary with observations, sessions, learnings, completed tasks, and file hotspots for the specified time period.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        project: { type: 'string', description: 'Project name (optional, uses auto-detected project)' },
+        period: { type: 'string', description: 'Time period: "weekly" (default) or "monthly"' }
+      },
+      required: []
+    }
   }
 ];
 
@@ -382,6 +394,65 @@ const handlers: Record<string, ToolHandler> = {
     if (checkpoint.open_questions) parts.push(`**Open Questions**: ${checkpoint.open_questions}`);
     if (checkpoint.relevant_files) parts.push(`**Relevant Files**: ${checkpoint.relevant_files}`);
     if (checkpoint.created_at) parts.push(`\n_Checkpoint created: ${checkpoint.created_at}_`);
+
+    return parts.join('\n');
+  },
+
+  async generate_report(args: { project?: string; period?: string }) {
+    const project = args.project || process.env.KIRO_MEMORY_PROJECT || '';
+    const period = args.period === 'monthly' ? 'monthly' : 'weekly';
+
+    const params: Record<string, string> = { period, format: 'markdown' };
+    if (project) params.project = project;
+
+    const result = await callWorkerGET('/api/report', params);
+
+    // Se il worker ritorna JSON (errore o dati raw), formatta come fallback
+    if (typeof result === 'string') return result;
+    if (result?.error) return `Report generation failed: ${result.error}`;
+
+    // Il worker con format=markdown ritorna testo diretto, ma callWorkerGET potrebbe parsare JSON
+    // In questo caso, costruiamo un riassunto dai dati
+    const d = result;
+    const parts = [
+      `# Activity Report — ${d.period?.label || period}`,
+      `**Period**: ${d.period?.start} → ${d.period?.end} (${d.period?.days} days)`,
+      '',
+      '## Overview',
+      `- Observations: ${d.overview?.observations || 0}`,
+      `- Summaries: ${d.overview?.summaries || 0}`,
+      `- Sessions: ${d.overview?.sessions || 0}`,
+      `- Knowledge items: ${d.overview?.knowledgeCount || 0}`,
+    ];
+
+    if (d.sessionStats?.total > 0) {
+      const pct = Math.round((d.sessionStats.completed / d.sessionStats.total) * 100);
+      parts.push('', '## Sessions');
+      parts.push(`- Total: ${d.sessionStats.total} | Completed: ${d.sessionStats.completed} (${pct}%)`);
+      if (d.sessionStats.avgDurationMinutes > 0) {
+        parts.push(`- Avg duration: ${d.sessionStats.avgDurationMinutes} min`);
+      }
+    }
+
+    if (d.topLearnings?.length > 0) {
+      parts.push('', '## Key Learnings');
+      d.topLearnings.forEach((l: string) => parts.push(`- ${l}`));
+    }
+
+    if (d.completedTasks?.length > 0) {
+      parts.push('', '## Completed');
+      d.completedTasks.forEach((t: string) => parts.push(`- ${t}`));
+    }
+
+    if (d.nextSteps?.length > 0) {
+      parts.push('', '## Next Steps');
+      d.nextSteps.forEach((s: string) => parts.push(`- ${s}`));
+    }
+
+    if (d.fileHotspots?.length > 0) {
+      parts.push('', '## File Hotspots');
+      d.fileHotspots.slice(0, 10).forEach((f: any) => parts.push(`- \`${f.file}\` (${f.count}x)`));
+    }
 
     return parts.join('\n');
   }

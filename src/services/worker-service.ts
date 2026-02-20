@@ -24,6 +24,8 @@ import { getVectorSearch } from './search/VectorSearch.js';
 import { getObservationsTimeline, getTypeDistribution, getSessionStats, getAnalyticsOverview } from './sqlite/Analytics.js';
 import { getLatestCheckpoint, getLatestCheckpointByProject } from './sqlite/Checkpoints.js';
 import { getSessionsByProject, getActiveSessions } from './sqlite/Sessions.js';
+import { getReportData } from './sqlite/Reports.js';
+import { formatReportMarkdown, formatReportJson } from './report-formatter.js';
 import { logger } from '../utils/logger.js';
 import { DATA_DIR } from '../shared/paths.js';
 
@@ -884,6 +886,42 @@ app.get('/api/checkpoint', (req, res) => {
   } catch (error) {
     logger.error('WORKER', 'Checkpoint per progetto fallito', { project }, error as Error);
     res.status(500).json({ error: 'Project checkpoint fetch failed' });
+  }
+});
+
+// ── Report endpoint ──
+
+app.get('/api/report', (req, res) => {
+  const { project, period, format } = req.query as {
+    project?: string; period?: string; format?: string;
+  };
+
+  if (project && !isValidProject(project)) {
+    res.status(400).json({ error: 'Invalid project name' });
+    return;
+  }
+
+  const validPeriods = ['weekly', 'monthly'];
+  const reportPeriod = validPeriods.includes(period || '') ? period : 'weekly';
+  const daysBack = reportPeriod === 'monthly' ? 30 : 7;
+  const now = Date.now();
+  const startEpoch = now - (daysBack * 24 * 60 * 60 * 1000);
+
+  try {
+    const data = getReportData(db.db, project || undefined, startEpoch, now);
+
+    const outputFormat = format || 'json';
+    if (outputFormat === 'markdown' || outputFormat === 'md') {
+      res.type('text/markdown').send(formatReportMarkdown(data));
+    } else if (outputFormat === 'text') {
+      // Rimuovi codici ANSI per output HTTP
+      res.type('text/plain').send(JSON.stringify(data, null, 2));
+    } else {
+      res.json(data);
+    }
+  } catch (error) {
+    logger.error('WORKER', 'Report generation fallita', { project, period }, error as Error);
+    res.status(500).json({ error: 'Report generation failed' });
   }
 });
 

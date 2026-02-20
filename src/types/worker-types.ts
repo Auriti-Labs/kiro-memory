@@ -177,6 +177,38 @@ export interface DBCheckpoint {
 }
 
 // ============================================================================
+// Report Types
+// ============================================================================
+
+export interface ReportData {
+  period: {
+    start: string;
+    end: string;
+    days: number;
+    label: string;
+  };
+  overview: {
+    observations: number;
+    summaries: number;
+    sessions: number;
+    prompts: number;
+    knowledgeCount: number;
+    staleCount: number;
+  };
+  timeline: Array<{ day: string; count: number }>;
+  typeDistribution: Array<{ type: string; count: number }>;
+  sessionStats: {
+    total: number;
+    completed: number;
+    avgDurationMinutes: number;
+  };
+  topLearnings: string[];
+  completedTasks: string[];
+  nextSteps: string[];
+  fileHotspots: Array<{ file: string; count: number }>;
+}
+
+// ============================================================================
 // Parsed Content Types
 // ============================================================================
 

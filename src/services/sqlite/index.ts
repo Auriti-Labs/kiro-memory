@@ -18,5 +18,8 @@ export * from './Prompts.js';
 // Export checkpoints
 export * from './Checkpoints.js';
 
+// Export reports
+export * from './Reports.js';
+
 // Export advanced search
 export * from './Search.js';
