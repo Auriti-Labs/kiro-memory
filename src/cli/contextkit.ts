@@ -866,6 +866,164 @@ async function installCursor() {
   console.log(`  Web dashboard: \x1b[4mhttp://localhost:3001\x1b[0m\n`);
 }
 
+// ─── Install Windsurf command ───
+
+async function installWindsurf() {
+  console.log('\n=== Kiro Memory - Windsurf Installation ===\n');
+  console.log('[1/3] Running environment checks...');
+
+  const checks = runEnvironmentChecks();
+  const { hasErrors } = printChecks(checks);
+
+  if (hasErrors) {
+    const { fixed, needsRestart } = await tryAutoFix(checks);
+
+    if (needsRestart) {
+      console.log('  \x1b[33mRestart your terminal and re-run: kiro-memory install --windsurf\x1b[0m\n');
+      process.exit(0);
+    }
+
+    if (fixed) {
+      console.log('  Re-running checks...\n');
+      const reChecks = runEnvironmentChecks();
+      const reResult = printChecks(reChecks);
+      if (reResult.hasErrors) {
+        console.log('\x1b[31mInstallation aborted.\x1b[0m Fix the remaining issues and retry.\n');
+        process.exit(1);
+      }
+    } else if (hasErrors) {
+      console.log('\x1b[31mInstallation aborted.\x1b[0m Fix the issues and retry.\n');
+      process.exit(1);
+    }
+  }
+
+  const distDir = DIST_DIR;
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.kiro-memory');
+
+  console.log('[2/3] Installing Windsurf configuration...\n');
+
+  mkdirSync(dataDir, { recursive: true });
+
+  // --- mcp_config.json ---
+  const windsurfDir = join(homedir(), '.codeium', 'windsurf');
+  mkdirSync(windsurfDir, { recursive: true });
+
+  const mcpPath = join(windsurfDir, 'mcp_config.json');
+  let mcpConfig: any = {};
+
+  if (existsSync(mcpPath)) {
+    try {
+      mcpConfig = JSON.parse(readFileSync(mcpPath, 'utf8'));
+    } catch {
+      // File corrotto, lo ricreiamo
+    }
+  }
+
+  if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
+
+  mcpConfig.mcpServers['kiro-memory'] = {
+    command: 'node',
+    args: [join(distDir, 'servers', 'mcp-server.js')]
+  };
+
+  writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
+  console.log(`  → MCP config:   ${mcpPath}`);
+  console.log(`  → Data dir:     ${dataDir}`);
+
+  // 3. Riepilogo finale
+  console.log('\n[3/3] Done!\n');
+  console.log('  \x1b[32m═══ Windsurf integration complete! ═══\x1b[0m\n');
+  console.log('  Kiro Memory MCP server is now registered for Windsurf.');
+  console.log('  Restart Windsurf to activate the MCP server.\n');
+  console.log('  The worker starts automatically on first use.');
+  console.log(`  Web dashboard: \x1b[4mhttp://localhost:3001\x1b[0m\n`);
+  console.log('  \x1b[2mTip: Add a .windsurfrules file to your project with instructions');
+  console.log('  to use the kiro-memory MCP tools for persistent context.\x1b[0m\n');
+}
+
+// ─── Install Cline command ───
+
+async function installCline() {
+  console.log('\n=== Kiro Memory - Cline Installation ===\n');
+  console.log('[1/3] Running environment checks...');
+
+  const checks = runEnvironmentChecks();
+  const { hasErrors } = printChecks(checks);
+
+  if (hasErrors) {
+    const { fixed, needsRestart } = await tryAutoFix(checks);
+
+    if (needsRestart) {
+      console.log('  \x1b[33mRestart your terminal and re-run: kiro-memory install --cline\x1b[0m\n');
+      process.exit(0);
+    }
+
+    if (fixed) {
+      console.log('  Re-running checks...\n');
+      const reChecks = runEnvironmentChecks();
+      const reResult = printChecks(reChecks);
+      if (reResult.hasErrors) {
+        console.log('\x1b[31mInstallation aborted.\x1b[0m Fix the remaining issues and retry.\n');
+        process.exit(1);
+      }
+    } else if (hasErrors) {
+      console.log('\x1b[31mInstallation aborted.\x1b[0m Fix the issues and retry.\n');
+      process.exit(1);
+    }
+  }
+
+  const distDir = DIST_DIR;
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.kiro-memory');
+
+  console.log('[2/3] Installing Cline configuration...\n');
+
+  mkdirSync(dataDir, { recursive: true });
+
+  // --- cline_mcp_settings.json (path OS-dependent) ---
+  const platform = process.platform;
+  let clineSettingsDir: string;
+  if (platform === 'darwin') {
+    clineSettingsDir = join(homedir(), 'Library', 'Application Support', 'Code', 'User', 'globalStorage', 'saoudrizwan.claude-dev', 'settings');
+  } else {
+    // Linux e WSL
+    clineSettingsDir = join(homedir(), '.config', 'Code', 'User', 'globalStorage', 'saoudrizwan.claude-dev', 'settings');
+  }
+
+  mkdirSync(clineSettingsDir, { recursive: true });
+
+  const mcpPath = join(clineSettingsDir, 'cline_mcp_settings.json');
+  let mcpConfig: any = {};
+
+  if (existsSync(mcpPath)) {
+    try {
+      mcpConfig = JSON.parse(readFileSync(mcpPath, 'utf8'));
+    } catch {
+      // File corrotto, lo ricreiamo
+    }
+  }
+
+  if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
+
+  mcpConfig.mcpServers['kiro-memory'] = {
+    command: 'node',
+    args: [join(distDir, 'servers', 'mcp-server.js')]
+  };
+
+  writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
+  console.log(`  → MCP config:   ${mcpPath}`);
+  console.log(`  → Data dir:     ${dataDir}`);
+
+  // 3. Riepilogo finale
+  console.log('\n[3/3] Done!\n');
+  console.log('  \x1b[32m═══ Cline integration complete! ═══\x1b[0m\n');
+  console.log('  Kiro Memory MCP server is now registered for Cline.');
+  console.log('  Restart VS Code to activate the MCP server in Cline.\n');
+  console.log('  The worker starts automatically on first use.');
+  console.log(`  Web dashboard: \x1b[4mhttp://localhost:3001\x1b[0m\n`);
+  console.log('  \x1b[2mTip: Add a .clinerules file to your project with instructions');
+  console.log('  to use the kiro-memory MCP tools for persistent context.\x1b[0m\n');
+}
+
 // ─── Doctor command ───
 
 async function runDoctor() {
@@ -988,6 +1146,49 @@ async function runDoctor() {
       : 'Not configured (optional: run kiro-memory install --cursor)',
   });
 
+  // Windsurf integration check
+  const windsurfMcpPath = join(homedir(), '.codeium', 'windsurf', 'mcp_config.json');
+  let windsurfMcpOk = false;
+  if (existsSync(windsurfMcpPath)) {
+    try {
+      const windsurfMcp = JSON.parse(readFileSync(windsurfMcpPath, 'utf8'));
+      windsurfMcpOk = !!windsurfMcp.mcpServers?.['kiro-memory'];
+    } catch {}
+  }
+
+  checks.push({
+    name: 'Windsurf MCP',
+    ok: true, // Non-blocking: installazione opzionale
+    message: windsurfMcpOk
+      ? 'kiro-memory registered in ~/.codeium/windsurf/mcp_config.json'
+      : 'Not configured (optional: run kiro-memory install --windsurf)',
+  });
+
+  // Cline integration check
+  const clinePlatform = process.platform;
+  let clineSettingsBase: string;
+  if (clinePlatform === 'darwin') {
+    clineSettingsBase = join(homedir(), 'Library', 'Application Support', 'Code', 'User', 'globalStorage', 'saoudrizwan.claude-dev', 'settings');
+  } else {
+    clineSettingsBase = join(homedir(), '.config', 'Code', 'User', 'globalStorage', 'saoudrizwan.claude-dev', 'settings');
+  }
+  const clineMcpPath = join(clineSettingsBase, 'cline_mcp_settings.json');
+  let clineMcpOk = false;
+  if (existsSync(clineMcpPath)) {
+    try {
+      const clineMcp = JSON.parse(readFileSync(clineMcpPath, 'utf8'));
+      clineMcpOk = !!clineMcp.mcpServers?.['kiro-memory'];
+    } catch {}
+  }
+
+  checks.push({
+    name: 'Cline MCP',
+    ok: true, // Non-blocking: installazione opzionale
+    message: clineMcpOk
+      ? `kiro-memory registered in cline_mcp_settings.json`
+      : 'Not configured (optional: run kiro-memory install --cline)',
+  });
+
   // Worker status check (informational, non-blocking)
   let workerOk = false;
   try {
@@ -1023,6 +1224,10 @@ async function main() {
       await installClaudeCode();
     } else if (args.includes('--cursor')) {
       await installCursor();
+    } else if (args.includes('--windsurf')) {
+      await installWindsurf();
+    } else if (args.includes('--cline')) {
+      await installCline();
     } else {
       await installKiro();
     }
@@ -1218,6 +1423,8 @@ Setup:
   install                   Install for Kiro CLI (default)
   install --claude-code     Install hooks and MCP server for Claude Code
   install --cursor          Install hooks and MCP server for Cursor IDE
+  install --windsurf        Install MCP server for Windsurf IDE
+  install --cline           Install MCP server for Cline (VS Code)
   doctor                    Run environment diagnostics (checks Node, build tools, WSL, etc.)
 
 Commands:
