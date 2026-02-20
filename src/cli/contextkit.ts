@@ -1290,6 +1290,10 @@ async function main() {
         await semanticSearchCli(sdk, args[1]);
         break;
 
+      case 'resume':
+        await resumeSession(sdk, args[1] ? parseInt(args[1]) : undefined);
+        break;
+
       case 'help':
       case '--help':
       case '-h':
@@ -1619,6 +1623,59 @@ async function handleDecay(sdk: ReturnType<typeof createKiroMemory>, subcommand:
   }
 }
 
+async function resumeSession(sdk: ReturnType<typeof createKiroMemory>, sessionId?: number) {
+  const checkpoint = sessionId
+    ? await sdk.getCheckpoint(sessionId)
+    : await sdk.getLatestProjectCheckpoint();
+
+  if (!checkpoint) {
+    console.log('\n  No checkpoint found.');
+    if (sessionId) {
+      console.log(`  Session ${sessionId} has no checkpoint.`);
+    } else {
+      console.log(`  No recent checkpoints for project "${sdk.getProject()}".`);
+    }
+    console.log('  Checkpoints are created automatically at the end of each session.\n');
+    return;
+  }
+
+  // Intestazione con colori ANSI
+  console.log('');
+  console.log(`  \x1b[36m═══ Session Checkpoint ═══\x1b[0m`);
+  console.log(`  \x1b[2mProject: ${checkpoint.project} | Session: ${checkpoint.session_id}\x1b[0m`);
+  console.log(`  \x1b[2m${new Date(checkpoint.created_at).toLocaleString()}\x1b[0m`);
+  console.log('');
+
+  // Task
+  console.log(`  \x1b[1mTask:\x1b[0m ${checkpoint.task}`);
+
+  // Progress
+  if (checkpoint.progress) {
+    console.log(`  \x1b[1mProgress:\x1b[0m ${checkpoint.progress}`);
+  }
+
+  // Next steps
+  if (checkpoint.next_steps) {
+    console.log(`  \x1b[1mNext Steps:\x1b[0m ${checkpoint.next_steps}`);
+  }
+
+  // Open questions
+  if (checkpoint.open_questions) {
+    console.log(`  \x1b[1mOpen Questions:\x1b[0m ${checkpoint.open_questions}`);
+  }
+
+  // Relevant files
+  if (checkpoint.relevant_files) {
+    console.log(`  \x1b[1mRelevant Files:\x1b[0m`);
+    const files = checkpoint.relevant_files.split(',').map(f => f.trim());
+    files.forEach(f => {
+      console.log(`    - ${f}`);
+    });
+  }
+
+  console.log('');
+}
+
 function showHelp() {
   console.log(`Usage: kiro-memory <command> [options]
 
@@ -1632,6 +1689,7 @@ Setup:
 
 Commands:
   context, ctx              Show current project context
+  resume [session-id]       Resume previous session (shows checkpoint)
   search <query>            Search across all context (keyword FTS5)
   semantic-search <query>   Hybrid search: vector + keyword (semantic)
   observations [limit]      Show recent observations (default: 10)
@@ -1654,6 +1712,8 @@ Examples:
   kiro-memory install
   kiro-memory doctor
   kiro-memory context
+  kiro-memory resume
+  kiro-memory resume 42
   kiro-memory search "authentication"
   kiro-memory semantic-search "how did I fix the auth bug"
   kiro-memory add-knowledge constraint "No any in TypeScript" "Never use any type" --severity=hard

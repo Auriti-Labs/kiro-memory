@@ -444,6 +444,31 @@ class MigrationRunner {
           // Indice per query stale
           db.run('CREATE INDEX IF NOT EXISTS idx_observations_stale ON observations(is_stale)');
         }
+      },
+      {
+        version: 6,
+        up: (db) => {
+          // Tabella checkpoint per session resume (Fase 6A)
+          db.run(`
+            CREATE TABLE IF NOT EXISTS checkpoints (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              session_id INTEGER NOT NULL,
+              project TEXT NOT NULL,
+              task TEXT NOT NULL,
+              progress TEXT,
+              next_steps TEXT,
+              open_questions TEXT,
+              relevant_files TEXT,
+              context_snapshot TEXT,
+              created_at TEXT NOT NULL,
+              created_at_epoch INTEGER NOT NULL,
+              FOREIGN KEY (session_id) REFERENCES sessions(id)
+            )
+          `);
+          db.run('CREATE INDEX IF NOT EXISTS idx_checkpoints_session ON checkpoints(session_id)');
+          db.run('CREATE INDEX IF NOT EXISTS idx_checkpoints_project ON checkpoints(project)');
+          db.run('CREATE INDEX IF NOT EXISTS idx_checkpoints_epoch ON checkpoints(created_at_epoch)');
+        }
       }
     ];
   }

@@ -15,5 +15,8 @@ export * from './Observations.js';
 export * from './Summaries.js';
 export * from './Prompts.js';
 
+// Export checkpoints
+export * from './Checkpoints.js';
+
 // Export advanced search
 export * from './Search.js';

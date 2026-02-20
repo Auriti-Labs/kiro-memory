@@ -154,6 +154,18 @@ const TOOLS = [
       },
       required: ['knowledge_type', 'title', 'content', 'project']
     }
+  },
+  {
+    name: 'resume_session',
+    description: 'Resume a previous coding session. Returns the checkpoint with task, progress, next steps, and relevant files from the last session on this project. Use when starting a new session to continue previous work.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        project: { type: 'string', description: 'Project name (optional, uses auto-detected project from environment)' },
+        session_id: { type: 'number', description: 'Specific session ID to resume (optional, uses latest checkpoint for the project)' }
+      },
+      required: []
+    }
   }
 ];
 
@@ -338,6 +350,40 @@ const handlers: Record<string, ToolHandler> = {
     const result = await callWorkerPOST('/api/knowledge', args);
 
     return `Knowledge stored successfully.\n- **ID**: ${result.id}\n- **Type**: ${result.knowledge_type}\n- **Title**: ${args.title}`;
+  },
+
+  async resume_session(args: { project?: string; session_id?: number }) {
+    let checkpoint: any;
+
+    if (args.session_id) {
+      // Resume di una sessione specifica
+      checkpoint = await callWorkerGET(`/api/sessions/${args.session_id}/checkpoint`);
+    } else {
+      // Resume dell'ultimo checkpoint per progetto
+      const project = args.project || process.env.KIRO_MEMORY_PROJECT || '';
+      if (!project) {
+        return 'No project specified and unable to auto-detect. Provide a project name or session_id.';
+      }
+      checkpoint = await callWorkerGET('/api/checkpoint', { project });
+    }
+
+    if (!checkpoint || checkpoint.error) {
+      return 'No checkpoint found. There is no previous session to resume for this project.';
+    }
+
+    // Formatta come markdown leggibile dall'AI
+    const parts = [
+      `## Session Checkpoint — ${checkpoint.project}`,
+      `**Task**: ${checkpoint.task}`,
+    ];
+
+    if (checkpoint.progress) parts.push(`**Progress**: ${checkpoint.progress}`);
+    if (checkpoint.next_steps) parts.push(`**Next Steps**: ${checkpoint.next_steps}`);
+    if (checkpoint.open_questions) parts.push(`**Open Questions**: ${checkpoint.open_questions}`);
+    if (checkpoint.relevant_files) parts.push(`**Relevant Files**: ${checkpoint.relevant_files}`);
+    if (checkpoint.created_at) parts.push(`\n_Checkpoint created: ${checkpoint.created_at}_`);
+
+    return parts.join('\n');
   }
 };
 

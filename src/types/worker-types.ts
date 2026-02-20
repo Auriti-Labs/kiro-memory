@@ -162,6 +162,20 @@ export interface DBSession {
   completed_at_epoch: number | null;
 }
 
+export interface DBCheckpoint {
+  id: number;
+  session_id: number;
+  project: string;
+  task: string;
+  progress: string | null;
+  next_steps: string | null;
+  open_questions: string | null;
+  relevant_files: string | null;
+  context_snapshot: string | null;
+  created_at: string;
+  created_at_epoch: number;
+}
+
 // ============================================================================
 // Parsed Content Types
 // ============================================================================

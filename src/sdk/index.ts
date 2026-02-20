@@ -10,6 +10,7 @@ import { getSummariesByProject, createSummary, searchSummaries } from '../servic
 import { getPromptsByProject, createPrompt } from '../services/sqlite/Prompts.js';
 import { getSessionByContentId, createSession, completeSession as dbCompleteSession } from '../services/sqlite/Sessions.js';
 import { searchObservationsFTS, searchSummariesFiltered, getObservationsByIds as dbGetObservationsByIds, getTimeline as dbGetTimeline, getStaleObservations as dbGetStaleObservations, markObservationsStale as dbMarkObservationsStale } from '../services/sqlite/Search.js';
+import { createCheckpoint as dbCreateCheckpoint, getLatestCheckpoint as dbGetLatestCheckpoint, getLatestCheckpointByProject as dbGetLatestCheckpointByProject } from '../services/sqlite/Checkpoints.js';
 import { getHybridSearch, type SearchResult } from '../services/search/HybridSearch.js';
 import { getEmbeddingService } from '../services/search/EmbeddingService.js';
 import { getVectorSearch } from '../services/search/VectorSearch.js';
@@ -26,6 +27,7 @@ import type {
   Summary,
   UserPrompt,
   DBSession,
+  DBCheckpoint,
   ContextContext,
   SearchFilters,
   TimelineEntry,
@@ -567,6 +569,48 @@ export class KiroMemorySDK {
   }
 
   /**
+   * Crea un checkpoint strutturato per resume sessione.
+   * Salva automaticamente un context_snapshot con le ultime 10 osservazioni.
+   */
+  async createCheckpoint(sessionId: number, data: {
+    task: string;
+    progress?: string;
+    nextSteps?: string;
+    openQuestions?: string;
+    relevantFiles?: string[];
+  }): Promise<number> {
+    // Serializza ultime 10 osservazioni della sessione come context snapshot
+    const recentObs = getObservationsByProject(this.db.db, this.project, 10);
+    const contextSnapshot = JSON.stringify(
+      recentObs.map(o => ({ id: o.id, type: o.type, title: o.title, text: o.text?.substring(0, 200) }))
+    );
+
+    return dbCreateCheckpoint(this.db.db, sessionId, this.project, {
+      task: data.task,
+      progress: data.progress,
+      nextSteps: data.nextSteps,
+      openQuestions: data.openQuestions,
+      relevantFiles: data.relevantFiles?.join(', '),
+      contextSnapshot
+    });
+  }
+
+  /**
+   * Recupera l'ultimo checkpoint di una sessione specifica.
+   */
+  async getCheckpoint(sessionId: number): Promise<DBCheckpoint | null> {
+    return dbGetLatestCheckpoint(this.db.db, sessionId);
+  }
+
+  /**
+   * Recupera l'ultimo checkpoint per il progetto corrente.
+   * Utile per resume automatico senza specificare session ID.
+   */
+  async getLatestProjectCheckpoint(): Promise<DBCheckpoint | null> {
+    return dbGetLatestCheckpointByProject(this.db.db, this.project);
+  }
+
+  /**
    * Getter for direct database access (for API routes)
    */
   getDb(): any {
@@ -600,6 +644,7 @@ export type {
   Summary,
   UserPrompt,
   DBSession,
+  DBCheckpoint,
   ContextContext,
   SearchFilters,
   TimelineEntry,

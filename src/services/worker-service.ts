@@ -22,6 +22,8 @@ import { getHybridSearch } from './search/HybridSearch.js';
 import { getEmbeddingService } from './search/EmbeddingService.js';
 import { getVectorSearch } from './search/VectorSearch.js';
 import { getObservationsTimeline, getTypeDistribution, getSessionStats, getAnalyticsOverview } from './sqlite/Analytics.js';
+import { getLatestCheckpoint, getLatestCheckpointByProject } from './sqlite/Checkpoints.js';
+import { getSessionsByProject, getActiveSessions } from './sqlite/Sessions.js';
 import { logger } from '../utils/logger.js';
 import { DATA_DIR } from '../shared/paths.js';
 
@@ -814,6 +816,74 @@ app.get('/api/analytics/sessions', (req, res) => {
   } catch (error) {
     logger.error('WORKER', 'Analytics sessions fallita', { project }, error as Error);
     res.status(500).json({ error: 'Analytics sessions failed' });
+  }
+});
+
+// ── Checkpoint & Session Resume endpoints ──
+
+app.get('/api/sessions', (req, res) => {
+  const { project } = req.query as { project?: string };
+
+  if (project && !isValidProject(project)) {
+    res.status(400).json({ error: 'Invalid project name' });
+    return;
+  }
+
+  try {
+    const sessions = project
+      ? getSessionsByProject(db.db, project, 50)
+      : getActiveSessions(db.db);
+    res.json(sessions);
+  } catch (error) {
+    logger.error('WORKER', 'Lista sessioni fallita', { project }, error as Error);
+    res.status(500).json({ error: 'Sessions list failed' });
+  }
+});
+
+app.get('/api/sessions/:id/checkpoint', (req, res) => {
+  const sessionId = parseInt(req.params.id, 10);
+
+  if (isNaN(sessionId) || sessionId <= 0) {
+    res.status(400).json({ error: 'Invalid session ID' });
+    return;
+  }
+
+  try {
+    const checkpoint = getLatestCheckpoint(db.db, sessionId);
+    if (!checkpoint) {
+      res.status(404).json({ error: 'No checkpoint found for this session' });
+      return;
+    }
+    res.json(checkpoint);
+  } catch (error) {
+    logger.error('WORKER', 'Checkpoint fetch fallito', { sessionId }, error as Error);
+    res.status(500).json({ error: 'Checkpoint fetch failed' });
+  }
+});
+
+app.get('/api/checkpoint', (req, res) => {
+  const { project } = req.query as { project?: string };
+
+  if (!project) {
+    res.status(400).json({ error: 'Project parameter is required' });
+    return;
+  }
+
+  if (!isValidProject(project)) {
+    res.status(400).json({ error: 'Invalid project name' });
+    return;
+  }
+
+  try {
+    const checkpoint = getLatestCheckpointByProject(db.db, project);
+    if (!checkpoint) {
+      res.status(404).json({ error: 'No checkpoint found for this project' });
+      return;
+    }
+    res.json(checkpoint);
+  } catch (error) {
+    logger.error('WORKER', 'Checkpoint per progetto fallito', { project }, error as Error);
+    res.status(500).json({ error: 'Project checkpoint fetch failed' });
   }
 });
 

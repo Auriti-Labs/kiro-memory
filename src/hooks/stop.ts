@@ -57,6 +57,24 @@ runHook('stop', async (input) => {
 
     // Notifica la dashboard in tempo reale
     await notifyWorker('summary-created', { project });
+
+    // Crea checkpoint strutturato per resume futuro
+    const session = await sdk.getOrCreateSession(input.session_id || `stop-${Date.now()}`);
+
+    const task = sessionObs[0]?.title || `Sessione ${project}`;
+    const progress = completed || 'Nessun progresso registrato';
+    const nextStepsCheckpoint = filesModified.length > 0
+      ? `Continuare lavoro su: ${filesModified.slice(0, 5).join(', ')}`
+      : undefined;
+
+    await sdk.createCheckpoint(session.id, {
+      task,
+      progress,
+      nextSteps: nextStepsCheckpoint,
+      relevantFiles: filesModified.slice(0, 20)
+    });
+
+    await notifyWorker('checkpoint-created', { project });
   } finally {
     sdk.close();
   }
