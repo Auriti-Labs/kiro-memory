@@ -19,7 +19,7 @@ runHook('userPromptSubmit', async (input) => {
   if (!promptText || typeof promptText !== 'string' || promptText.trim().length === 0) return;
 
   const project = detectProject(input.cwd);
-  const sdk = createKiroMemory({ project });
+  const sdk = createKiroMemory({ project, skipMigrations: true });
 
   try {
     // Usa session_id da Kiro se disponibile, altrimenti genera uno

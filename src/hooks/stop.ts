@@ -11,7 +11,7 @@ import { createKiroMemory } from '../sdk/index.js';
 
 runHook('stop', async (input) => {
   const project = detectProject(input.cwd);
-  const sdk = createKiroMemory({ project });
+  const sdk = createKiroMemory({ project, skipMigrations: true });
 
   try {
     // Recupera le osservazioni recenti della sessione corrente

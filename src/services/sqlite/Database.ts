@@ -27,7 +27,11 @@ let dbInstance: Database | null = null;
 export class KiroMemoryDatabase {
   public db: Database;
 
-  constructor(dbPath: string = DB_PATH) {
+  /**
+   * @param dbPath - Percorso al file SQLite (default: DB_PATH)
+   * @param skipMigrations - Se true, salta il migration runner (per hook ad alta frequenza)
+   */
+  constructor(dbPath: string = DB_PATH, skipMigrations: boolean = false) {
     // Ensure data directory exists (skip for in-memory databases)
     if (dbPath !== ':memory:') {
       ensureDir(DATA_DIR);
@@ -44,9 +48,11 @@ export class KiroMemoryDatabase {
     this.db.run(`PRAGMA mmap_size = ${SQLITE_MMAP_SIZE_BYTES}`);
     this.db.run(`PRAGMA cache_size = ${SQLITE_CACHE_SIZE_PAGES}`);
 
-    // Run all migrations
-    const migrationRunner = new MigrationRunner(this.db);
-    migrationRunner.runAllMigrations();
+    // Esegui migrazioni solo se necessario (i hook le saltano per performance)
+    if (!skipMigrations) {
+      const migrationRunner = new MigrationRunner(this.db);
+      migrationRunner.runAllMigrations();
+    }
   }
 
   /**

@@ -74,7 +74,7 @@ export const fileChangeHook: KiroMemoryHook = {
   async action(context) {
     if (!context.data?.filePath) return;
     
-    const sdk = createKiroMemory({ project: context.project });
+    const sdk = createKiroMemory({ project: context.project, skipMigrations: true });
 
     try {
       await sdk.storeObservation({
@@ -101,7 +101,7 @@ export const sessionSummaryHook: KiroMemoryHook = {
   async action(context) {
     if (!context.data?.summary) return;
     
-    const sdk = createKiroMemory({ project: context.project });
+    const sdk = createKiroMemory({ project: context.project, skipMigrations: true });
 
     try {
       await sdk.storeSummary({

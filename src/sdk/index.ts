@@ -5,6 +5,11 @@
  */
 
 import { KiroMemoryDatabase } from '../services/sqlite/index.js';
+import { getObservationsByProject, createObservation, searchObservations } from '../services/sqlite/Observations.js';
+import { getSummariesByProject, createSummary, searchSummaries } from '../services/sqlite/Summaries.js';
+import { getPromptsByProject, createPrompt } from '../services/sqlite/Prompts.js';
+import { getSessionByContentId, createSession, completeSession as dbCompleteSession } from '../services/sqlite/Sessions.js';
+import { searchObservationsFTS, searchSummariesFiltered, getObservationsByIds as dbGetObservationsByIds, getTimeline as dbGetTimeline } from '../services/sqlite/Search.js';
 import type {
   Observation,
   Summary,
@@ -18,6 +23,8 @@ import type {
 export interface KiroMemoryConfig {
   dataDir?: string;
   project?: string;
+  /** Salta il migration check per performance (usare nei hook ad alta frequenza) */
+  skipMigrations?: boolean;
 }
 
 export class KiroMemorySDK {
@@ -25,7 +32,7 @@ export class KiroMemorySDK {
   private project: string;
 
   constructor(config: KiroMemoryConfig = {}) {
-    this.db = new KiroMemoryDatabase(config.dataDir);
+    this.db = new KiroMemoryDatabase(config.dataDir, config.skipMigrations || false);
     this.project = config.project || this.detectProject();
   }
 
@@ -47,10 +54,6 @@ export class KiroMemorySDK {
    * Get context for the current project
    */
   async getContext(): Promise<ContextContext> {
-    const { getObservationsByProject } = await import('../services/sqlite/Observations.js');
-    const { getSummariesByProject } = await import('../services/sqlite/Summaries.js');
-    const { getPromptsByProject } = await import('../services/sqlite/Prompts.js');
-
     return {
       project: this.project,
       relevantObservations: getObservationsByProject(this.db.db, this.project, 20),
@@ -69,8 +72,6 @@ export class KiroMemorySDK {
     concepts?: string[];
     files?: string[];
   }): Promise<number> {
-    const { createObservation } = await import('../services/sqlite/Observations.js');
-    
     return createObservation(
       this.db.db,
       'sdk-' + Date.now(),
@@ -97,8 +98,6 @@ export class KiroMemorySDK {
     completed?: string;
     nextSteps?: string;
   }): Promise<number> {
-    const { createSummary } = await import('../services/sqlite/Summaries.js');
-    
     return createSummary(
       this.db.db,
       'sdk-' + Date.now(),
@@ -119,9 +118,6 @@ export class KiroMemorySDK {
     observations: Observation[];
     summaries: Summary[];
   }> {
-    const { searchObservations } = await import('../services/sqlite/Observations.js');
-    const { searchSummaries } = await import('../services/sqlite/Summaries.js');
-
     return {
       observations: searchObservations(this.db.db, query, this.project),
       summaries: searchSummaries(this.db.db, query, this.project)
@@ -132,7 +128,6 @@ export class KiroMemorySDK {
    * Get recent observations
    */
   async getRecentObservations(limit: number = 10): Promise<Observation[]> {
-    const { getObservationsByProject } = await import('../services/sqlite/Observations.js');
     return getObservationsByProject(this.db.db, this.project, limit);
   }
 
@@ -140,7 +135,6 @@ export class KiroMemorySDK {
    * Get recent summaries
    */
   async getRecentSummaries(limit: number = 5): Promise<Summary[]> {
-    const { getSummariesByProject } = await import('../services/sqlite/Summaries.js');
     return getSummariesByProject(this.db.db, this.project, limit);
   }
 
@@ -151,9 +145,6 @@ export class KiroMemorySDK {
     observations: Observation[];
     summaries: Summary[];
   }> {
-    const { searchObservationsFTS } = await import('../services/sqlite/Search.js');
-    const { searchSummariesFiltered } = await import('../services/sqlite/Search.js');
-
     const projectFilters = { ...filters, project: filters.project || this.project };
 
     return {
@@ -166,24 +157,20 @@ export class KiroMemorySDK {
    * Retrieve observations by ID (batch)
    */
   async getObservationsByIds(ids: number[]): Promise<Observation[]> {
-    const { getObservationsByIds } = await import('../services/sqlite/Search.js');
-    return getObservationsByIds(this.db.db, ids);
+    return dbGetObservationsByIds(this.db.db, ids);
   }
 
   /**
    * Timeline: chronological context around an observation
    */
   async getTimeline(anchorId: number, depthBefore: number = 5, depthAfter: number = 5): Promise<TimelineEntry[]> {
-    const { getTimeline } = await import('../services/sqlite/Search.js');
-    return getTimeline(this.db.db, anchorId, depthBefore, depthAfter);
+    return dbGetTimeline(this.db.db, anchorId, depthBefore, depthAfter);
   }
 
   /**
    * Create or retrieve a session for the current project
    */
   async getOrCreateSession(contentSessionId: string): Promise<DBSession> {
-    const { getSessionByContentId, createSession } = await import('../services/sqlite/Sessions.js');
-
     let session = getSessionByContentId(this.db.db, contentSessionId);
     if (!session) {
       const id = createSession(this.db.db, contentSessionId, this.project, '');
@@ -201,7 +188,6 @@ export class KiroMemorySDK {
    * Store a user prompt
    */
   async storePrompt(contentSessionId: string, promptNumber: number, text: string): Promise<number> {
-    const { createPrompt } = await import('../services/sqlite/Prompts.js');
     return createPrompt(this.db.db, contentSessionId, this.project, promptNumber, text);
   }
 
@@ -209,8 +195,7 @@ export class KiroMemorySDK {
    * Complete a session
    */
   async completeSession(sessionId: number): Promise<void> {
-    const { completeSession } = await import('../services/sqlite/Sessions.js');
-    completeSession(this.db.db, sessionId);
+    dbCompleteSession(this.db.db, sessionId);
   }
 
   /**
