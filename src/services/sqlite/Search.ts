@@ -6,17 +6,25 @@ import type { Observation, Summary, SearchFilters, TimelineEntry } from '../../t
  * Supports FTS5 full-text search with LIKE fallback
  */
 
+/** Escape dei caratteri wildcard LIKE per prevenire pattern injection */
+function escapeLikePattern(input: string): string {
+  return input.replace(/[%_\\]/g, '\\$&');
+}
+
 /**
  * Sanitizza una query per FTS5: wrappa ogni termine tra virgolette
  * per evitare che operatori riservati (AND, OR, NOT, NEAR, *, ^, :)
- * causino errori di parsing.
+ * causino errori di parsing. Limita lunghezza e numero termini per evitare ReDoS.
  */
 function sanitizeFTS5Query(query: string): string {
-  // Rimuovi caratteri speciali FTS5 e wrappa ogni termine tra virgolette
-  const terms = query
-    .replace(/[""]/g, '') // Rimuovi virgolette esistenti
+  // Limita lunghezza input prima del parsing
+  const trimmed = query.length > 10_000 ? query.substring(0, 10_000) : query;
+
+  const terms = trimmed
+    .replace(/[""]/g, '')
     .split(/\s+/)
     .filter(t => t.length > 0)
+    .slice(0, 100)
     .map(t => `"${t}"`);
 
   return terms.join(' ');
@@ -42,7 +50,7 @@ export function searchObservationsFTS(
       JOIN observations_fts fts ON o.id = fts.rowid
       WHERE observations_fts MATCH ?
     `;
-    const params: any[] = [safeQuery];
+    const params: (string | number)[] = [safeQuery];
 
     if (filters.project) {
       sql += ' AND o.project = ?';
@@ -81,12 +89,12 @@ export function searchObservationsLIKE(
   filters: SearchFilters = {}
 ): Observation[] {
   const limit = filters.limit || 50;
-  const pattern = `%${query}%`;
+  const pattern = `%${escapeLikePattern(query)}%`;
   let sql = `
     SELECT * FROM observations
-    WHERE (title LIKE ? OR text LIKE ? OR narrative LIKE ? OR concepts LIKE ?)
+    WHERE (title LIKE ? ESCAPE '\\' OR text LIKE ? ESCAPE '\\' OR narrative LIKE ? ESCAPE '\\' OR concepts LIKE ? ESCAPE '\\')
   `;
-  const params: any[] = [pattern, pattern, pattern, pattern];
+  const params: (string | number)[] = [pattern, pattern, pattern, pattern];
 
   if (filters.project) {
     sql += ' AND project = ?';
@@ -121,12 +129,12 @@ export function searchSummariesFiltered(
   filters: SearchFilters = {}
 ): Summary[] {
   const limit = filters.limit || 20;
-  const pattern = `%${query}%`;
+  const pattern = `%${escapeLikePattern(query)}%`;
   let sql = `
     SELECT * FROM summaries
-    WHERE (request LIKE ? OR learned LIKE ? OR completed LIKE ? OR notes LIKE ? OR next_steps LIKE ?)
+    WHERE (request LIKE ? ESCAPE '\\' OR learned LIKE ? ESCAPE '\\' OR completed LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\' OR next_steps LIKE ? ESCAPE '\\')
   `;
-  const params: any[] = [pattern, pattern, pattern, pattern, pattern];
+  const params: (string | number)[] = [pattern, pattern, pattern, pattern, pattern];
 
   if (filters.project) {
     sql += ' AND project = ?';
@@ -152,12 +160,19 @@ export function searchSummariesFiltered(
  * Recupera osservazioni per ID (batch)
  */
 export function getObservationsByIds(db: Database, ids: number[]): Observation[] {
-  if (ids.length === 0) return [];
+  if (!Array.isArray(ids) || ids.length === 0) return [];
 
-  const placeholders = ids.map(() => '?').join(',');
+  // Valida e filtra: solo interi positivi, max 500 per query
+  const validIds = ids
+    .filter(id => typeof id === 'number' && Number.isInteger(id) && id > 0)
+    .slice(0, 500);
+
+  if (validIds.length === 0) return [];
+
+  const placeholders = validIds.map(() => '?').join(',');
   const sql = `SELECT * FROM observations WHERE id IN (${placeholders}) ORDER BY created_at_epoch DESC`;
   const stmt = db.query(sql);
-  return stmt.all(...ids) as Observation[];
+  return stmt.all(...validIds) as Observation[];
 }
 
 /**

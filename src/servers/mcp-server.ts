@@ -277,8 +277,12 @@ async function main() {
         };
       }
 
+      // Sanitizza il messaggio di errore: non esporre dettagli interni
+      const safeMsg = msg.includes('Worker')
+        ? 'Worker communication error'
+        : 'Internal error processing request';
       return {
-        content: [{ type: 'text', text: `Error: ${msg}` }],
+        content: [{ type: 'text', text: `Error: ${safeMsg}` }],
         isError: true
       };
     }

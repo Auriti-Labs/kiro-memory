@@ -87,6 +87,11 @@ export function useSSE(): SSEState {
       fetchProjects();
     };
 
+    /* ── Handler SSE nominati (reference stabile per add/removeEventListener) ── */
+    const onObservation = () => { fetchObservations(); fetchProjects(); };
+    const onSummary = () => { fetchSummaries(); };
+    const onPrompt = () => { fetchPrompts(); };
+
     /* ── SSE con exponential backoff ── */
     let wasConnected = false;
 
@@ -97,8 +102,7 @@ export function useSSE(): SSEState {
 
       eventSource.onopen = () => {
         if (!mountedRef.current) return;
-        // Se è un reconnect (non la prima connessione), re-fetch tutti i dati
-        // per recuperare eventuali eventi persi durante la disconnessione
+        // Se è un reconnect, re-fetch tutti i dati per recuperare eventi persi
         if (wasConnected) {
           fetchAll();
         }
@@ -111,7 +115,13 @@ export function useSSE(): SSEState {
         if (!mountedRef.current) return;
         setState(prev => ({ ...prev, isConnected: false }));
 
-        eventSource?.close();
+        // Rimuovi listener prima di chiudere per evitare leak
+        if (eventSource) {
+          eventSource.removeEventListener('observation-created', onObservation);
+          eventSource.removeEventListener('summary-created', onSummary);
+          eventSource.removeEventListener('prompt-created', onPrompt);
+          eventSource.close();
+        }
         eventSource = null;
 
         const delay = Math.min(1000 * Math.pow(2, retryCount), MAX_RETRY_DELAY);
@@ -119,18 +129,9 @@ export function useSSE(): SSEState {
         retryTimeout = setTimeout(connect, delay);
       };
 
-      eventSource.addEventListener('observation-created', () => {
-        fetchObservations();
-        fetchProjects();
-      });
-
-      eventSource.addEventListener('summary-created', () => {
-        fetchSummaries();
-      });
-
-      eventSource.addEventListener('prompt-created', () => {
-        fetchPrompts();
-      });
+      eventSource.addEventListener('observation-created', onObservation);
+      eventSource.addEventListener('summary-created', onSummary);
+      eventSource.addEventListener('prompt-created', onPrompt);
     };
 
     // Fetch iniziale di tutti i dati
@@ -141,7 +142,12 @@ export function useSSE(): SSEState {
 
     return () => {
       mountedRef.current = false;
-      eventSource?.close();
+      if (eventSource) {
+        eventSource.removeEventListener('observation-created', onObservation);
+        eventSource.removeEventListener('summary-created', onSummary);
+        eventSource.removeEventListener('prompt-created', onPrompt);
+        eventSource.close();
+      }
       if (retryTimeout) clearTimeout(retryTimeout);
     };
   }, []);

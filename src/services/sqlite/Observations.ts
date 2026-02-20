@@ -5,6 +5,11 @@ import type { Observation } from '../../types/worker-types.js';
  * Observation operations for Kiro Memory database
  */
 
+/** Escape dei caratteri wildcard LIKE per prevenire pattern injection */
+function escapeLikePattern(input: string): string {
+  return input.replace(/[%_\\]/g, '\\$&');
+}
+
 export function createObservation(
   db: Database,
   memorySessionId: string,
@@ -46,16 +51,16 @@ export function getObservationsByProject(db: Database, project: string, limit: n
 
 export function searchObservations(db: Database, searchTerm: string, project?: string): Observation[] {
   const sql = project
-    ? `SELECT * FROM observations 
-       WHERE project = ? AND (title LIKE ? OR text LIKE ? OR narrative LIKE ?)
+    ? `SELECT * FROM observations
+       WHERE project = ? AND (title LIKE ? ESCAPE '\\' OR text LIKE ? ESCAPE '\\' OR narrative LIKE ? ESCAPE '\\')
        ORDER BY created_at_epoch DESC`
-    : `SELECT * FROM observations 
-       WHERE title LIKE ? OR text LIKE ? OR narrative LIKE ?
+    : `SELECT * FROM observations
+       WHERE title LIKE ? ESCAPE '\\' OR text LIKE ? ESCAPE '\\' OR narrative LIKE ? ESCAPE '\\'
        ORDER BY created_at_epoch DESC`;
-  
-  const pattern = `%${searchTerm}%`;
+
+  const pattern = `%${escapeLikePattern(searchTerm)}%`;
   const query = db.query(sql);
-  
+
   if (project) {
     return query.all(project, pattern, pattern, pattern) as Observation[];
   }

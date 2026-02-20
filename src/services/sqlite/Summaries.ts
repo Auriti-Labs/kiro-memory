@@ -5,6 +5,11 @@ import type { Summary } from '../../types/worker-types.js';
  * Summary operations for Kiro Memory database
  */
 
+/** Escape dei caratteri wildcard LIKE per prevenire pattern injection */
+function escapeLikePattern(input: string): string {
+  return input.replace(/[%_\\]/g, '\\$&');
+}
+
 export function createSummary(
   db: Database,
   sessionId: string,
@@ -40,16 +45,16 @@ export function getSummariesByProject(db: Database, project: string, limit: numb
 
 export function searchSummaries(db: Database, searchTerm: string, project?: string): Summary[] {
   const sql = project
-    ? `SELECT * FROM summaries 
-       WHERE project = ? AND (request LIKE ? OR learned LIKE ? OR completed LIKE ? OR notes LIKE ?)
+    ? `SELECT * FROM summaries
+       WHERE project = ? AND (request LIKE ? ESCAPE '\\' OR learned LIKE ? ESCAPE '\\' OR completed LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\')
        ORDER BY created_at_epoch DESC`
-    : `SELECT * FROM summaries 
-       WHERE request LIKE ? OR learned LIKE ? OR completed LIKE ? OR notes LIKE ?
+    : `SELECT * FROM summaries
+       WHERE request LIKE ? ESCAPE '\\' OR learned LIKE ? ESCAPE '\\' OR completed LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\'
        ORDER BY created_at_epoch DESC`;
-  
-  const pattern = `%${searchTerm}%`;
+
+  const pattern = `%${escapeLikePattern(searchTerm)}%`;
   const query = db.query(sql);
-  
+
   if (project) {
     return query.all(project, pattern, pattern, pattern, pattern) as Summary[];
   }

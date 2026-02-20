@@ -326,7 +326,8 @@ async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean
     try {
       const npmGlobalDir = join(homedir(), '.npm-global');
       mkdirSync(npmGlobalDir, { recursive: true });
-      execSync(`npm config set prefix "${npmGlobalDir}"`, { stdio: 'ignore' });
+      const { spawnSync: spawnNpmConfig } = require('child_process');
+      spawnNpmConfig('npm', ['config', 'set', 'prefix', npmGlobalDir], { stdio: 'ignore' });
 
       // Aggiorna rcFile se non contiene già il path
       const exportLine = 'export PATH="$HOME/.npm-global/bin:$PATH"';
@@ -409,15 +410,18 @@ async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean
     console.log('\n  Rebuilding better-sqlite3...');
     try {
       // Trova il path del modulo installato globalmente
-      const globalDir = execSync('npm prefix -g', { encoding: 'utf8' }).trim();
+      const { spawnSync: spawnRebuild } = require('child_process');
+      const globalDirResult = spawnRebuild('npm', ['prefix', '-g'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+      const globalDir = (globalDirResult.stdout || '').trim();
       const sqlitePkg = join(globalDir, 'lib', 'node_modules', 'kiro-memory');
       if (existsSync(sqlitePkg)) {
-        execSync(`cd "${sqlitePkg}" && npm rebuild better-sqlite3`, {
+        spawnRebuild('npm', ['rebuild', 'better-sqlite3'], {
+          cwd: sqlitePkg,
           stdio: 'inherit',
           timeout: 60000,
         });
       } else {
-        execSync('npm rebuild better-sqlite3', { stdio: 'inherit', timeout: 60000 });
+        spawnRebuild('npm', ['rebuild', 'better-sqlite3'], { stdio: 'inherit', timeout: 60000 });
       }
       console.log(`  \x1b[32m✓\x1b[0m better-sqlite3 rebuilt`);
       anyFixed = true;

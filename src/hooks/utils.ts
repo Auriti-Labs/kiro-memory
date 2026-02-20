@@ -45,11 +45,21 @@ export async function readStdin(): Promise<KiroHookInput> {
     let data = '';
 
     process.stdin.setEncoding('utf8');
+    // Timeout di sicurezza: 5 secondi (cancellato in end/error per evitare leak)
+    const safetyTimeout = setTimeout(() => {
+      if (!data.trim()) {
+        resolve({
+          hook_event_name: 'agentSpawn',
+          cwd: process.cwd()
+        });
+      }
+    }, 5000);
+
     process.stdin.on('data', (chunk) => { data += chunk; });
     process.stdin.on('end', () => {
+      clearTimeout(safetyTimeout);
       try {
         if (!data.trim()) {
-          // Nessun input: crea un contesto minimo
           resolve({
             hook_event_name: 'agentSpawn',
             cwd: process.cwd()
@@ -61,17 +71,10 @@ export async function readStdin(): Promise<KiroHookInput> {
         reject(new Error(`Errore parsing stdin JSON: ${err}`));
       }
     });
-    process.stdin.on('error', reject);
-
-    // Timeout di sicurezza: 5 secondi
-    setTimeout(() => {
-      if (!data.trim()) {
-        resolve({
-          hook_event_name: 'agentSpawn',
-          cwd: process.cwd()
-        });
-      }
-    }, 5000);
+    process.stdin.on('error', (err) => {
+      clearTimeout(safetyTimeout);
+      reject(err);
+    });
   });
 }
 

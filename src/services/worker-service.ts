@@ -38,7 +38,14 @@ if (!existsSync(DATA_DIR)) {
 // Genera token di autenticazione per comunicazione hook→worker
 const WORKER_TOKEN = crypto.randomBytes(32).toString('hex');
 writeFileSync(TOKEN_FILE, WORKER_TOKEN, 'utf-8');
-try { chmodSync(TOKEN_FILE, 0o600); } catch { /* Windows compat */ }
+try {
+  chmodSync(TOKEN_FILE, 0o600);
+} catch (err) {
+  // Su Windows chmod non è supportato — ignora. Su Unix è un problema reale.
+  if (process.platform !== 'win32') {
+    logger.warn('WORKER', `chmod 600 fallito su ${TOKEN_FILE}`, {}, err as Error);
+  }
+}
 
 // Initialize database
 const db = new KiroMemoryDatabase();
@@ -56,7 +63,11 @@ function parseIntSafe(value: string | undefined, defaultVal: number, min: number
 
 /** Valida che un nome progetto contenga solo caratteri sicuri */
 function isValidProject(project: unknown): project is string {
-  return typeof project === 'string' && project.length > 0 && project.length <= 200 && /^[\w\-\.\/@ ]+$/.test(project);
+  return typeof project === 'string'
+    && project.length > 0
+    && project.length <= 200
+    && /^[\w\-\.\/@ ]+$/.test(project)
+    && !project.includes('..');
 }
 
 /** Valida una stringa con lunghezza massima */
@@ -198,7 +209,12 @@ app.get('/events', (req, res) => {
 // Get context for project
 app.get('/api/context/:project', (req, res) => {
   const { project } = req.params;
-  
+
+  if (!isValidProject(project)) {
+    res.status(400).json({ error: 'Invalid project name' });
+    return;
+  }
+
   try {
     const context = {
       project,
@@ -385,6 +401,11 @@ app.post('/api/observations/batch', (req, res) => {
 // Statistiche progetto
 app.get('/api/stats/:project', (req, res) => {
   const { project } = req.params;
+
+  if (!isValidProject(project)) {
+    res.status(400).json({ error: 'Invalid project name' });
+    return;
+  }
 
   try {
     const stats = getProjectStats(db.db, project);

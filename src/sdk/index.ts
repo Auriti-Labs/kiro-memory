@@ -63,6 +63,34 @@ export class KiroMemorySDK {
   }
 
   /**
+   * Valida input per storeObservation
+   */
+  private validateObservationInput(data: { type: string; title: string; content: string }): void {
+    if (!data.type || typeof data.type !== 'string' || data.type.length > 100) {
+      throw new Error('type è obbligatorio (stringa, max 100 caratteri)');
+    }
+    if (!data.title || typeof data.title !== 'string' || data.title.length > 500) {
+      throw new Error('title è obbligatorio (stringa, max 500 caratteri)');
+    }
+    if (!data.content || typeof data.content !== 'string' || data.content.length > 100_000) {
+      throw new Error('content è obbligatorio (stringa, max 100KB)');
+    }
+  }
+
+  /**
+   * Valida input per storeSummary
+   */
+  private validateSummaryInput(data: Record<string, unknown>): void {
+    const MAX = 50_000;
+    for (const [key, val] of Object.entries(data)) {
+      if (val !== undefined && val !== null) {
+        if (typeof val !== 'string') throw new Error(`${key} deve essere una stringa`);
+        if (val.length > MAX) throw new Error(`${key} troppo grande (max 50KB)`);
+      }
+    }
+  }
+
+  /**
    * Store a new observation
    */
   async storeObservation(data: {
@@ -72,6 +100,7 @@ export class KiroMemorySDK {
     concepts?: string[];
     files?: string[];
   }): Promise<number> {
+    this.validateObservationInput(data);
     return createObservation(
       this.db.db,
       'sdk-' + Date.now(),
@@ -98,6 +127,7 @@ export class KiroMemorySDK {
     completed?: string;
     nextSteps?: string;
   }): Promise<number> {
+    this.validateSummaryInput(data);
     return createSummary(
       this.db.db,
       'sdk-' + Date.now(),
