@@ -292,6 +292,89 @@ app.post('/api/observations', (req, res) => {
   }
 });
 
+// Store structured knowledge (constraint, decision, heuristic, rejected)
+import { KNOWLEDGE_TYPES } from '../types/worker-types.js';
+import type { KnowledgeMetadata } from '../types/worker-types.js';
+
+app.post('/api/knowledge', (req, res) => {
+  const { project, knowledge_type, title, content, concepts, files,
+          severity, alternatives, reason, context: metaContext, confidence } = req.body;
+
+  // Validazione campi obbligatori
+  if (!isValidProject(project)) {
+    res.status(400).json({ error: 'Invalid or missing "project"' });
+    return;
+  }
+  if (!knowledge_type || !KNOWLEDGE_TYPES.includes(knowledge_type)) {
+    res.status(400).json({ error: `Invalid "knowledge_type". Must be one of: ${KNOWLEDGE_TYPES.join(', ')}` });
+    return;
+  }
+  if (!isValidString(title, 500)) {
+    res.status(400).json({ error: 'Invalid or missing "title" (max 500 chars)' });
+    return;
+  }
+  if (!isValidString(content, 100_000)) {
+    res.status(400).json({ error: 'Invalid or missing "content" (max 100KB)' });
+    return;
+  }
+  if (concepts && !Array.isArray(concepts)) {
+    res.status(400).json({ error: '"concepts" must be an array' });
+    return;
+  }
+  if (files && !Array.isArray(files)) {
+    res.status(400).json({ error: '"files" must be an array' });
+    return;
+  }
+
+  try {
+    // Costruisci metadati JSON in base al tipo
+    let metadata: KnowledgeMetadata;
+    switch (knowledge_type) {
+      case 'constraint':
+        metadata = { knowledgeType: 'constraint', severity: severity === 'hard' ? 'hard' : 'soft', reason };
+        break;
+      case 'decision':
+        metadata = { knowledgeType: 'decision', alternatives, reason };
+        break;
+      case 'heuristic':
+        metadata = { knowledgeType: 'heuristic', context: metaContext, confidence: ['high', 'medium', 'low'].includes(confidence) ? confidence : undefined };
+        break;
+      case 'rejected':
+        metadata = { knowledgeType: 'rejected', reason: reason || '', alternatives };
+        break;
+      default:
+        res.status(400).json({ error: 'Invalid knowledge_type' });
+        return;
+    }
+
+    const id = createObservation(
+      db.db,
+      'api-' + Date.now(),
+      project,
+      knowledge_type,
+      title,
+      null,
+      content,
+      null,
+      JSON.stringify(metadata),
+      concepts?.join(', ') || null,
+      files?.join(', ') || null,
+      null,
+      0
+    );
+
+    broadcast('observation-created', { id, project, title, type: knowledge_type });
+
+    // Genera embedding in background (fire-and-forget)
+    generateEmbeddingForObservation(id, title, content, concepts).catch(() => {});
+
+    res.json({ id, success: true, knowledge_type });
+  } catch (error) {
+    logger.error('WORKER', 'Failed to store knowledge', {}, error as Error);
+    res.status(500).json({ error: 'Failed to store knowledge' });
+  }
+});
+
 // Store summary (con validazione input)
 app.post('/api/summaries', (req, res) => {
   const { sessionId, project, request, learned, completed, nextSteps } = req.body;

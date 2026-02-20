@@ -18,6 +18,7 @@ import {
   recencyScore,
   projectMatchScore,
   computeCompositeScore,
+  knowledgeTypeBoost,
   CONTEXT_WEIGHTS
 } from '../services/search/ScoringEngine.js';
 import type {
@@ -29,8 +30,12 @@ import type {
   SearchFilters,
   TimelineEntry,
   ScoredItem,
-  SmartContext
+  SmartContext,
+  StoreKnowledgeInput,
+  KnowledgeType,
+  KnowledgeMetadata
 } from '../types/worker-types.js';
+import { KNOWLEDGE_TYPES } from '../types/worker-types.js';
 
 export interface KiroMemoryConfig {
   dataDir?: string;
@@ -161,6 +166,70 @@ export class KiroMemorySDK {
     // Genera embedding in background (fire-and-forget, non blocca)
     this.generateEmbeddingAsync(observationId, data.title, data.content, data.concepts)
       .catch(() => {}); // Ignora errori silenziosamente
+
+    return observationId;
+  }
+
+  /**
+   * Salva conoscenza strutturata (constraint, decision, heuristic, rejected).
+   * Usa il campo `type` per il knowledgeType e `facts` per i metadati JSON.
+   */
+  async storeKnowledge(data: StoreKnowledgeInput): Promise<number> {
+    // Valida knowledgeType contro enum
+    if (!KNOWLEDGE_TYPES.includes(data.knowledgeType)) {
+      throw new Error(`knowledgeType non valido: ${data.knowledgeType}. Valori ammessi: ${KNOWLEDGE_TYPES.join(', ')}`);
+    }
+    this.validateObservationInput({ type: data.knowledgeType, title: data.title, content: data.content });
+
+    // Costruisci metadati JSON in base al tipo
+    const metadata: KnowledgeMetadata = (() => {
+      switch (data.knowledgeType) {
+        case 'constraint':
+          return {
+            knowledgeType: 'constraint' as const,
+            severity: data.metadata?.severity || 'soft',
+            reason: data.metadata?.reason
+          };
+        case 'decision':
+          return {
+            knowledgeType: 'decision' as const,
+            alternatives: data.metadata?.alternatives,
+            reason: data.metadata?.reason
+          };
+        case 'heuristic':
+          return {
+            knowledgeType: 'heuristic' as const,
+            context: data.metadata?.context,
+            confidence: data.metadata?.confidence
+          };
+        case 'rejected':
+          return {
+            knowledgeType: 'rejected' as const,
+            reason: data.metadata?.reason || '',
+            alternatives: data.metadata?.alternatives
+          };
+      }
+    })();
+
+    const observationId = createObservation(
+      this.db.db,
+      'sdk-' + Date.now(),
+      data.project || this.project,
+      data.knowledgeType,       // type = knowledgeType
+      data.title,
+      null,                     // subtitle
+      data.content,
+      null,                     // narrative
+      JSON.stringify(metadata), // facts = metadati JSON
+      data.concepts?.join(', ') || null,
+      data.files?.join(', ') || null,
+      data.files?.join(', ') || null,
+      0                         // prompt_number
+    );
+
+    // Genera embedding in background
+    this.generateEmbeddingAsync(observationId, data.title, data.content, data.concepts)
+      .catch(() => {});
 
     return observationId;
   }
@@ -409,6 +478,10 @@ export class KiroMemorySDK {
           projectMatch: projectMatchScore(obs.project, this.project)
         };
 
+        // Boost per tipi knowledge (constraint, decision, heuristic, rejected)
+        const baseScore = computeCompositeScore(signals, CONTEXT_WEIGHTS);
+        const boostedScore = Math.min(1, baseScore * knowledgeTypeBoost(obs.type));
+
         return {
           id: obs.id,
           title: obs.title,
@@ -417,7 +490,7 @@ export class KiroMemorySDK {
           project: obs.project,
           created_at: obs.created_at,
           created_at_epoch: obs.created_at_epoch,
-          score: computeCompositeScore(signals, CONTEXT_WEIGHTS),
+          score: boostedScore,
           signals
         };
       });
@@ -532,7 +605,11 @@ export type {
   TimelineEntry,
   ScoredItem,
   SmartContext,
-  ScoringWeights
+  ScoringWeights,
+  StoreKnowledgeInput,
+  KnowledgeType,
+  KnowledgeMetadata
 } from '../types/worker-types.js';
+export { KNOWLEDGE_TYPES } from '../types/worker-types.js';
 
 export type { SearchResult } from '../services/search/HybridSearch.js';

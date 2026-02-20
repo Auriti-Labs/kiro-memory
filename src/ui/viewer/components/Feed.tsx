@@ -10,6 +10,10 @@ const TYPE_STYLES: Record<string, { border: string; bg: string; text: string; do
   'research': { border: 'border-l-blue-500', bg: 'bg-blue-500/10', text: 'text-blue-400', dot: 'bg-blue-500', label: 'research' },
   'delegation': { border: 'border-l-violet-500', bg: 'bg-violet-500/10', text: 'text-violet-400', dot: 'bg-violet-500', label: 'delegation' },
   'tool-use': { border: 'border-l-zinc-500', bg: 'bg-zinc-500/10', text: 'text-zinc-400', dot: 'bg-zinc-500', label: 'tool-use' },
+  'constraint': { border: 'border-l-red-500', bg: 'bg-red-500/10', text: 'text-red-400', dot: 'bg-red-500', label: 'constraint' },
+  'decision': { border: 'border-l-orange-500', bg: 'bg-orange-500/10', text: 'text-orange-400', dot: 'bg-orange-500', label: 'decision' },
+  'heuristic': { border: 'border-l-indigo-500', bg: 'bg-indigo-500/10', text: 'text-indigo-400', dot: 'bg-indigo-500', label: 'heuristic' },
+  'rejected': { border: 'border-l-slate-500', bg: 'bg-slate-500/10', text: 'text-slate-400', dot: 'bg-slate-500', label: 'rejected' },
 };
 
 function getTypeStyle(type: string) {

@@ -144,6 +144,29 @@ export function stalenessPenalty(isStale: number): number {
 }
 
 /**
+ * Boost moltiplicativo per tipi di conoscenza strutturata.
+ * Constraint e decision pesano di piu perche rappresentano regole e scelte critiche.
+ * Tipi non-knowledge restano a 1.0 (nessun boost).
+ */
+export const KNOWLEDGE_TYPE_BOOST: Record<string, number> = {
+  constraint: 1.30,
+  decision: 1.25,
+  heuristic: 1.15,
+  rejected: 1.10
+};
+
+/**
+ * Ritorna il moltiplicatore di boost per il tipo di osservazione.
+ * Tipi knowledge ottengono un boost, tutti gli altri restano a 1.0.
+ *
+ * @param type - Tipo dell'osservazione
+ * @returns Moltiplicatore >= 1.0
+ */
+export function knowledgeTypeBoost(type: string): number {
+  return KNOWLEDGE_TYPE_BOOST[type] ?? 1.0;
+}
+
+/**
  * Stima approssimativa dei token da una stringa.
  * Usa la regola empirica: 1 token ≈ 4 caratteri.
  */

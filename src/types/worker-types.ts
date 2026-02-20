@@ -332,3 +332,59 @@ export interface SmartContext {
   tokenBudget: number;
   tokensUsed: number;
 }
+
+// ============================================================================
+// Structured Knowledge Types (Phase 5A)
+// ============================================================================
+
+/** Tipi di conoscenza strutturata */
+export type KnowledgeType = 'constraint' | 'decision' | 'heuristic' | 'rejected';
+
+/** Costante per validazione runtime */
+export const KNOWLEDGE_TYPES: KnowledgeType[] = ['constraint', 'decision', 'heuristic', 'rejected'];
+
+/** Metadati per vincoli (regole hard/soft) */
+export interface ConstraintMeta {
+  knowledgeType: 'constraint';
+  severity: 'hard' | 'soft';
+  reason?: string;
+}
+
+/** Metadati per decisioni architetturali */
+export interface DecisionMeta {
+  knowledgeType: 'decision';
+  alternatives?: string[];
+  reason?: string;
+}
+
+/** Metadati per preferenze/euristiche */
+export interface HeuristicMeta {
+  knowledgeType: 'heuristic';
+  context?: string;
+  confidence?: 'high' | 'medium' | 'low';
+}
+
+/** Metadati per soluzioni scartate */
+export interface RejectedMeta {
+  knowledgeType: 'rejected';
+  reason: string;
+  alternatives?: string[];
+}
+
+/** Union discriminata per metadati knowledge */
+export type KnowledgeMetadata = ConstraintMeta | DecisionMeta | HeuristicMeta | RejectedMeta;
+
+/** Input per salvare conoscenza strutturata */
+export interface StoreKnowledgeInput {
+  project: string;
+  knowledgeType: KnowledgeType;
+  title: string;
+  content: string;
+  concepts?: string[];
+  files?: string[];
+  /** Metadati specifici per tipo (severity, alternatives, reason, context, confidence) */
+  metadata?: Partial<Omit<ConstraintMeta, 'knowledgeType'>> &
+    Partial<Omit<DecisionMeta, 'knowledgeType'>> &
+    Partial<Omit<HeuristicMeta, 'knowledgeType'>> &
+    Partial<Omit<RejectedMeta, 'knowledgeType'>>;
+}

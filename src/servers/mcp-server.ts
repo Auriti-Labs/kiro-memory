@@ -63,7 +63,7 @@ const TOOLS = [
       properties: {
         query: { type: 'string', description: 'Text to search in observations and summaries' },
         project: { type: 'string', description: 'Filter by project name (optional)' },
-        type: { type: 'string', description: 'Filter by observation type: file-write, command, research, tool-use (optional)' },
+        type: { type: 'string', description: 'Filter by observation type: file-write, command, research, tool-use, constraint, decision, heuristic, rejected (optional)' },
         limit: { type: 'number', description: 'Max number of results (default: 20)' }
       },
       required: ['query']
@@ -128,6 +128,31 @@ const TOOLS = [
       type: 'object' as const,
       properties: {},
       required: []
+    }
+  },
+  {
+    name: 'store_knowledge',
+    description: 'Store structured knowledge: constraints (rules), decisions (architectural choices), heuristics (soft preferences), or rejected solutions. This knowledge is boosted in search rankings and helps remember the "why" behind code decisions.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        knowledge_type: {
+          type: 'string',
+          enum: ['constraint', 'decision', 'heuristic', 'rejected'],
+          description: 'Type of knowledge: constraint (hard/soft rules), decision (architectural choices with alternatives), heuristic (soft preferences), rejected (discarded solutions with reason)'
+        },
+        title: { type: 'string', description: 'Short descriptive title for the knowledge entry' },
+        content: { type: 'string', description: 'Detailed content explaining the knowledge' },
+        project: { type: 'string', description: 'Project name (required)' },
+        severity: { type: 'string', enum: ['hard', 'soft'], description: 'For constraints: hard (must never violate) or soft (prefer to follow)' },
+        alternatives: { type: 'array', items: { type: 'string' }, description: 'For decisions/rejected: alternative options considered' },
+        reason: { type: 'string', description: 'For decisions/rejected: why this choice was made or rejected' },
+        context: { type: 'string', description: 'For heuristics: when this preference applies' },
+        confidence: { type: 'string', enum: ['high', 'medium', 'low'], description: 'For heuristics: confidence level' },
+        concepts: { type: 'array', items: { type: 'string' }, description: 'Related concepts/tags (optional)' },
+        files: { type: 'array', items: { type: 'string' }, description: 'Related files (optional)' }
+      },
+      required: ['knowledge_type', 'title', 'content', 'project']
     }
   }
 ];
@@ -295,6 +320,24 @@ const handlers: Record<string, ToolHandler> = {
     }
 
     return output;
+  },
+
+  async store_knowledge(args: {
+    knowledge_type: string;
+    title: string;
+    content: string;
+    project: string;
+    severity?: string;
+    alternatives?: string[];
+    reason?: string;
+    context?: string;
+    confidence?: string;
+    concepts?: string[];
+    files?: string[];
+  }) {
+    const result = await callWorkerPOST('/api/knowledge', args);
+
+    return `Knowledge stored successfully.\n- **ID**: ${result.id}\n- **Type**: ${result.knowledge_type}\n- **Title**: ${args.title}`;
   }
 };
 

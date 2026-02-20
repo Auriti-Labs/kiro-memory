@@ -17,6 +17,7 @@ import {
   normalizeFTS5Rank,
   projectMatchScore,
   computeCompositeScore,
+  knowledgeTypeBoost,
   SEARCH_WEIGHTS
 } from './ScoringEngine.js';
 import type { Database } from 'bun:sqlite';
@@ -185,7 +186,9 @@ export class HybridSearch {
 
       // Boost per item presenti in entrambe le sorgenti
       const isHybrid = item.semanticScore > 0 && item.fts5Rank !== null;
-      const finalScore = isHybrid ? Math.min(1, score * 1.15) : score;
+      const hybridBoost = isHybrid ? 1.15 : 1.0;
+      // Boost per tipi knowledge (constraint, decision, heuristic, rejected)
+      const finalScore = Math.min(1, score * hybridBoost * knowledgeTypeBoost(item.type));
 
       scored.push({
         id: item.id,

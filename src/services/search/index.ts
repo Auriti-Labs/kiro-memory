@@ -10,6 +10,8 @@ export {
   estimateTokens,
   accessRecencyScore,
   stalenessPenalty,
+  knowledgeTypeBoost,
   SEARCH_WEIGHTS,
-  CONTEXT_WEIGHTS
+  CONTEXT_WEIGHTS,
+  KNOWLEDGE_TYPE_BOOST
 } from './ScoringEngine.js';

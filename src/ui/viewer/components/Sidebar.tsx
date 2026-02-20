@@ -8,6 +8,10 @@ const TYPE_CONFIG: Record<string, { color: string; label: string }> = {
   'research': { color: 'bg-accent-blue', label: 'Research' },
   'delegation': { color: 'bg-accent-violet', label: 'Delegations' },
   'tool-use': { color: 'bg-zinc-400', label: 'Tool usage' },
+  'constraint': { color: 'bg-red-500', label: 'Constraints' },
+  'decision': { color: 'bg-orange-500', label: 'Decisions' },
+  'heuristic': { color: 'bg-indigo-500', label: 'Heuristics' },
+  'rejected': { color: 'bg-slate-500', label: 'Rejected' },
 };
 
 /* Colori per progetto (hash deterministico) */

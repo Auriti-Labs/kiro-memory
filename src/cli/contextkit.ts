@@ -1271,6 +1271,11 @@ async function main() {
         await addSummary(sdk, args.slice(1).join(' '));
         break;
 
+      case 'add-knowledge':
+      case 'add-k':
+        await addKnowledge(sdk, args[1], args[2], args.slice(3).join(' '));
+        break;
+
       case 'decay':
         await handleDecay(sdk, args[1]);
         break;
@@ -1430,6 +1435,57 @@ async function addSummary(sdk: ReturnType<typeof createKiroMemory>, content: str
   console.log(`✅ Summary stored with ID: ${id}\n`);
 }
 
+async function addKnowledge(
+  sdk: ReturnType<typeof createKiroMemory>,
+  knowledgeType: string,
+  title: string,
+  content: string
+) {
+  const validTypes = ['constraint', 'decision', 'heuristic', 'rejected'];
+  if (!knowledgeType || !validTypes.includes(knowledgeType)) {
+    console.error(`Error: knowledge type must be one of: ${validTypes.join(', ')}`);
+    process.exit(1);
+  }
+  if (!title) {
+    console.error('Error: title is required');
+    process.exit(1);
+  }
+  if (!content) {
+    console.error('Error: content is required');
+    process.exit(1);
+  }
+
+  // Parse opzioni dal CLI
+  const severity = args.find(a => a.startsWith('--severity='))?.split('=')[1] as 'hard' | 'soft' | undefined;
+  const alternativesRaw = args.find(a => a.startsWith('--alternatives='))?.split('=')[1];
+  const alternatives = alternativesRaw ? alternativesRaw.split(',').map(s => s.trim()) : undefined;
+  const reason = args.find(a => a.startsWith('--reason='))?.split('=')[1];
+  const context = args.find(a => a.startsWith('--context='))?.split('=')[1];
+  const confidence = args.find(a => a.startsWith('--confidence='))?.split('=')[1] as 'high' | 'medium' | 'low' | undefined;
+  const conceptsRaw = args.find(a => a.startsWith('--concepts='))?.split('=')[1];
+  const concepts = conceptsRaw ? conceptsRaw.split(',').map(s => s.trim()) : undefined;
+  const filesRaw = args.find(a => a.startsWith('--files='))?.split('=')[1];
+  const files = filesRaw ? filesRaw.split(',').map(s => s.trim()) : undefined;
+
+  // Rimuovi opzioni dal content (le opzioni --key=val non fanno parte del contenuto)
+  const cleanContent = content.split(' ').filter(w => !w.startsWith('--')).join(' ');
+
+  const id = await sdk.storeKnowledge({
+    project: sdk.getProject(),
+    knowledgeType: knowledgeType as any,
+    title,
+    content: cleanContent || content,
+    concepts,
+    files,
+    metadata: { severity, alternatives, reason, context, confidence }
+  });
+
+  console.log(`\nKnowledge stored successfully.`);
+  console.log(`  ID:   ${id}`);
+  console.log(`  Type: ${knowledgeType}`);
+  console.log(`  Title: ${title}\n`);
+}
+
 async function handleEmbeddings(sdk: ReturnType<typeof createKiroMemory>, subcommand: string) {
   switch (subcommand) {
     case 'stats': {
@@ -1582,6 +1638,11 @@ Commands:
   summaries [limit]         Show recent summaries (default: 5)
   add-observation <title> <content>   Add a new observation
   add-summary <content>     Add a new summary
+  add-knowledge <type> <title> <content>  Store structured knowledge
+    Types: constraint, decision, heuristic, rejected
+    Options: --severity=hard|soft  --alternatives=a,b,c  --reason=...
+             --context=...  --confidence=high|medium|low
+             --concepts=a,b  --files=path1,path2
   embeddings stats          Show embedding statistics
   embeddings backfill [n]   Generate embeddings for unprocessed observations
   decay stats               Show decay statistics (stale, never accessed, etc.)
@@ -1595,6 +1656,8 @@ Examples:
   kiro-memory context
   kiro-memory search "authentication"
   kiro-memory semantic-search "how did I fix the auth bug"
+  kiro-memory add-knowledge constraint "No any in TypeScript" "Never use any type" --severity=hard
+  kiro-memory add-knowledge decision "PostgreSQL over MongoDB" "Chosen for ACID" --alternatives=MongoDB,DynamoDB
   kiro-memory embeddings stats
   kiro-memory embeddings backfill 100
   kiro-memory decay stats

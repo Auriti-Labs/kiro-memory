@@ -13,6 +13,10 @@ export function getTypeBadgeClasses(type: string): { bg: string; text: string; d
     'research': { bg: 'bg-blue-500/10 dark:bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400', dot: 'bg-blue-500' },
     'delegation': { bg: 'bg-violet-500/10 dark:bg-violet-500/10', text: 'text-violet-600 dark:text-violet-400', dot: 'bg-violet-500' },
     'tool-use': { bg: 'bg-zinc-500/10 dark:bg-zinc-500/10', text: 'text-zinc-600 dark:text-zinc-400', dot: 'bg-zinc-500' },
+    'constraint': { bg: 'bg-red-500/10 dark:bg-red-500/10', text: 'text-red-600 dark:text-red-400', dot: 'bg-red-500' },
+    'decision': { bg: 'bg-orange-500/10 dark:bg-orange-500/10', text: 'text-orange-600 dark:text-orange-400', dot: 'bg-orange-500' },
+    'heuristic': { bg: 'bg-indigo-500/10 dark:bg-indigo-500/10', text: 'text-indigo-600 dark:text-indigo-400', dot: 'bg-indigo-500' },
+    'rejected': { bg: 'bg-slate-500/10 dark:bg-slate-500/10', text: 'text-slate-600 dark:text-slate-400', dot: 'bg-slate-500' },
   };
   return map[type] || { bg: 'bg-zinc-500/10 dark:bg-zinc-500/10', text: 'text-zinc-600 dark:text-zinc-400', dot: 'bg-zinc-500' };
 }
@@ -28,6 +32,10 @@ export function getTypeAccentBorder(type: string): string {
     'research': 'border-l-blue-500/60',
     'delegation': 'border-l-violet-500/60',
     'tool-use': 'border-l-zinc-500/60',
+    'constraint': 'border-l-red-500/60',
+    'decision': 'border-l-orange-500/60',
+    'heuristic': 'border-l-indigo-500/60',
+    'rejected': 'border-l-slate-500/60',
     'summary': 'border-l-teal-500/60',
     'prompt': 'border-l-pink-500/60',
   };
@@ -66,7 +74,11 @@ export function getBadgeClass(type: string): string {
     'command': 'badge--command',
     'research': 'badge--research',
     'delegation': 'badge--delegation',
-    'tool-use': 'badge--tool-use'
+    'tool-use': 'badge--tool-use',
+    'constraint': 'badge--constraint',
+    'decision': 'badge--decision',
+    'heuristic': 'badge--heuristic',
+    'rejected': 'badge--rejected'
   };
   return map[type] || 'badge--default';
 }
