@@ -621,7 +621,7 @@ async function runDoctor() {
   let workerOk = false;
   try {
     const port = process.env.KIRO_MEMORY_WORKER_PORT || '3001';
-    execSync(`curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${port}/api/health`, {
+    execSync(`curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${port}/health`, {
       timeout: 2000,
       encoding: 'utf8'
     });

@@ -8,11 +8,11 @@ import { existsSync, mkdirSync, cpSync, rmSync } from 'fs';
 
 const KIRO_DIR = join(homedir(), '.kiro');
 const PLUGINS_DIR = join(KIRO_DIR, 'plugins');
-const CONTEXTKIT_DIR = join(PLUGINS_DIR, 'contextkit');
+const CONTEXTKIT_DIR = join(PLUGINS_DIR, 'kiro-memory');
 const PLUGIN_SOURCE = join(process.cwd(), 'plugin');
 
 function sync() {
-  console.log('Syncing ContextKit to Kiro...\n');
+  console.log('Syncing Kiro Memory to Kiro...\n');
   
   // Ensure directories exist
   if (!existsSync(KIRO_DIR)) {
@@ -38,16 +38,16 @@ function sync() {
   // Ensure data directory exists
   const dataDir = join(homedir(), '.contextkit');
   if (!existsSync(dataDir)) {
-    console.log('Creating ContextKit data directory...');
+    console.log('Creating Kiro Memory data directory...');
     mkdirSync(dataDir, { recursive: true });
     mkdirSync(join(dataDir, 'logs'), { recursive: true });
   }
   
-  console.log('\n✅ ContextKit synced successfully!');
+  console.log('\n✅ Kiro Memory synced successfully!');
   console.log(`Location: ${CONTEXTKIT_DIR}`);
   console.log('\nNext steps:');
   console.log('1. Restart Kiro CLI');
-  console.log('2. ContextKit hooks will be available automatically');
+  console.log('2. Kiro Memory hooks will be available automatically');
 }
 
 sync();

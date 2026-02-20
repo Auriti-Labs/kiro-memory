@@ -12,6 +12,9 @@ import { homedir } from 'os';
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { KiroMemoryDatabase } from './sqlite/Database.js';
+import { getObservationsByProject, createObservation } from './sqlite/Observations.js';
+import { getSummariesByProject, createSummary } from './sqlite/Summaries.js';
+import { searchObservationsFTS, searchSummariesFiltered, getTimeline, getObservationsByIds, getProjectStats } from './sqlite/Search.js';
 import { logger } from '../utils/logger.js';
 import { DATA_DIR } from '../shared/paths.js';
 
@@ -55,7 +58,7 @@ function broadcast(event: string, data: any): void {
 
 // Endpoint di notifica: gli hook chiamano questo endpoint dopo ogni scrittura in SQLite
 // per triggerare il broadcast SSE ai client della dashboard
-app.post('/api/notify', express.json(), (req, res) => {
+app.post('/api/notify', (req, res) => {
   const { event, data } = req.body || {};
   if (event && typeof event === 'string') {
     broadcast(event, data || {});
@@ -74,20 +77,31 @@ app.get('/health', (req, res) => {
   });
 });
 
-// SSE endpoint
+// SSE endpoint con keepalive per evitare disconnessioni da proxy/browser
 app.get('/events', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disabilita buffering nginx
   res.flushHeaders();
-  
+
   clients.push(res);
   logger.info('WORKER', 'SSE client connected', { clients: clients.length });
-  
-  // Send initial connection event
+
+  // Invia evento iniziale di connessione
   res.write(`event: connected\ndata: ${JSON.stringify({ timestamp: Date.now() })}\n\n`);
-  
+
+  // Keepalive ogni 15 secondi per mantenere la connessione aperta
+  const keepaliveInterval = setInterval(() => {
+    try {
+      res.write(`:keepalive ${Date.now()}\n\n`);
+    } catch {
+      clearInterval(keepaliveInterval);
+    }
+  }, 15000);
+
   req.on('close', () => {
+    clearInterval(keepaliveInterval);
     const index = clients.indexOf(res);
     if (index > -1) {
       clients.splice(index, 1);
@@ -101,9 +115,6 @@ app.get('/api/context/:project', (req, res) => {
   const { project } = req.params;
   
   try {
-    const { getObservationsByProject } = require('./sqlite/Observations.js');
-    const { getSummariesByProject } = require('./sqlite/Summaries.js');
-    
     const context = {
       project,
       observations: getObservationsByProject(db.db, project, 20),
@@ -122,8 +133,6 @@ app.post('/api/observations', (req, res) => {
   const { memorySessionId, project, type, title, content, concepts, files } = req.body;
   
   try {
-    const { createObservation } = require('./sqlite/Observations.js');
-    
     const id = createObservation(
       db.db,
       memorySessionId || 'api-' + Date.now(),
@@ -154,8 +163,6 @@ app.post('/api/summaries', (req, res) => {
   const { sessionId, project, request, learned, completed, nextSteps } = req.body;
   
   try {
-    const { createSummary } = require('./sqlite/Summaries.js');
-    
     const id = createSummary(
       db.db,
       sessionId || 'api-' + Date.now(),
@@ -187,9 +194,6 @@ app.get('/api/search', (req, res) => {
   }
 
   try {
-    const { searchObservationsFTS } = require('./sqlite/Search.js');
-    const { searchSummariesFiltered } = require('./sqlite/Search.js');
-
     const filters = {
       project: project || undefined,
       type: type || undefined,
@@ -218,8 +222,6 @@ app.get('/api/timeline', (req, res) => {
   }
 
   try {
-    const { getTimeline } = require('./sqlite/Search.js');
-
     const timeline = getTimeline(
       db.db,
       parseInt(anchor, 10),
@@ -244,7 +246,6 @@ app.post('/api/observations/batch', (req, res) => {
   }
 
   try {
-    const { getObservationsByIds } = require('./sqlite/Search.js');
     const observations = getObservationsByIds(db.db, ids);
     res.json({ observations });
   } catch (error) {
@@ -258,7 +259,6 @@ app.get('/api/stats/:project', (req, res) => {
   const { project } = req.params;
 
   try {
-    const { getProjectStats } = require('./sqlite/Search.js');
     const stats = getProjectStats(db.db, project);
     res.json(stats);
   } catch (error) {
