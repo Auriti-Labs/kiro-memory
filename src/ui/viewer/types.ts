@@ -56,3 +56,34 @@ export interface ViewerSettings {
 }
 
 export type ThemePreference = 'light' | 'dark' | 'system';
+
+// ── Analytics Types ──
+
+export interface AnalyticsOverview {
+  observations: number;
+  summaries: number;
+  sessions: number;
+  prompts: number;
+  observationsToday: number;
+  observationsThisWeek: number;
+  staleCount: number;
+  knowledgeCount: number;
+}
+
+export interface TimelineEntry {
+  day: string;
+  count: number;
+}
+
+export interface TypeDistributionEntry {
+  type: string;
+  count: number;
+}
+
+export interface SessionStatsData {
+  total: number;
+  completed: number;
+  avgDurationMinutes: number;
+}
+
+export type ViewMode = 'feed' | 'analytics';

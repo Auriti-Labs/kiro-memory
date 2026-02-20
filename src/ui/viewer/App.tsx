@@ -2,16 +2,18 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { Feed } from './components/Feed';
+import { Analytics } from './components/Analytics';
 import { useSSE } from './hooks/useSSE';
 import { useTheme } from './hooks/useTheme';
 import { useProjectAliases } from './hooks/useProjectAliases';
-import { Observation, Summary, UserPrompt } from './types';
+import { Observation, Summary, UserPrompt, ViewMode } from './types';
 import { mergeAndDeduplicateByProject } from './utils/data';
 
 const TYPE_FILTERS = ['file-write', 'file-read', 'command', 'research', 'delegation', 'tool-use'] as const;
 
 export function App() {
   const [currentFilter, setCurrentFilter] = useState('');
+  const [currentView, setCurrentView] = useState<ViewMode>('feed');
   const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set(TYPE_FILTERS));
   const [paginatedObservations, setPaginatedObservations] = useState<Observation[]>([]);
   const [paginatedSummaries, setPaginatedSummaries] = useState<Summary[]>([]);
@@ -151,6 +153,8 @@ export function App() {
         isConnected={isConnected}
         resolvedTheme={resolvedTheme}
         onThemeToggle={() => setThemePreference(resolvedTheme === 'dark' ? 'light' : 'dark')}
+        currentView={currentView}
+        onViewChange={setCurrentView}
       />
 
       {/* Content */}
@@ -200,15 +204,22 @@ export function App() {
               </div>
             )}
 
-            <Feed
-              observations={filteredObservations}
-              summaries={allSummaries}
-              prompts={allPrompts}
-              onLoadMore={handleLoadMore}
-              isLoading={isLoadingMore}
-              hasMore={hasMore}
-              getDisplayName={getDisplayName}
-            />
+            {currentView === 'feed' ? (
+              <Feed
+                observations={filteredObservations}
+                summaries={allSummaries}
+                prompts={allPrompts}
+                onLoadMore={handleLoadMore}
+                isLoading={isLoadingMore}
+                hasMore={hasMore}
+                getDisplayName={getDisplayName}
+              />
+            ) : (
+              <Analytics
+                currentFilter={currentFilter}
+                getDisplayName={getDisplayName}
+              />
+            )}
           </div>
         </main>
       </div>

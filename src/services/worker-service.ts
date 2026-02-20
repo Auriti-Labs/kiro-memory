@@ -21,6 +21,7 @@ import { searchObservationsFTS, searchSummariesFiltered, getTimeline, getObserva
 import { getHybridSearch } from './search/HybridSearch.js';
 import { getEmbeddingService } from './search/EmbeddingService.js';
 import { getVectorSearch } from './search/VectorSearch.js';
+import { getObservationsTimeline, getTypeDistribution, getSessionStats, getAnalyticsOverview } from './sqlite/Analytics.js';
 import { logger } from '../utils/logger.js';
 import { DATA_DIR } from '../shared/paths.js';
 
@@ -739,6 +740,80 @@ app.get('/api/projects', (_req, res) => {
   } catch (error) {
     logger.error('WORKER', 'Lista progetti fallita', {}, error as Error);
     res.status(500).json({ error: 'Failed to list projects' });
+  }
+});
+
+// ── Analytics endpoints ──
+
+app.get('/api/analytics/overview', (req, res) => {
+  const { project } = req.query as { project?: string };
+
+  if (project && !isValidProject(project)) {
+    res.status(400).json({ error: 'Invalid project name' });
+    return;
+  }
+
+  try {
+    const overview = getAnalyticsOverview(db.db, project || undefined);
+    res.json(overview);
+  } catch (error) {
+    logger.error('WORKER', 'Analytics overview fallita', { project }, error as Error);
+    res.status(500).json({ error: 'Analytics overview failed' });
+  }
+});
+
+app.get('/api/analytics/timeline', (req, res) => {
+  const { project, days } = req.query as { project?: string; days?: string };
+
+  if (project && !isValidProject(project)) {
+    res.status(400).json({ error: 'Invalid project name' });
+    return;
+  }
+
+  try {
+    const timeline = getObservationsTimeline(
+      db.db,
+      project || undefined,
+      parseIntSafe(days, 30, 1, 365)
+    );
+    res.json(timeline);
+  } catch (error) {
+    logger.error('WORKER', 'Analytics timeline fallita', { project }, error as Error);
+    res.status(500).json({ error: 'Analytics timeline failed' });
+  }
+});
+
+app.get('/api/analytics/types', (req, res) => {
+  const { project } = req.query as { project?: string };
+
+  if (project && !isValidProject(project)) {
+    res.status(400).json({ error: 'Invalid project name' });
+    return;
+  }
+
+  try {
+    const distribution = getTypeDistribution(db.db, project || undefined);
+    res.json(distribution);
+  } catch (error) {
+    logger.error('WORKER', 'Analytics types fallita', { project }, error as Error);
+    res.status(500).json({ error: 'Analytics types failed' });
+  }
+});
+
+app.get('/api/analytics/sessions', (req, res) => {
+  const { project } = req.query as { project?: string };
+
+  if (project && !isValidProject(project)) {
+    res.status(400).json({ error: 'Invalid project name' });
+    return;
+  }
+
+  try {
+    const stats = getSessionStats(db.db, project || undefined);
+    res.json(stats);
+  } catch (error) {
+    logger.error('WORKER', 'Analytics sessions fallita', { project }, error as Error);
+    res.status(500).json({ error: 'Analytics sessions failed' });
   }
 });
 
