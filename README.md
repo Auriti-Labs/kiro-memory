@@ -386,10 +386,10 @@ The agent configuration was not installed. Run the install command:
 kiro-memory install
 ```
 
-This creates the agent config at `~/.kiro/agents/contextkit.json`. Note: the agent name is `contextkit-memory`, so start Kiro with:
+This creates the agent config at `~/.kiro/agents/kiro-memory.json`. Then start Kiro with:
 
 ```bash
-kiro-cli --agent contextkit-memory
+kiro-cli --agent kiro-memory
 ```
 
 ### Port 3001 already in use
@@ -412,6 +412,19 @@ Run the built-in doctor command to check your environment:
 ```bash
 kiro-memory doctor
 ```
+
+## Security
+
+Kiro Memory runs **locally only** on `127.0.0.1` and implements multiple layers of protection:
+
+- **Token Authentication** on the notify endpoint (shared secret via `~/.kiro-memory/worker.token`)
+- **Rate Limiting** on all API endpoints (200 req/min global, 60 req/min for notifications)
+- **Helmet** security headers with Content Security Policy
+- **CORS** restricted to localhost origins
+- **Input Validation** on all POST endpoints (type checking, length limits, safe character patterns)
+- **SSE Connection Limit** (max 50 concurrent clients)
+
+To report a security vulnerability, please open a [private security advisory](https://github.com/auriti-web-design/kiro-memory/security/advisories/new).
 
 ## Contributing
 
