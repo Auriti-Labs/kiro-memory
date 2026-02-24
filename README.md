@@ -11,11 +11,15 @@
   <a href="https://www.npmjs.com/package/kiro-memory"><img src="https://img.shields.io/npm/v/kiro-memory" alt="npm" /></a>
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License" />
   <img src="https://img.shields.io/badge/node-%3E%3D18-green" alt="Node" />
+  <a href="https://auritidesign.it/docs/kiro-memory/"><img src="https://img.shields.io/badge/docs-auritidesign.it-00b4d8" alt="Docs" /></a>
 </p>
 
 ---
 
 Kiro Memory gives your AI coding assistant memory that persists across sessions. It automatically captures what happened -- files changed, tools used, decisions made -- and feeds relevant context back at the start of the next session. No manual bookkeeping. Your agent picks up exactly where it left off.
+
+
+**[Read the full documentation →](https://auritidesign.it/docs/kiro-memory/)**
 
 Works with **Claude Code** (hooks), **Cursor** (rules + MCP), **Windsurf** (rules + MCP), **Cline** (custom instructions + MCP), and any editor that supports the **Model Context Protocol**.
 
