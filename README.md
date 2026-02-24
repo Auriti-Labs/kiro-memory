@@ -443,3 +443,11 @@ Contributions are welcome. Please open an issue to discuss proposed changes befo
 ---
 
 Built by [auriti-web-design](https://github.com/auriti-web-design)
+
+---
+
+<p align="center">
+  <a href="https://buymeacoffee.com/auritidesign">
+    <img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee" />
+  </a>
+</p>
