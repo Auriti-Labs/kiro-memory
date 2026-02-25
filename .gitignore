@@ -42,6 +42,9 @@ https*/
 # Session analysis logs
 *.txt
 
+# Local model cache (embedding models)
+local_cache/
+
 # npm tarballs
 *.tgz
 
@@ -50,3 +53,4 @@ CLAUDE.md
 .kiro/context.md
 COMPETITOR_ANALYSIS.md
 FEATURE_ROADMAP.md
+local_cache/
