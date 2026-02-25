@@ -23,7 +23,7 @@ export function App() {
   const [hasMore, setHasMore] = useState(true);
 
   const { observations, summaries, prompts, projects, isConnected, lastEventTime } = useSSE();
-  const { resolvedTheme, setThemePreference } = useTheme();
+  const { preference: themePreference, resolvedTheme, setThemePreference } = useTheme();
   const { getDisplayName, updateAlias } = useProjectAliases();
 
   // Merge dati SSE live con dati paginati
@@ -170,7 +170,8 @@ export function App() {
         isConnected={isConnected}
         lastEventTime={lastEventTime}
         resolvedTheme={resolvedTheme}
-        onThemeToggle={() => setThemePreference(resolvedTheme === 'dark' ? 'light' : 'dark')}
+        themePreference={themePreference}
+        onThemeChange={setThemePreference}
         currentView={currentView}
         onViewChange={setCurrentView}
       />

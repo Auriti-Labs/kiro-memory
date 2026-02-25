@@ -146,7 +146,7 @@ export function Feed({ observations, summaries, prompts, onLoadMore, isLoading, 
   );
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" aria-live="polite" aria-label="Memory feed">
       {items.map((item, index) => {
         const stagger = index < 8 ? `stagger-${index + 1}` : '';
 

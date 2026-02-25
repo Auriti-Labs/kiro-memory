@@ -171,22 +171,22 @@ export function Sidebar({
               <label
                 key={type}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm cursor-pointer transition-all ${
-                  isActive ? 'text-zinc-300 hover:text-zinc-100' : 'text-zinc-600 hover:text-zinc-400'
+                  isActive ? 'text-zinc-300 hover:text-zinc-100' : 'text-zinc-500 hover:text-zinc-400'
                 }`}
               >
+                <input type="checkbox" checked={isActive} onChange={() => onToggleType(type)} className="sr-only" aria-label={`Filter ${config.label}`} />
                 <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
                   isActive
                     ? 'bg-accent-violet border-accent-violet'
                     : 'bg-transparent border-zinc-600'
-                }`}>
+                }`} aria-hidden="true">
                   {isActive && (
                     <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   )}
                 </div>
-                <input type="checkbox" checked={isActive} onChange={() => onToggleType(type)} className="sr-only" />
-                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${config.color} ${isActive ? 'opacity-100' : 'opacity-30'}`} />
+                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${config.color} ${isActive ? 'opacity-100' : 'opacity-30'}`} aria-hidden="true" />
                 <span className="flex-1">{config.label}</span>
               </label>
             );
