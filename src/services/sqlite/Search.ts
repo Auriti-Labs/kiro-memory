@@ -7,6 +7,12 @@ import type { Observation, Summary, SearchFilters, TimelineEntry } from '../../t
  * Supports FTS5 full-text search with LIKE fallback
  */
 
+/**
+ * Pesi BM25 per le colonne FTS5: title, text, narrative, concepts.
+ * Valori più alti = colonna più rilevante nel ranking.
+ */
+const BM25_WEIGHTS = '10.0, 1.0, 5.0, 3.0';
+
 /** Escape dei caratteri wildcard LIKE per prevenire pattern injection */
 function escapeLikePattern(input: string): string {
   return input.replace(/[%_\\]/g, '\\$&');
@@ -70,7 +76,7 @@ export function searchObservationsFTS(
       params.push(filters.dateEnd);
     }
 
-    sql += ' ORDER BY rank LIMIT ?';
+    sql += ` ORDER BY bm25(observations_fts, ${BM25_WEIGHTS}) LIMIT ?`;
     params.push(limit);
 
     const stmt = db.query(sql);
@@ -98,7 +104,7 @@ export function searchObservationsFTSWithRank(
     if (!safeQuery) return [];
 
     let sql = `
-      SELECT o.*, rank as fts5_rank FROM observations o
+      SELECT o.*, bm25(observations_fts, ${BM25_WEIGHTS}) as fts5_rank FROM observations o
       JOIN observations_fts fts ON o.id = fts.rowid
       WHERE observations_fts MATCH ?
     `;
@@ -121,7 +127,7 @@ export function searchObservationsFTSWithRank(
       params.push(filters.dateEnd);
     }
 
-    sql += ' ORDER BY rank LIMIT ?';
+    sql += ` ORDER BY bm25(observations_fts, ${BM25_WEIGHTS}) LIMIT ?`;
     params.push(limit);
 
     const stmt = db.query(sql);

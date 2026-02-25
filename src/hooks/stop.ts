@@ -26,12 +26,38 @@ runHook('stop', async (input) => {
 
     if (sessionObs.length === 0) return;
 
-    // Costruisci un sommario automatico basato sulle osservazioni
-    const completed = sessionObs
-      .map(o => o.title)
-      .slice(0, 10)
-      .join('; ');
+    // Categorizza osservazioni per tipo
+    const byType = new Map<string, typeof sessionObs>();
+    for (const obs of sessionObs) {
+      const group = byType.get(obs.type) || [];
+      group.push(obs);
+      byType.set(obs.type, group);
+    }
 
+    // Sezione "investigated": file letti e ricerche
+    const readFiles = byType.get('file-read') || [];
+    const researched = byType.get('research') || [];
+    const investigated = [
+      ...readFiles.slice(0, 5).map(o => o.narrative || o.title),
+      ...researched.slice(0, 3).map(o => o.narrative || o.title),
+    ].filter(Boolean).join('; ') || undefined;
+
+    // Sezione "completed": file modificati e comandi eseguiti
+    const writes = byType.get('file-write') || [];
+    const commands = byType.get('command') || [];
+    const completed = [
+      ...writes.slice(0, 8).map(o => o.narrative || o.title),
+      ...commands.slice(0, 3).map(o => o.narrative || o.title),
+    ].filter(Boolean).join('; ') || undefined;
+
+    // Sezione "learned": contenuto ricerca e code-intelligence
+    const learned = researched
+      .map(o => o.text?.substring(0, 150))
+      .filter(Boolean)
+      .slice(0, 5)
+      .join('; ') || undefined;
+
+    // File modificati unici
     const filesModified = [...new Set(
       sessionObs
         .filter(o => o.files_modified)
@@ -39,20 +65,32 @@ runHook('stop', async (input) => {
         .flatMap(f => f.split(',').map(s => s.trim()))
     )];
 
-    const learned = sessionObs
-      .filter(o => o.type === 'research' || o.type === 'code-intelligence')
-      .map(o => o.text?.substring(0, 100))
-      .filter(Boolean)
-      .slice(0, 5)
-      .join('; ');
+    // Concetti unici dalla sessione
+    const sessionConcepts = [...new Set(
+      sessionObs
+        .filter(o => o.concepts)
+        .flatMap(o => o.concepts!.split(',').map(c => c.trim()))
+    )].slice(0, 10);
+
+    // Sezione "next_steps": file toccati + concetti
+    const nextSteps = [
+      filesModified.length > 0 ? `Files modified: ${filesModified.slice(0, 10).join(', ')}` : '',
+      sessionConcepts.length > 0 ? `Concepts: ${sessionConcepts.join(', ')}` : '',
+    ].filter(Boolean).join('. ') || undefined;
+
+    // Titolo basato sull'azione principale
+    const mainAction = writes.length > 0
+      ? `${writes.length} file modific${writes.length === 1 ? 'ato' : 'ati'}`
+      : commands.length > 0
+        ? `${commands.length} comand${commands.length === 1 ? 'o' : 'i'}`
+        : `${sessionObs.length} osservazion${sessionObs.length === 1 ? 'e' : 'i'}`;
 
     await sdk.storeSummary({
-      request: `${project} session — ${new Date().toISOString().split('T')[0]}`,
-      completed: completed || undefined,
-      learned: learned || undefined,
-      nextSteps: filesModified.length > 0
-        ? `Files modified: ${filesModified.join(', ')}`
-        : undefined
+      request: `${project} — ${mainAction} — ${new Date().toISOString().split('T')[0]}`,
+      investigated,
+      completed,
+      learned,
+      nextSteps,
     });
 
     // Notifica la dashboard in tempo reale

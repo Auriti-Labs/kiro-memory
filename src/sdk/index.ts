@@ -152,6 +152,21 @@ export class KiroMemorySDK {
   }
 
   /**
+   * Finestre di deduplicazione per tipo (ms).
+   * Tipi con molte ripetizioni hanno finestre più ampie.
+   */
+  private getDeduplicationWindow(type: string): number {
+    switch (type) {
+      case 'file-read':    return 60_000;  // 60s — letture frequenti sugli stessi file
+      case 'file-write':   return 10_000;  // 10s — scritture rapide consecutive
+      case 'command':      return 30_000;  // 30s — standard
+      case 'research':     return 120_000; // 120s — web search e fetch ripetuti
+      case 'delegation':   return 60_000;  // 60s — delegazioni rapide
+      default:             return 30_000;  // 30s — default
+    }
+  }
+
+  /**
    * Store a new observation
    */
   async storeObservation(data: {
@@ -171,10 +186,11 @@ export class KiroMemorySDK {
 
     const sessionId = 'sdk-' + Date.now();
 
-    // Deduplicazione con content hash (finestra 30 secondi)
+    // Deduplicazione con content hash (finestra tipo-specifica)
     const contentHash = this.generateContentHash(data.type, data.title, data.narrative);
-    if (isDuplicateObservation(this.db.db, contentHash)) {
-      logger.debug('SDK', `Osservazione duplicata scartata: ${data.title}`);
+    const dedupWindow = this.getDeduplicationWindow(data.type);
+    if (isDuplicateObservation(this.db.db, contentHash, dedupWindow)) {
+      logger.debug('SDK', `Osservazione duplicata scartata (${data.type}, ${dedupWindow}ms): ${data.title}`);
       return -1;
     }
 
@@ -290,9 +306,11 @@ export class KiroMemorySDK {
    */
   async storeSummary(data: {
     request?: string;
+    investigated?: string;
     learned?: string;
     completed?: string;
     nextSteps?: string;
+    notes?: string;
   }): Promise<number> {
     this.validateSummaryInput(data);
     return createSummary(
@@ -300,11 +318,11 @@ export class KiroMemorySDK {
       'sdk-' + Date.now(),
       this.project,
       data.request || null,
-      null,
+      data.investigated || null,
       data.learned || null,
       data.completed || null,
       data.nextSteps || null,
-      null
+      data.notes || null
     );
   }
 
