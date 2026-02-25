@@ -88,4 +88,19 @@ export interface SessionStatsData {
   avgDurationMinutes: number;
 }
 
-export type ViewMode = 'feed' | 'analytics';
+export type ViewMode = 'feed' | 'analytics' | 'sessions';
+
+// ── Session Types (per la UI) ──
+
+export interface Session {
+  id: number;
+  content_session_id: string;
+  project: string;
+  user_prompt: string;
+  memory_session_id: string | null;
+  status: 'active' | 'completed' | 'failed';
+  started_at: string;
+  started_at_epoch: number;
+  completed_at: string | null;
+  completed_at_epoch: number | null;
+}

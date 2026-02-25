@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { Feed } from './components/Feed';
 import { Analytics } from './components/Analytics';
+import { Sessions } from './components/Sessions';
 import { useSSE } from './hooks/useSSE';
 import { useTheme } from './hooks/useTheme';
 import { useProjectAliases } from './hooks/useProjectAliases';
@@ -231,6 +232,11 @@ export function App() {
                 onLoadMore={handleLoadMore}
                 isLoading={isLoadingMore}
                 hasMore={hasMore}
+                getDisplayName={getDisplayName}
+              />
+            ) : currentView === 'sessions' ? (
+              <Sessions
+                currentFilter={currentFilter}
                 getDisplayName={getDisplayName}
               />
             ) : (

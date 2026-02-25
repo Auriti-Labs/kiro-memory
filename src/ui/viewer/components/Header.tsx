@@ -117,6 +117,22 @@ export function Header({ isConnected, lastEventTime, resolvedTheme, themePrefere
           </svg>
           Analytics
         </button>
+        <button
+          onClick={() => onViewChange('sessions')}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+            currentView === 'sessions'
+              ? 'bg-surface-3 text-zinc-100 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+          role="tab"
+          aria-selected={currentView === 'sessions'}
+          aria-label="Sessions"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+          </svg>
+          Sessions
+        </button>
       </div>
 
       {/* Theme toggle */}
