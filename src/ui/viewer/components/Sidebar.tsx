@@ -45,6 +45,7 @@ export function Sidebar({
 }: SidebarProps) {
   const [editingProject, setEditingProject] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [renameFeedback, setRenameFeedback] = useState<{ project: string; success: boolean } | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -62,7 +63,14 @@ export function Sidebar({
 
   const confirmEdit = async () => {
     if (editingProject && editValue.trim()) {
-      await onRenameProject(editingProject, editValue.trim());
+      try {
+        await onRenameProject(editingProject, editValue.trim());
+        setRenameFeedback({ project: editingProject, success: true });
+      } catch {
+        setRenameFeedback({ project: editingProject, success: false });
+      }
+      /* Nascondi feedback dopo 2 secondi */
+      setTimeout(() => setRenameFeedback(null), 2000);
     }
     setEditingProject(null);
   };
@@ -140,6 +148,12 @@ export function Sidebar({
                       {initials}
                     </div>
                     <span className="flex-1 truncate">{getDisplayName(project)}</span>
+                    {/* Feedback rename */}
+                    {renameFeedback?.project === project && (
+                      <span className={`text-[10px] font-medium animate-fade-in ${renameFeedback.success ? 'text-accent-green' : 'text-accent-rose'}`}>
+                        {renameFeedback.success ? 'Saved' : 'Error'}
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={e => startEditing(project, e)}

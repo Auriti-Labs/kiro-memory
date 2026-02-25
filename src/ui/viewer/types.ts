@@ -16,6 +16,7 @@ export interface Observation {
   files_read: string | null;
   files_modified: string | null;
   prompt_number: number;
+  is_stale?: number;
   created_at: string;
   created_at_epoch: number;
 }

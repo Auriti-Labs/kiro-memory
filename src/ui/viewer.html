@@ -75,6 +75,10 @@
               '0%, 100%': { opacity: '1' },
               '50%': { opacity: '0.5' },
             },
+            'slide-in-left': {
+              '0%': { opacity: '0', transform: 'translateX(-100%)' },
+              '100%': { opacity: '1', transform: 'translateX(0)' },
+            },
           },
           animation: {
             'slide-up': 'slide-up 0.35s ease-out forwards',
@@ -82,6 +86,7 @@
             'scale-in': 'scale-in 0.2s ease-out forwards',
             'spin': 'spin 0.8s linear infinite',
             'pulse-dot': 'pulse-dot 2s ease-in-out infinite',
+            'slide-in-left': 'slide-in-left 0.25s ease-out forwards',
           },
         },
       },

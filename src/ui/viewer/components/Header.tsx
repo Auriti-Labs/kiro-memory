@@ -12,6 +12,7 @@ interface HeaderProps {
   onThemeChange: (theme: ThemePreference) => void;
   currentView: ViewMode;
   onViewChange: (view: ViewMode) => void;
+  onMenuToggle?: () => void;
 }
 
 /** Formatta secondi trascorsi in testo leggibile */
@@ -25,7 +26,7 @@ function formatAgo(ms: number): string {
   return `${Math.floor(min / 60)}h ago`;
 }
 
-export function Header({ isConnected, lastEventTime, resolvedTheme, themePreference, onThemeChange, currentView, onViewChange }: HeaderProps) {
+export function Header({ isConnected, lastEventTime, resolvedTheme, themePreference, onThemeChange, currentView, onViewChange, onMenuToggle }: HeaderProps) {
   /* Cicla il tema: dark → light → system → dark */
   const cycleTheme = () => {
     const order: ThemePreference[] = ['dark', 'light', 'system'];
@@ -43,7 +44,20 @@ export function Header({ isConnected, lastEventTime, resolvedTheme, themePrefere
   /* Evento fresco: meno di 3 secondi fa */
   const isFresh = lastEventTime > 0 && (now - lastEventTime) < 3_000;
   return (
-    <header className="flex items-center gap-4 px-6 h-14 bg-surface-1 border-b border-border z-50">
+    <header className="flex items-center gap-4 px-4 md:px-6 h-14 bg-surface-1 border-b border-border z-50">
+      {/* Menu hamburger (solo mobile) */}
+      {onMenuToggle && (
+        <button
+          onClick={onMenuToggle}
+          className="md:hidden w-8 h-8 rounded-lg bg-surface-2 border border-border text-zinc-400 hover:text-zinc-100 hover:bg-surface-3 transition-all flex items-center justify-center flex-shrink-0"
+          aria-label="Apri menu laterale"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" />
+          </svg>
+        </button>
+      )}
+
       {/* Brand */}
       <div className="flex items-center gap-3 flex-shrink-0">
         <div className="w-8 h-8 rounded-lg bg-accent-violet flex items-center justify-center">
@@ -69,7 +83,7 @@ export function Header({ isConnected, lastEventTime, resolvedTheme, themePrefere
       <div className="flex-1" />
 
       {/* Status + ultimo aggiornamento */}
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-2 border border-border">
+      <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-2 border border-border">
         <div className={`w-2 h-2 rounded-full transition-all ${
           isFresh ? 'bg-accent-green scale-125' :
           isConnected ? 'bg-accent-green animate-pulse-dot' : 'bg-zinc-500'
@@ -82,8 +96,8 @@ export function Header({ isConnected, lastEventTime, resolvedTheme, themePrefere
         )}
       </div>
 
-      {/* View toggle: Feed / Analytics */}
-      <div className="flex items-center rounded-lg bg-surface-2 border border-border p-0.5" role="tablist" aria-label="View mode">
+      {/* View toggle: Feed / Analytics / Sessions */}
+      <div className="hidden sm:flex items-center rounded-lg bg-surface-2 border border-border p-0.5" role="tablist" aria-label="View mode">
         <button
           onClick={() => onViewChange('feed')}
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${

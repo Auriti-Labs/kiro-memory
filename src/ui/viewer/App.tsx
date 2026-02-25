@@ -21,7 +21,8 @@ export function App() {
   const [paginatedSummaries, setPaginatedSummaries] = useState<Summary[]>([]);
   const [paginatedPrompts, setPaginatedPrompts] = useState<UserPrompt[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState({ observations: true, summaries: true, prompts: true });
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const { observations, summaries, prompts, projects, isConnected, lastEventTime } = useSSE();
   const { preference: themePreference, resolvedTheme, setThemePreference } = useTheme();
@@ -108,56 +109,61 @@ export function App() {
     }
   }, []);
 
-  // Caricamento paginato incrementale — offset separato per ogni tipo
+  // Caricamento paginato incrementale — fetch solo tipi che hanno ancora dati
   const handleLoadMore = useCallback(async () => {
     if (isLoadingMore) return;
+    if (!hasMore.observations && !hasMore.summaries && !hasMore.prompts) return;
     setIsLoadingMore(true);
 
     try {
-      const obsOffset = paginatedObservations.length;
-      const sumOffset = paginatedSummaries.length;
-      const promptOffset = paginatedPrompts.length;
       const limit = '20';
       const projectParam = currentFilter ? `&project=${encodeURIComponent(currentFilter)}` : '';
 
-      const [obsRes, sumRes, promptRes] = await Promise.all([
-        fetch(`/api/observations?offset=${obsOffset}&limit=${limit}${projectParam}`),
-        fetch(`/api/summaries?offset=${sumOffset}&limit=${limit}${projectParam}`),
-        fetch(`/api/prompts?offset=${promptOffset}&limit=${limit}${projectParam}`)
+      const fetches = await Promise.all([
+        hasMore.observations
+          ? fetch(`/api/observations?offset=${paginatedObservations.length}&limit=${limit}${projectParam}`)
+          : null,
+        hasMore.summaries
+          ? fetch(`/api/summaries?offset=${paginatedSummaries.length}&limit=${limit}${projectParam}`)
+          : null,
+        hasMore.prompts
+          ? fetch(`/api/prompts?offset=${paginatedPrompts.length}&limit=${limit}${projectParam}`)
+          : null,
       ]);
 
-      let newItems = 0;
+      const [obsRes, sumRes, promptRes] = fetches;
+      const nextHasMore = { ...hasMore };
 
-      if (obsRes.ok) {
+      if (obsRes?.ok) {
         const newObs = await obsRes.json();
-        newItems += newObs.length;
-        setPaginatedObservations(prev => [...prev, ...newObs]);
+        if (newObs.length === 0) nextHasMore.observations = false;
+        else setPaginatedObservations(prev => [...prev, ...newObs]);
       }
-      if (sumRes.ok) {
+      if (sumRes?.ok) {
         const newSum = await sumRes.json();
-        newItems += newSum.length;
-        setPaginatedSummaries(prev => [...prev, ...newSum]);
+        if (newSum.length === 0) nextHasMore.summaries = false;
+        else setPaginatedSummaries(prev => [...prev, ...newSum]);
       }
-      if (promptRes.ok) {
+      if (promptRes?.ok) {
         const newPrompts = await promptRes.json();
-        newItems += newPrompts.length;
-        setPaginatedPrompts(prev => [...prev, ...newPrompts]);
+        if (newPrompts.length === 0) nextHasMore.prompts = false;
+        else setPaginatedPrompts(prev => [...prev, ...newPrompts]);
       }
 
-      if (newItems === 0) setHasMore(false);
+      setHasMore(nextHasMore);
     } catch (error) {
       console.error('Failed to load more data:', error);
     } finally {
       setIsLoadingMore(false);
     }
-  }, [currentFilter, paginatedObservations.length, paginatedSummaries.length, paginatedPrompts.length, isLoadingMore]);
+  }, [currentFilter, paginatedObservations.length, paginatedSummaries.length, paginatedPrompts.length, isLoadingMore, hasMore]);
 
   // Reset + fetch automatico quando cambia il filtro progetto
   useEffect(() => {
     setPaginatedObservations([]);
     setPaginatedSummaries([]);
     setPaginatedPrompts([]);
-    setHasMore(true);
+    setHasMore({ observations: true, summaries: true, prompts: true });
 
     if (currentFilter) {
       fetchForProject(currentFilter);
@@ -175,11 +181,12 @@ export function App() {
         onThemeChange={setThemePreference}
         currentView={currentView}
         onViewChange={setCurrentView}
+        onMenuToggle={() => setIsMobileMenuOpen(prev => !prev)}
       />
 
       {/* Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
+        {/* Sidebar desktop */}
         <div className="hidden md:flex w-[260px] flex-shrink-0">
           <Sidebar
             projects={projects}
@@ -192,6 +199,28 @@ export function App() {
             onRenameProject={updateAlias}
           />
         </div>
+
+        {/* Sidebar mobile (drawer) */}
+        {isMobileMenuOpen && (
+          <>
+            <div
+              className="fixed inset-0 bg-black/50 z-40 md:hidden"
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+            <div className="fixed inset-y-0 left-0 w-[280px] z-50 md:hidden animate-slide-in-left">
+              <Sidebar
+                projects={projects}
+                currentFilter={currentFilter}
+                onFilterChange={(p) => { setCurrentFilter(p); setIsMobileMenuOpen(false); }}
+                activeTypes={activeTypes}
+                onToggleType={toggleType}
+                stats={stats}
+                getDisplayName={getDisplayName}
+                onRenameProject={updateAlias}
+              />
+            </div>
+          </>
+        )}
 
         {/* Main feed */}
         <main className="flex-1 overflow-y-auto bg-surface-0">
@@ -231,7 +260,7 @@ export function App() {
                 prompts={allPrompts}
                 onLoadMore={handleLoadMore}
                 isLoading={isLoadingMore}
-                hasMore={hasMore}
+                hasMore={hasMore.observations || hasMore.summaries || hasMore.prompts}
                 getDisplayName={getDisplayName}
               />
             ) : currentView === 'sessions' ? (

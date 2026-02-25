@@ -242,6 +242,11 @@ function ObservationCard({ obs, getDisplayName }: { obs: Observation; getDisplay
           <span className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-md bg-accent-violet/10 text-accent-violet">
             {getDisplayName(obs.project)}
           </span>
+          {obs.is_stale === 1 && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/25" title="File modificato dopo l'osservazione">
+              stale
+            </span>
+          )}
           <span className="text-[11px] text-zinc-500 font-mono ml-auto tabular-nums">{timeAgo(obs.created_at_epoch)}</span>
         </div>
 
