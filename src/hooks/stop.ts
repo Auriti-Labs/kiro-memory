@@ -47,11 +47,11 @@ runHook('stop', async (input) => {
       .join('; ');
 
     await sdk.storeSummary({
-      request: `Sessione ${project} - ${new Date().toISOString().split('T')[0]}`,
+      request: `${project} session — ${new Date().toISOString().split('T')[0]}`,
       completed: completed || undefined,
       learned: learned || undefined,
       nextSteps: filesModified.length > 0
-        ? `File modificati: ${filesModified.join(', ')}`
+        ? `Files modified: ${filesModified.join(', ')}`
         : undefined
     });
 
@@ -61,10 +61,10 @@ runHook('stop', async (input) => {
     // Crea checkpoint strutturato per resume futuro
     const session = await sdk.getOrCreateSession(input.session_id || `stop-${Date.now()}`);
 
-    const task = sessionObs[0]?.title || `Sessione ${project}`;
-    const progress = completed || 'Nessun progresso registrato';
+    const task = sessionObs[0]?.title || `${project} session`;
+    const progress = completed || 'No progress recorded';
     const nextStepsCheckpoint = filesModified.length > 0
-      ? `Continuare lavoro su: ${filesModified.slice(0, 5).join(', ')}`
+      ? `Continue work on: ${filesModified.slice(0, 5).join(', ')}`
       : undefined;
 
     await sdk.createCheckpoint(session.id, {
@@ -73,6 +73,9 @@ runHook('stop', async (input) => {
       nextSteps: nextStepsCheckpoint,
       relevantFiles: filesModified.slice(0, 20)
     });
+
+    // Completa la sessione (imposta status='completed' e completed_at)
+    await sdk.completeSession(session.id);
 
     await notifyWorker('checkpoint-created', { project });
   } finally {
