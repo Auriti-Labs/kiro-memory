@@ -18,15 +18,15 @@
     "typescript",
     "ai-tools"
   ],
-  "author": "auriti-web-design",
+  "author": "Auriti Labs",
   "license": "AGPL-3.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/auriti-web-design/kiro-memory.git"
+    "url": "https://github.com/Auriti-Labs/kiro-memory.git"
   },
-  "homepage": "https://github.com/auriti-web-design/kiro-memory#readme",
+  "homepage": "https://github.com/Auriti-Labs/kiro-memory#readme",
   "bugs": {
-    "url": "https://github.com/auriti-web-design/kiro-memory/issues"
+    "url": "https://github.com/Auriti-Labs/kiro-memory/issues"
   },
   "type": "module",
   "exports": {

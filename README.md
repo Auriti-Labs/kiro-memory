@@ -83,7 +83,7 @@ kiro-memory install --cline        # Cline (instructions + MCP)
 Or from source:
 
 ```bash
-git clone https://github.com/auriti-web-design/kiro-memory.git
+git clone https://github.com/Auriti-Labs/kiro-memory.git
 cd kiro-memory
 npm install && npm run build
 npm run install:kiro
@@ -441,7 +441,7 @@ Kiro Memory runs **locally only** on `127.0.0.1` and implements multiple layers 
 - **Input Validation** on all POST endpoints (type checking, length limits, safe character patterns)
 - **SSE Connection Limit** (max 50 concurrent clients)
 
-To report a security vulnerability, please open a [private security advisory](https://github.com/auriti-web-design/kiro-memory/security/advisories/new).
+To report a security vulnerability, please open a [private security advisory](https://github.com/Auriti-Labs/kiro-memory/security/advisories/new).
 
 ## Contributing
 
@@ -453,7 +453,7 @@ Contributions are welcome. Please open an issue to discuss proposed changes befo
 
 ---
 
-Built by [auriti-web-design](https://github.com/auriti-web-design)
+Built by [Auriti Labs](https://github.com/Auriti-Labs)
 
 ---
 
