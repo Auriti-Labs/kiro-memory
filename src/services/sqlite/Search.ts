@@ -282,17 +282,36 @@ export function getProjectStats(db: Database, project: string): {
   summaries: number;
   sessions: number;
   prompts: number;
+  tokenEconomics: { discoveryTokens: number; readTokens: number; savings: number };
 } {
   const obsStmt = db.query('SELECT COUNT(*) as count FROM observations WHERE project = ?');
   const sumStmt = db.query('SELECT COUNT(*) as count FROM summaries WHERE project = ?');
   const sesStmt = db.query('SELECT COUNT(*) as count FROM sessions WHERE project = ?');
   const prmStmt = db.query('SELECT COUNT(*) as count FROM prompts WHERE project = ?');
 
+  // Token economics: discovery_tokens (costo generazione) vs read_tokens (costo lettura)
+  const discoveryStmt = db.query(
+    'SELECT COALESCE(SUM(discovery_tokens), 0) as total FROM observations WHERE project = ?'
+  );
+  const discoveryTokens = (discoveryStmt.get(project) as any)?.total || 0;
+
+  // read_tokens: stima basata su (title + narrative) / 4 chars per token
+  const readStmt = db.query(
+    `SELECT COALESCE(SUM(
+      CAST((LENGTH(COALESCE(title, '')) + LENGTH(COALESCE(narrative, ''))) / 4 AS INTEGER)
+    ), 0) as total FROM observations WHERE project = ?`
+  );
+  const readTokens = (readStmt.get(project) as any)?.total || 0;
+
+  // Savings: discovery_tokens risparmiati riutilizzando contesto anziché ridiscovery
+  const savings = Math.max(0, discoveryTokens - readTokens);
+
   return {
     observations: (obsStmt.get(project) as any)?.count || 0,
     summaries: (sumStmt.get(project) as any)?.count || 0,
     sessions: (sesStmt.get(project) as any)?.count || 0,
     prompts: (prmStmt.get(project) as any)?.count || 0,
+    tokenEconomics: { discoveryTokens, readTokens, savings },
   };
 }
 

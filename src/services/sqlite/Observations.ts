@@ -10,6 +10,19 @@ function escapeLikePattern(input: string): string {
   return input.replace(/[%_\\]/g, '\\$&');
 }
 
+/**
+ * Verifica se esiste un'osservazione con lo stesso content_hash negli ultimi 30 secondi.
+ * Ritorna true se è un duplicato (da scartare).
+ */
+export function isDuplicateObservation(db: Database, contentHash: string, windowMs: number = 30_000): boolean {
+  if (!contentHash) return false;
+  const threshold = Date.now() - windowMs;
+  const result = db.query(
+    'SELECT id FROM observations WHERE content_hash = ? AND created_at_epoch > ? LIMIT 1'
+  ).get(contentHash, threshold);
+  return !!result;
+}
+
 export function createObservation(
   db: Database,
   memorySessionId: string,
@@ -23,14 +36,16 @@ export function createObservation(
   concepts: string | null,
   filesRead: string | null,
   filesModified: string | null,
-  promptNumber: number
+  promptNumber: number,
+  contentHash: string | null = null,
+  discoveryTokens: number = 0
 ): number {
   const now = new Date();
   const result = db.run(
-    `INSERT INTO observations 
-     (memory_session_id, project, type, title, subtitle, text, narrative, facts, concepts, files_read, files_modified, prompt_number, created_at, created_at_epoch)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [memorySessionId, project, type, title, subtitle, text, narrative, facts, concepts, filesRead, filesModified, promptNumber, now.toISOString(), now.getTime()]
+    `INSERT INTO observations
+     (memory_session_id, project, type, title, subtitle, text, narrative, facts, concepts, files_read, files_modified, prompt_number, created_at, created_at_epoch, content_hash, discovery_tokens)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [memorySessionId, project, type, title, subtitle, text, narrative, facts, concepts, filesRead, filesModified, promptNumber, now.toISOString(), now.getTime(), contentHash, discoveryTokens]
   );
   return Number(result.lastInsertRowid);
 }

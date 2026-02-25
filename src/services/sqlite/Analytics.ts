@@ -25,6 +25,13 @@ export interface SessionStatsResult {
   avgDurationMinutes: number;
 }
 
+export interface TokenEconomicsResult {
+  discoveryTokens: number;
+  readTokens: number;
+  savings: number;
+  reductionPct: number;
+}
+
 export interface AnalyticsOverviewResult {
   observations: number;
   summaries: number;
@@ -34,6 +41,7 @@ export interface AnalyticsOverviewResult {
   observationsThisWeek: number;
   staleCount: number;
   knowledgeCount: number;
+  tokenEconomics: TokenEconomicsResult;
 }
 
 // ============================================================================
@@ -201,9 +209,30 @@ export function getAnalyticsOverview(
     ? (knowledgeStmt.get(project) as any)?.count || 0
     : (knowledgeStmt.get() as any)?.count || 0;
 
+  // Token economics: discovery (costo generazione) vs read (costo riutilizzo)
+  const discoverySql = project
+    ? 'SELECT COALESCE(SUM(discovery_tokens), 0) as total FROM observations WHERE project = ?'
+    : 'SELECT COALESCE(SUM(discovery_tokens), 0) as total FROM observations';
+  const discoveryStmt = db.query(discoverySql);
+  const discoveryTokens = project
+    ? (discoveryStmt.get(project) as any)?.total || 0
+    : (discoveryStmt.get() as any)?.total || 0;
+
+  const readSql = project
+    ? `SELECT COALESCE(SUM(CAST((LENGTH(COALESCE(title, '')) + LENGTH(COALESCE(narrative, ''))) / 4 AS INTEGER)), 0) as total FROM observations WHERE project = ?`
+    : `SELECT COALESCE(SUM(CAST((LENGTH(COALESCE(title, '')) + LENGTH(COALESCE(narrative, ''))) / 4 AS INTEGER)), 0) as total FROM observations`;
+  const readStmt = db.query(readSql);
+  const readTokens = project
+    ? (readStmt.get(project) as any)?.total || 0
+    : (readStmt.get() as any)?.total || 0;
+
+  const savings = Math.max(0, discoveryTokens - readTokens);
+  const reductionPct = discoveryTokens > 0 ? Math.round((1 - readTokens / discoveryTokens) * 100) : 0;
+
   return {
     observations, summaries, sessions, prompts,
     observationsToday, observationsThisWeek,
-    staleCount, knowledgeCount
+    staleCount, knowledgeCount,
+    tokenEconomics: { discoveryTokens, readTokens, savings, reductionPct }
   };
 }

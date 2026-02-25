@@ -448,7 +448,7 @@ class MigrationRunner {
       {
         version: 6,
         up: (db) => {
-          // Tabella checkpoint per session resume (Fase 6A)
+          // Tabella checkpoint per session resume
           db.run(`
             CREATE TABLE IF NOT EXISTS checkpoints (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -468,6 +468,23 @@ class MigrationRunner {
           db.run('CREATE INDEX IF NOT EXISTS idx_checkpoints_session ON checkpoints(session_id)');
           db.run('CREATE INDEX IF NOT EXISTS idx_checkpoints_project ON checkpoints(project)');
           db.run('CREATE INDEX IF NOT EXISTS idx_checkpoints_epoch ON checkpoints(created_at_epoch)');
+        }
+      },
+      {
+        version: 7,
+        up: (db) => {
+          // Content hash per deduplicazione basata su contenuto (SHA256)
+          db.run('ALTER TABLE observations ADD COLUMN content_hash TEXT');
+          db.run('CREATE INDEX IF NOT EXISTS idx_observations_hash ON observations(content_hash)');
+        }
+      },
+      {
+        version: 8,
+        up: (db) => {
+          // Token economics: token spesi per generare l'osservazione (discovery cost)
+          db.run('ALTER TABLE observations ADD COLUMN discovery_tokens INTEGER DEFAULT 0');
+          // Token economics sui summary
+          db.run('ALTER TABLE summaries ADD COLUMN discovery_tokens INTEGER DEFAULT 0');
         }
       }
     ];
