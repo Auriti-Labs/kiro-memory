@@ -5,7 +5,8 @@
  */
 
 import { KiroMemoryDatabase } from '../services/sqlite/index.js';
-import { getObservationsByProject, createObservation, searchObservations, updateLastAccessed, consolidateObservations as dbConsolidateObservations } from '../services/sqlite/Observations.js';
+import { getObservationsByProject, createObservation, searchObservations, updateLastAccessed, consolidateObservations as dbConsolidateObservations, isDuplicateObservation } from '../services/sqlite/Observations.js';
+import { createHash } from 'crypto';
 import { getSummariesByProject, createSummary, searchSummaries } from '../services/sqlite/Summaries.js';
 import { getPromptsByProject, createPrompt } from '../services/sqlite/Prompts.js';
 import { getSessionByContentId, createSession, completeSession as dbCompleteSession } from '../services/sqlite/Sessions.js';
@@ -141,30 +142,64 @@ export class KiroMemorySDK {
   }
 
   /**
+   * Genera content hash SHA256 per deduplicazione basata su contenuto.
+   * Usa (sessionId + title + narrative) come tupla di identità semantica.
+   */
+  private generateContentHash(sessionId: string, title: string, narrative?: string): string {
+    const payload = `${sessionId}|${title}|${narrative || ''}`;
+    return createHash('sha256').update(payload).digest('hex');
+  }
+
+  /**
    * Store a new observation
    */
   async storeObservation(data: {
     type: string;
     title: string;
     content: string;
+    subtitle?: string;
+    narrative?: string;
+    facts?: string;
     concepts?: string[];
+    /** @deprecated Usa filesRead/filesModified per separare i file */
     files?: string[];
+    filesRead?: string[];
+    filesModified?: string[];
   }): Promise<number> {
     this.validateObservationInput(data);
+
+    const sessionId = 'sdk-' + Date.now();
+
+    // Deduplicazione con content hash (finestra 30 secondi)
+    const contentHash = this.generateContentHash(sessionId, data.title, data.narrative);
+    if (isDuplicateObservation(this.db.db, contentHash)) {
+      logger.debug('SDK', `Osservazione duplicata scartata: ${data.title}`);
+      return -1;
+    }
+
+    // Separa filesRead e filesModified (retrocompatibile con files generico)
+    const filesRead = data.filesRead || (data.type === 'file-read' ? data.files : undefined);
+    const filesModified = data.filesModified || (data.type === 'file-write' ? data.files : undefined);
+
+    // Token economics: stima costo discovery (content completo / 4 chars per token)
+    const discoveryTokens = Math.ceil(data.content.length / 4);
+
     const observationId = createObservation(
       this.db.db,
-      'sdk-' + Date.now(),
+      sessionId,
       this.project,
       data.type,
       data.title,
-      null,           // subtitle
+      data.subtitle || null,
       data.content,
-      null,           // narrative
-      null,           // facts
+      data.narrative || null,
+      data.facts || null,
       data.concepts?.join(', ') || null,
-      data.files?.join(', ') || null,  // files_read
-      data.files?.join(', ') || null,  // files_modified
-      0               // prompt_number
+      filesRead?.join(', ') || null,
+      filesModified?.join(', ') || null,
+      0,
+      contentHash,
+      discoveryTokens
     );
 
     // Genera embedding in background (fire-and-forget, non blocca)
@@ -215,9 +250,18 @@ export class KiroMemorySDK {
       }
     })();
 
+    const sessionId = 'sdk-' + Date.now();
+    const contentHash = this.generateContentHash(sessionId, data.title);
+    if (isDuplicateObservation(this.db.db, contentHash)) {
+      logger.debug('SDK', `Knowledge duplicata scartata: ${data.title}`);
+      return -1;
+    }
+
+    const discoveryTokens = Math.ceil(data.content.length / 4);
+
     const observationId = createObservation(
       this.db.db,
-      'sdk-' + Date.now(),
+      sessionId,
       data.project || this.project,
       data.knowledgeType,       // type = knowledgeType
       data.title,
@@ -227,8 +271,10 @@ export class KiroMemorySDK {
       JSON.stringify(metadata), // facts = metadati JSON
       data.concepts?.join(', ') || null,
       data.files?.join(', ') || null,
-      data.files?.join(', ') || null,
-      0                         // prompt_number
+      null,                     // filesModified: knowledge non modifica file
+      0,                        // prompt_number
+      contentHash,
+      discoveryTokens
     );
 
     // Genera embedding in background
