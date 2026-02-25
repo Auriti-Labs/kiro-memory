@@ -940,6 +940,176 @@ app.get('/api/report', (req, res) => {
   }
 });
 
+// ── Save Memory (endpoint programmabile) ──
+
+app.post('/api/memory/save', (req, res) => {
+  const { project, title, content, type, concepts } = req.body;
+
+  if (!isValidProject(project)) {
+    res.status(400).json({ error: 'Invalid or missing "project"' });
+    return;
+  }
+  if (!isValidString(title, 500)) {
+    res.status(400).json({ error: 'Invalid or missing "title" (max 500 chars)' });
+    return;
+  }
+  if (!isValidString(content, 100_000)) {
+    res.status(400).json({ error: 'Invalid or missing "content" (max 100KB)' });
+    return;
+  }
+
+  const obsType = type || 'research';
+  const conceptStr = Array.isArray(concepts) ? concepts.join(', ') : (concepts || null);
+
+  try {
+    const id = createObservation(
+      db.db,
+      'memory-save-' + Date.now(),
+      project,
+      obsType,
+      title,
+      null,    // subtitle
+      content, // text
+      content, // narrative
+      null,    // facts
+      conceptStr,
+      null,    // filesRead
+      null,    // filesModified
+      0        // promptNumber
+    );
+
+    broadcast('observation-created', { id, project, title });
+    projectsCache.ts = 0;
+
+    // Genera embedding in background
+    generateEmbeddingForObservation(id, title, content, Array.isArray(concepts) ? concepts : undefined).catch(() => {});
+
+    res.json({ id, success: true });
+  } catch (error) {
+    logger.error('WORKER', 'Memory save fallito', {}, error as Error);
+    res.status(500).json({ error: 'Failed to save memory' });
+  }
+});
+
+// ── Retention Policy (cleanup automatico) ──
+
+app.post('/api/retention/cleanup', (req, res) => {
+  const { maxAgeDays, dryRun } = req.body || {};
+  const days = parseIntSafe(String(maxAgeDays), 90, 7, 730);
+  const threshold = Date.now() - (days * 86_400_000);
+
+  try {
+    if (dryRun) {
+      // Conta senza eliminare
+      const obsCount = (db.db.query('SELECT COUNT(*) as c FROM observations WHERE created_at_epoch < ?').get(threshold) as { c: number }).c;
+      const sumCount = (db.db.query('SELECT COUNT(*) as c FROM summaries WHERE created_at_epoch < ?').get(threshold) as { c: number }).c;
+      const promptCount = (db.db.query('SELECT COUNT(*) as c FROM prompts WHERE created_at_epoch < ?').get(threshold) as { c: number }).c;
+      res.json({ dryRun: true, maxAgeDays: days, wouldDelete: { observations: obsCount, summaries: sumCount, prompts: promptCount } });
+      return;
+    }
+
+    // Elimina in transazione
+    const cleanup = db.db.transaction(() => {
+      // Elimina embeddings associati
+      db.db.run('DELETE FROM observation_embeddings WHERE observation_id IN (SELECT id FROM observations WHERE created_at_epoch < ?)', [threshold]);
+      const obsResult = db.db.run('DELETE FROM observations WHERE created_at_epoch < ?', [threshold]);
+      const sumResult = db.db.run('DELETE FROM summaries WHERE created_at_epoch < ?', [threshold]);
+      const promptResult = db.db.run('DELETE FROM prompts WHERE created_at_epoch < ?', [threshold]);
+      return {
+        observations: obsResult.changes,
+        summaries: sumResult.changes,
+        prompts: promptResult.changes,
+      };
+    });
+
+    const deleted = cleanup();
+    projectsCache.ts = 0; // Invalida cache
+
+    logger.info('WORKER', `Retention cleanup: eliminati ${deleted.observations} obs, ${deleted.summaries} sum, ${deleted.prompts} prompts (> ${days}gg)`);
+    res.json({ success: true, maxAgeDays: days, deleted });
+  } catch (error) {
+    logger.error('WORKER', 'Retention cleanup fallito', { maxAgeDays: days }, error as Error);
+    res.status(500).json({ error: 'Retention cleanup failed' });
+  }
+});
+
+// ── Export endpoint ──
+
+app.get('/api/export', (req, res) => {
+  const { project, format: fmt, type, days } = req.query as {
+    project?: string; format?: string; type?: string; days?: string;
+  };
+
+  if (project && !isValidProject(project)) {
+    res.status(400).json({ error: 'Invalid project name' });
+    return;
+  }
+
+  const daysBack = parseIntSafe(days, 30, 1, 365);
+  const threshold = Date.now() - (daysBack * 86_400_000);
+
+  try {
+    // Query con filtri opzionali
+    let sql = 'SELECT * FROM observations WHERE created_at_epoch > ?';
+    const params: (string | number)[] = [threshold];
+
+    if (project) { sql += ' AND project = ?'; params.push(project); }
+    if (type) { sql += ' AND type = ?'; params.push(type); }
+    sql += ' ORDER BY created_at_epoch DESC LIMIT 1000';
+
+    const observations = db.db.query(sql).all(...params) as any[];
+
+    // Summaries per lo stesso periodo
+    let sumSql = 'SELECT * FROM summaries WHERE created_at_epoch > ?';
+    const sumParams: (string | number)[] = [threshold];
+    if (project) { sumSql += ' AND project = ?'; sumParams.push(project); }
+    sumSql += ' ORDER BY created_at_epoch DESC LIMIT 100';
+    const summaries = db.db.query(sumSql).all(...sumParams) as any[];
+
+    if (fmt === 'markdown' || fmt === 'md') {
+      // Formato Markdown
+      const lines: string[] = [
+        `# Kiro Memory Export`,
+        `> Project: ${project || 'All'} | Period: ${daysBack} days | Generated: ${new Date().toISOString()}`,
+        '',
+        `## Observations (${observations.length})`,
+        '',
+      ];
+
+      for (const obs of observations) {
+        const date = new Date(obs.created_at_epoch).toISOString().split('T')[0];
+        lines.push(`### [${obs.type}] ${obs.title}`);
+        lines.push(`- **Date**: ${date} | **Project**: ${obs.project} | **ID**: #${obs.id}`);
+        if (obs.narrative) lines.push(`- ${obs.narrative}`);
+        if (obs.concepts) lines.push(`- **Concepts**: ${obs.concepts}`);
+        lines.push('');
+      }
+
+      lines.push(`## Summaries (${summaries.length})`, '');
+      for (const sum of summaries) {
+        const date = new Date(sum.created_at_epoch).toISOString().split('T')[0];
+        lines.push(`### Session ${sum.session_id} (${date})`);
+        if (sum.request) lines.push(`- **Request**: ${sum.request}`);
+        if (sum.completed) lines.push(`- **Completed**: ${sum.completed}`);
+        if (sum.next_steps) lines.push(`- **Next steps**: ${sum.next_steps}`);
+        lines.push('');
+      }
+
+      res.type('text/markdown').send(lines.join('\n'));
+    } else {
+      // Formato JSON (default)
+      res.json({
+        meta: { project: project || 'all', daysBack, exportedAt: new Date().toISOString() },
+        observations,
+        summaries,
+      });
+    }
+  } catch (error) {
+    logger.error('WORKER', 'Export fallito', { project, fmt }, error as Error);
+    res.status(500).json({ error: 'Export failed' });
+  }
+});
+
 // Servire la UI viewer (file statici dalla directory dist)
 app.use(express.static(__worker_dirname, {
   index: false,

@@ -168,6 +168,21 @@ const TOOLS = [
     }
   },
   {
+    name: 'save_memory',
+    description: 'Save a memory/observation manually. Use to persist important information, learnings, decisions, or context that should be remembered across sessions.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        project: { type: 'string', description: 'Project name (required)' },
+        title: { type: 'string', description: 'Short descriptive title for the memory' },
+        content: { type: 'string', description: 'Full content of the memory to save' },
+        type: { type: 'string', description: 'Observation type: research, file-write, command, etc. (default: research)' },
+        concepts: { type: 'array', items: { type: 'string' }, description: 'Related concepts/tags (optional)' }
+      },
+      required: ['project', 'title', 'content']
+    }
+  },
+  {
     name: 'generate_report',
     description: 'Generate an activity report for a project. Returns a markdown summary with observations, sessions, learnings, completed tasks, and file hotspots for the specified time period.',
     inputSchema: {
@@ -396,6 +411,18 @@ const handlers: Record<string, ToolHandler> = {
     if (checkpoint.created_at) parts.push(`\n_Checkpoint created: ${checkpoint.created_at}_`);
 
     return parts.join('\n');
+  },
+
+  async save_memory(args: { project: string; title: string; content: string; type?: string; concepts?: string[] }) {
+    const result = await callWorkerPOST('/api/memory/save', {
+      project: args.project,
+      title: args.title,
+      content: args.content,
+      type: args.type || 'research',
+      concepts: args.concepts,
+    });
+
+    return `Memory saved successfully.\n- **ID**: ${result.id}\n- **Project**: ${args.project}\n- **Title**: ${args.title}`;
   },
 
   async generate_report(args: { project?: string; period?: string }) {
