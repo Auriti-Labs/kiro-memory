@@ -107,23 +107,22 @@ export function App() {
     }
   }, []);
 
-  // Caricamento paginato incrementale
+  // Caricamento paginato incrementale — offset separato per ogni tipo
   const handleLoadMore = useCallback(async () => {
     if (isLoadingMore) return;
     setIsLoadingMore(true);
 
     try {
-      const offset = paginatedObservations.length;
-      const params = new URLSearchParams({
-        offset: String(offset),
-        limit: '20',
-        ...(currentFilter && { project: currentFilter })
-      });
+      const obsOffset = paginatedObservations.length;
+      const sumOffset = paginatedSummaries.length;
+      const promptOffset = paginatedPrompts.length;
+      const limit = '20';
+      const projectParam = currentFilter ? `&project=${encodeURIComponent(currentFilter)}` : '';
 
       const [obsRes, sumRes, promptRes] = await Promise.all([
-        fetch(`/api/observations?${params}`),
-        fetch(`/api/summaries?${params}`),
-        fetch(`/api/prompts?${params}`)
+        fetch(`/api/observations?offset=${obsOffset}&limit=${limit}${projectParam}`),
+        fetch(`/api/summaries?offset=${sumOffset}&limit=${limit}${projectParam}`),
+        fetch(`/api/prompts?offset=${promptOffset}&limit=${limit}${projectParam}`)
       ]);
 
       let newItems = 0;
@@ -150,7 +149,7 @@ export function App() {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [currentFilter, paginatedObservations.length, isLoadingMore]);
+  }, [currentFilter, paginatedObservations.length, paginatedSummaries.length, paginatedPrompts.length, isLoadingMore]);
 
   // Reset + fetch automatico quando cambia il filtro progetto
   useEffect(() => {

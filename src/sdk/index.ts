@@ -143,10 +143,11 @@ export class KiroMemorySDK {
 
   /**
    * Genera content hash SHA256 per deduplicazione basata su contenuto.
-   * Usa (sessionId + title + narrative) come tupla di identità semantica.
+   * Usa (project + type + title + narrative) come tupla di identità semantica.
+   * NON include sessionId perché è unico ad ogni invocazione.
    */
-  private generateContentHash(sessionId: string, title: string, narrative?: string): string {
-    const payload = `${sessionId}|${title}|${narrative || ''}`;
+  private generateContentHash(type: string, title: string, narrative?: string): string {
+    const payload = `${this.project}|${type}|${title}|${narrative || ''}`;
     return createHash('sha256').update(payload).digest('hex');
   }
 
@@ -171,7 +172,7 @@ export class KiroMemorySDK {
     const sessionId = 'sdk-' + Date.now();
 
     // Deduplicazione con content hash (finestra 30 secondi)
-    const contentHash = this.generateContentHash(sessionId, data.title, data.narrative);
+    const contentHash = this.generateContentHash(data.type, data.title, data.narrative);
     if (isDuplicateObservation(this.db.db, contentHash)) {
       logger.debug('SDK', `Osservazione duplicata scartata: ${data.title}`);
       return -1;
@@ -251,7 +252,7 @@ export class KiroMemorySDK {
     })();
 
     const sessionId = 'sdk-' + Date.now();
-    const contentHash = this.generateContentHash(sessionId, data.title);
+    const contentHash = this.generateContentHash(data.type, data.title);
     if (isDuplicateObservation(this.db.db, contentHash)) {
       logger.debug('SDK', `Knowledge duplicata scartata: ${data.title}`);
       return -1;

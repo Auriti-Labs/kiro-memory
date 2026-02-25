@@ -39,6 +39,24 @@ export function SearchBar() {
 
   const total = results ? results.observations.length + results.summaries.length : 0;
 
+  /** Naviga al risultato selezionato: scrolla alla card nel feed */
+  const openSelected = useCallback(() => {
+    if (!results || total === 0) return;
+    const obsCount = results.observations.length;
+    let targetId: string;
+    if (selectedIndex < obsCount) {
+      targetId = `obs-${results.observations[selectedIndex].id}`;
+    } else {
+      targetId = `sum-${results.summaries[selectedIndex - obsCount].id}`;
+    }
+    close();
+    // Cerca l'elemento nel DOM e scrolla
+    setTimeout(() => {
+      const el = document.querySelector(`[data-id="${targetId}"]`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  }, [results, selectedIndex, total, close]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -56,10 +74,14 @@ export function SearchBar() {
         e.preventDefault();
         setSelectedIndex(prev => Math.max(prev - 1, 0));
       }
+      if (e.key === 'Enter' && total > 0) {
+        e.preventDefault();
+        openSelected();
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [close, isOpen, total]);
+  }, [close, isOpen, total, openSelected]);
 
   return (
     <>

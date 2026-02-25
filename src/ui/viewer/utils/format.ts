@@ -47,6 +47,6 @@ export function timeAgo(epoch: number): string {
     const w = Math.floor(diff / 604800);
     return `${w}w ago`;
   }
-  const date = new Date(epochSeconds * 1000);
+  const date = new Date(epochMs);
   return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
 }
