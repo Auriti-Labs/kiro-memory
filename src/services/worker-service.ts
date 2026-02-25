@@ -286,6 +286,7 @@ app.post('/api/observations', (req, res) => {
     );
     
     broadcast('observation-created', { id, project, title });
+    projectsCache.ts = 0; // Invalida cache progetti
 
     // Genera embedding in background (fire-and-forget)
     generateEmbeddingForObservation(id, title, content, concepts).catch(() => {});
@@ -707,8 +708,12 @@ app.put('/api/project-aliases/:project', (req, res) => {
   const { project } = req.params;
   const { displayName } = req.body;
 
-  if (!displayName || typeof displayName !== 'string') {
-    res.status(400).json({ error: 'Field "displayName" (string) is required' });
+  if (!isValidProject(project)) {
+    res.status(400).json({ error: 'Invalid project name' });
+    return;
+  }
+  if (!displayName || typeof displayName !== 'string' || displayName.trim().length === 0 || displayName.length > 100) {
+    res.status(400).json({ error: 'Field "displayName" is required (string, max 100 chars)' });
     return;
   }
 
@@ -727,9 +732,18 @@ app.put('/api/project-aliases/:project', (req, res) => {
   }
 });
 
-// Lista progetti distinti
+// Lista progetti distinti (con cache TTL 60s)
+let projectsCache: { data: string[]; ts: number } = { data: [], ts: 0 };
+const PROJECTS_CACHE_TTL = 60_000;
+
 app.get('/api/projects', (_req, res) => {
   try {
+    const now = Date.now();
+    if (now - projectsCache.ts < PROJECTS_CACHE_TTL && projectsCache.data.length > 0) {
+      res.json(projectsCache.data);
+      return;
+    }
+
     const stmt = db.db.query(
       `SELECT DISTINCT project FROM (
         SELECT project FROM observations
@@ -740,7 +754,8 @@ app.get('/api/projects', (_req, res) => {
       ) ORDER BY project ASC`
     );
     const rows = stmt.all() as { project: string }[];
-    res.json(rows.map(r => r.project));
+    projectsCache = { data: rows.map(r => r.project), ts: now };
+    res.json(projectsCache.data);
   } catch (error) {
     logger.error('WORKER', 'Lista progetti fallita', {}, error as Error);
     res.status(500).json({ error: 'Failed to list projects' });

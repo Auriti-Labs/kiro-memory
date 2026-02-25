@@ -92,16 +92,6 @@ export interface PaginationParams {
 }
 
 // ============================================================================
-// Settings Types
-// ============================================================================
-
-export interface ViewerSettings {
-  sidebarOpen: boolean;
-  selectedProject: string | null;
-  theme: 'light' | 'dark' | 'system';
-}
-
-// ============================================================================
 // Database Record Types
 // ============================================================================
 

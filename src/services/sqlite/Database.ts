@@ -486,6 +486,16 @@ class MigrationRunner {
           // Token economics sui summary
           db.run('ALTER TABLE summaries ADD COLUMN discovery_tokens INTEGER DEFAULT 0');
         }
+      },
+      {
+        version: 9,
+        up: (db) => {
+          // Indici compositi per paginazione e filtri per progetto
+          db.run('CREATE INDEX IF NOT EXISTS idx_observations_project_epoch ON observations(project, created_at_epoch DESC)');
+          db.run('CREATE INDEX IF NOT EXISTS idx_observations_project_type ON observations(project, type)');
+          db.run('CREATE INDEX IF NOT EXISTS idx_summaries_project_epoch ON summaries(project, created_at_epoch DESC)');
+          db.run('CREATE INDEX IF NOT EXISTS idx_prompts_project_epoch ON prompts(project, created_at_epoch DESC)');
+        }
       }
     ];
   }

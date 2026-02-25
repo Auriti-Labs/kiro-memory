@@ -50,3 +50,23 @@ export function timeAgo(epoch: number): string {
   const date = new Date(epochMs);
   return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
 }
+
+/**
+ * Formatta conteggio token in formato leggibile (1.2k, 45.3k, 1.2M).
+ */
+export function formatTokenCount(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
+  return String(tokens);
+}
+
+/**
+ * Formatta durata in minuti in formato leggibile.
+ */
+export function formatDuration(minutes: number): string {
+  if (minutes < 1) return '<1m';
+  if (minutes < 60) return `${Math.round(minutes)}m`;
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes % 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}

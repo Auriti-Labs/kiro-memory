@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { formatTokenCount, formatDuration } from '../utils/format';
 import type { TimelineEntry, TypeDistributionEntry, TokenEconomics } from '../types';
 
 /* Colori per tipo osservazione (stessi del Feed) */
@@ -272,7 +273,7 @@ function SessionStatsPanel({ stats }: { stats: { total: number; completed: numbe
           <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
         </svg>
         <div>
-          <span className="text-sm font-semibold text-zinc-200">{formatDuration(stats.avgDurationMinutes)}</span>
+          <span className="text-sm font-semibold text-zinc-200">{formatDuration(stats.avgDurationMinutes as number)}</span>
           <span className="text-xs text-zinc-500 ml-2">avg session duration</span>
         </div>
       </div>
@@ -290,17 +291,17 @@ function TokenEconomicsPanel({ economics }: { economics: TokenEconomics }) {
 
       <div className="grid grid-cols-3 gap-3 mb-4">
         <div className="rounded-lg bg-surface-2 border border-border px-4 py-3 text-center">
-          <div className="text-lg font-bold text-amber-400 tabular-nums">{formatTokens(discoveryTokens)}</div>
+          <div className="text-lg font-bold text-amber-400 tabular-nums">{formatTokenCount(discoveryTokens)}</div>
           <div className="text-[10px] uppercase tracking-wider text-zinc-600 mt-0.5">Discovery</div>
           <div className="text-[9px] text-zinc-700 mt-0.5">tokens spent</div>
         </div>
         <div className="rounded-lg bg-surface-2 border border-border px-4 py-3 text-center">
-          <div className="text-lg font-bold text-cyan-400 tabular-nums">{formatTokens(readTokens)}</div>
+          <div className="text-lg font-bold text-cyan-400 tabular-nums">{formatTokenCount(readTokens)}</div>
           <div className="text-[10px] uppercase tracking-wider text-zinc-600 mt-0.5">Read Cost</div>
           <div className="text-[9px] text-zinc-700 mt-0.5">to reuse context</div>
         </div>
         <div className="rounded-lg bg-surface-2 border border-border px-4 py-3 text-center">
-          <div className="text-lg font-bold text-emerald-400 tabular-nums">{formatTokens(savings)}</div>
+          <div className="text-lg font-bold text-emerald-400 tabular-nums">{formatTokenCount(savings)}</div>
           <div className="text-[10px] uppercase tracking-wider text-zinc-600 mt-0.5">Savings</div>
           <div className="text-[9px] text-zinc-700 mt-0.5">tokens saved</div>
         </div>
@@ -324,11 +325,11 @@ function TokenEconomicsPanel({ economics }: { economics: TokenEconomics }) {
         <div className="flex items-center justify-between text-[9px] text-zinc-700">
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-cyan-500 inline-block" />
-            Read: {formatTokens(readTokens)}
+            Read: {formatTokenCount(readTokens)}
           </span>
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-emerald-500/40 inline-block" />
-            Saved: {formatTokens(savings)}
+            Saved: {formatTokenCount(savings)}
           </span>
         </div>
       </div>
@@ -336,18 +337,3 @@ function TokenEconomicsPanel({ economics }: { economics: TokenEconomics }) {
   );
 }
 
-/* ── Helper: formatta token in formato leggibile (1.2k, 45.3k, 1.2M) ── */
-function formatTokens(tokens: number): string {
-  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
-  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
-  return String(tokens);
-}
-
-/* ── Helper: formatta durata in formato leggibile ── */
-function formatDuration(minutes: number): string {
-  if (minutes < 1) return '<1m';
-  if (minutes < 60) return `${Math.round(minutes)}m`;
-  const h = Math.floor(minutes / 60);
-  const m = Math.round(minutes % 60);
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
-}

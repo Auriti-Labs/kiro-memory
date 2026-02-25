@@ -94,7 +94,6 @@
     "better-sqlite3": "^12.6.2",
     "chromadb": "^3.2.2",
     "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
     "cors": "^2.8.5",
     "dompurify": "^3.3.1",
     "express": "^4.18.2",
@@ -105,13 +104,12 @@
     "lucide-react": "^0.574.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "tailwind-merge": "^3.4.1",
     "yaml": "^2.8.2",
     "zod": "^3.23.8"
   },
   "optionalDependencies": {
-    "fastembed": "^2.1.0",
-    "@huggingface/transformers": "^3.8.0"
+    "@huggingface/transformers": "^3.8.0",
+    "fastembed": "^2.1.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

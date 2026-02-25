@@ -139,6 +139,8 @@ export function consolidateObservations(
   let totalMerged = 0;
   let totalRemoved = 0;
 
+  // Esegui tutto in una transazione atomica per consistenza
+  const runConsolidation = db.transaction(() => {
   for (const group of groups) {
     const obsIds = group.ids.split(',').map(Number);
 
@@ -185,6 +187,9 @@ export function consolidateObservations(
     totalMerged += 1;
     totalRemoved += removeIds.length;
   }
+  }); // fine transazione
+
+  runConsolidation();
 
   return { merged: totalMerged, removed: totalRemoved };
 }

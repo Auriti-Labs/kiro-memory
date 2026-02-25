@@ -49,12 +49,6 @@ export interface ProjectAlias {
   display_name: string;
 }
 
-export interface ViewerSettings {
-  sidebarOpen: boolean;
-  selectedProject: string | null;
-  theme: 'light' | 'dark' | 'system';
-}
-
 export type ThemePreference = 'light' | 'dark' | 'system';
 
 // ── Analytics Types ──
