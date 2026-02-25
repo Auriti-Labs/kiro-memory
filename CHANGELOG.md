@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-02-25
+
+### Added
+
+- **Sessions View**: New "Sessions" tab in the dashboard with stats cards (total, active, completed, avg duration), expandable session list with color-coded status indicators, and project filtering
+- **Hybrid Search in SearchBar**: Upgraded from FTS5-only to hybrid search (vector + keyword) with source badges (semantic/keyword/hybrid) and relevance scores
+- **Save Memory API**: `POST /api/memory/save` endpoint and `save_memory` MCP tool for programmatic observation creation from external tools
+- **Export Endpoint**: `GET /api/export` with JSON and Markdown formats, filterable by project, type, and time period
+- **Retention Policy**: `POST /api/retention/cleanup` with dry-run mode and configurable age (7-730 days) for automatic data cleanup
+- **Stale Badge**: Visual "stale" indicator on observation cards when files have been modified after the observation was created
+- **Mobile Sidebar**: Hamburger menu and slide-in drawer for mobile/small screens with responsive layout
+- **Concept Extraction from Code**: Analyzes actual code content (React hooks, API calls, SQL, testing patterns, security, performance) to generate richer concept tags
+- **Structured Session Summaries**: Stop hook now generates categorized summaries with investigated/completed/learned/next_steps sections instead of flat text
+- **Priority Knowledge Injection**: Knowledge items (constraints, decisions, heuristics) are always placed first in context injection, before regular observations
+- **Weighted BM25 Search**: FTS5 queries now use column-weighted BM25 scoring (title=10, narrative=5, concepts=3, text=1) for better relevance ranking
+- **Type-Specific Deduplication**: Different dedup windows per observation type (file-read=60s, research=120s, file-write=10s, command=30s) to reduce noise
+- **Slide-in Animation**: New CSS animation for mobile drawer
+
+### Fixed
+
+- **6 Critical UI Bugs**: `epochSeconds` undefined in timeAgo, SDK deduplication using sessionId instead of content hash, separate pagination offsets for each type, SearchBar Enter key handler, feed items beyond index 8 invisible, ObservationCard redesigned without toggle
+- **Accessibility**: Checkbox DOM order in sidebar, ARIA labels on header buttons, combobox roles on search, `aria-live` on feed, improved contrast ratios
+- **Theme Cycling**: Dark → Light → System cycle with proper icon for each state
+
+### Changed
+
+- **Dashboard Redesign**: Cleaner ObservationCard without facts/narrative toggle, concept badges with semantic coloring, token economics in sidebar
+- **Separate Pagination**: `hasMore` state split per type (observations/summaries/prompts) to avoid unnecessary fetches
+- **Rename Feedback**: Visual "Saved"/"Error" indicator after project rename in sidebar
+- **storeSummary SDK**: Now accepts `investigated` and `notes` fields
+
+### Performance
+
+- **Composite SQLite Indices**: Migration v9 adds `(project, created_at_epoch DESC)` indices on observations, summaries, and prompts
+- **Projects Cache**: In-memory cache with 60s TTL on `/api/projects`, invalidated on new observations
+- **Atomic Consolidation**: `consolidateObservations` wrapped in database transaction
+- **Input Validation**: Project name validation on `PUT /api/project-aliases`
+
+### Removed
+
+- Dead code: `useSettings.ts`, `lib/utils.ts`, `styles.css`, `tailwind.config.js`
+- Unused dependencies: `clsx`, `tailwind-merge`
+
 ## [1.7.1] - 2026-02-20
 
 ### Fixed
@@ -134,6 +177,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session Summaries**: Structured summaries generated automatically at session end
 - **Web Dashboard**: Real-time viewer at `http://localhost:3001`
 
+[1.8.0]: https://github.com/auriti-web-design/kiro-memory/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/auriti-web-design/kiro-memory/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/auriti-web-design/kiro-memory/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/auriti-web-design/kiro-memory/compare/v1.5.0...v1.6.0

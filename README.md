@@ -56,10 +56,13 @@ When a new session starts, Kiro Memory automatically injects previous session co
 - **Session Checkpoint & Resume** -- Checkpoint sessions and resume from where you left off
 - **Activity Reports** -- Weekly/monthly digests in text, Markdown, or JSON format
 - **Analytics Dashboard** -- Activity timeline, type distribution, session stats, and file hotspots
-- **Session Summaries** -- Structured summaries generated when sessions end
-- **Web Dashboard** -- Real-time viewer at `http://localhost:3001` with dark/light theme, search, project filters, and live updates via SSE
-- **MCP Server** -- 10 tools exposed via Model Context Protocol
-- **Full-Text Search** -- SQLite FTS5 for fast, typo-tolerant search across all stored context
+- **Session Tracking** -- Sessions view with stats (total, active, completed, avg duration) and expandable session details
+- **Session Summaries** -- Structured summaries with investigated/completed/learned/next_steps sections
+- **Web Dashboard** -- Real-time viewer at `http://localhost:3001` with dark/light/system theme, hybrid search, project filters, mobile drawer, and live updates via SSE
+- **MCP Server** -- 11 tools exposed via Model Context Protocol
+- **Full-Text Search** -- SQLite FTS5 with weighted BM25 scoring for relevance-ranked results
+- **Data Export** -- Export observations and summaries in JSON or Markdown format
+- **Retention Policy** -- Automatic cleanup of old data with configurable age and dry-run mode
 - **TypeScript SDK** -- Programmatic access to the entire memory system
 - **CLI** -- Query and manage context directly from the terminal
 
@@ -151,6 +154,7 @@ The MCP server exposes 10 tools that your AI assistant can use directly.
 | `resume_session` | Get checkpoint data to resume a previous session |
 | `generate_report` | Generate weekly/monthly activity report in Markdown |
 | `get_recent_context` | Get recent memory context for session injection |
+| `save_memory` | Save a structured observation from external tools or scripts |
 
 ### Storage
 
@@ -286,9 +290,12 @@ kiro-memory decay --days=30
 The worker starts automatically when a Kiro session begins (via the `agentSpawn` hook). Once running, open `http://localhost:3001` in your browser to access the web dashboard with:
 
 - **Live feed** of observations, summaries, and prompts (via SSE)
-- **Project sidebar** with type filters and stats
-- **Spotlight search** (Ctrl+K / Cmd+K) with instant results
-- **Dark/light theme** toggle
+- **Sessions view** with stats cards and expandable session details
+- **Analytics dashboard** with timeline charts and type distribution
+- **Project sidebar** with type filters, stats, and token economics
+- **Spotlight search** (Ctrl+K / Cmd+K) with hybrid search and source badges
+- **Dark/light/system theme** cycling
+- **Mobile-responsive** sidebar drawer
 
 For development, you can also manage the worker manually:
 
