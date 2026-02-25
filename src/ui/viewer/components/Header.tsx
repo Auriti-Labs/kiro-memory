@@ -1,16 +1,38 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SearchBar } from './SearchBar';
 import type { ViewMode } from '../types';
 
 interface HeaderProps {
   isConnected: boolean;
+  lastEventTime: number;
   resolvedTheme: 'light' | 'dark';
   onThemeToggle: () => void;
   currentView: ViewMode;
   onViewChange: (view: ViewMode) => void;
 }
 
-export function Header({ isConnected, resolvedTheme, onThemeToggle, currentView, onViewChange }: HeaderProps) {
+/** Formatta secondi trascorsi in testo leggibile */
+function formatAgo(ms: number): string {
+  if (ms <= 0) return '';
+  const sec = Math.floor(ms / 1000);
+  if (sec < 5) return 'just now';
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  return `${Math.floor(min / 60)}h ago`;
+}
+
+export function Header({ isConnected, lastEventTime, resolvedTheme, onThemeToggle, currentView, onViewChange }: HeaderProps) {
+  /* Aggiorna il testo "Updated Xs ago" ogni 5 secondi */
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 5_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const agoText = lastEventTime > 0 ? formatAgo(now - lastEventTime) : '';
+  /* Evento fresco: meno di 3 secondi fa */
+  const isFresh = lastEventTime > 0 && (now - lastEventTime) < 3_000;
   return (
     <header className="flex items-center gap-4 px-6 h-14 bg-surface-1 border-b border-border z-50">
       {/* Brand */}
@@ -37,12 +59,18 @@ export function Header({ isConnected, resolvedTheme, onThemeToggle, currentView,
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Status */}
+      {/* Status + ultimo aggiornamento */}
       <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-2 border border-border">
-        <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-accent-green animate-pulse-dot' : 'bg-zinc-500'}`} />
+        <div className={`w-2 h-2 rounded-full transition-all ${
+          isFresh ? 'bg-accent-green scale-125' :
+          isConnected ? 'bg-accent-green animate-pulse-dot' : 'bg-zinc-500'
+        }`} />
         <span className={`text-xs font-medium ${isConnected ? 'text-accent-green' : 'text-zinc-500'}`}>
           {isConnected ? 'Live' : 'Offline'}
         </span>
+        {agoText && (
+          <span className="text-[10px] text-zinc-600 ml-1">{agoText}</span>
+        )}
       </div>
 
       {/* View toggle: Feed / Analytics */}

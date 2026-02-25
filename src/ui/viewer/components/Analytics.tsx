@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAnalytics } from '../hooks/useAnalytics';
-import type { TimelineEntry, TypeDistributionEntry } from '../types';
+import type { TimelineEntry, TypeDistributionEntry, TokenEconomics } from '../types';
 
 /* Colori per tipo osservazione (stessi del Feed) */
 const TYPE_COLORS: Record<string, { bar: string; text: string }> = {
@@ -94,7 +94,12 @@ export function Analytics({ currentFilter, getDisplayName }: AnalyticsProps) {
         />
       </div>
 
-      {/* Sezione B: Timeline Chart */}
+      {/* Sezione B: Token Economics */}
+      {overview.tokenEconomics && overview.tokenEconomics.discoveryTokens > 0 && (
+        <TokenEconomicsPanel economics={overview.tokenEconomics} />
+      )}
+
+      {/* Sezione C: Timeline Chart */}
       {timeline.length > 0 && (
         <div className="bg-surface-1 border border-border rounded-lg p-5">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-4">Activity Timeline (30 days)</h3>
@@ -102,7 +107,7 @@ export function Analytics({ currentFilter, getDisplayName }: AnalyticsProps) {
         </div>
       )}
 
-      {/* Sezione C: Type Distribution */}
+      {/* Sezione D: Type Distribution */}
       {typeDistribution.length > 0 && (
         <div className="bg-surface-1 border border-border rounded-lg p-5">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-4">Observation Types</h3>
@@ -110,7 +115,7 @@ export function Analytics({ currentFilter, getDisplayName }: AnalyticsProps) {
         </div>
       )}
 
-      {/* Sezione D: Session Stats */}
+      {/* Sezione E: Session Stats */}
       {sessionStats && sessionStats.total > 0 && (
         <div className="bg-surface-1 border border-border rounded-lg p-5">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-4">Sessions</h3>
@@ -142,83 +147,63 @@ function MiniStat({ label, value, color }: { label: string; value: number | stri
   );
 }
 
-/* ── Timeline Chart (SVG bar chart) ── */
+/* ── Timeline Chart (CSS flexbox, niente SVG distorto) ── */
 function TimelineChart({ entries }: { entries: TimelineEntry[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const maxCount = Math.max(...entries.map(e => e.count), 1);
-  const barWidth = Math.max(4, Math.min(16, Math.floor(600 / entries.length) - 2));
   const chartHeight = 120;
-  const chartWidth = entries.length * (barWidth + 2);
+
+  // Label asse X: mostra ~6 date distribuite uniformemente
+  const labelInterval = Math.max(1, Math.floor(entries.length / 6));
 
   return (
-    <div className="relative overflow-x-auto">
-      <svg
-        width={Math.max(chartWidth, 200)}
-        height={chartHeight + 24}
-        className="w-full"
-        viewBox={`0 0 ${Math.max(chartWidth, 200)} ${chartHeight + 24}`}
-        preserveAspectRatio="none"
-      >
+    <div className="space-y-2">
+      {/* Tooltip */}
+      <div className="h-5 text-center">
+        {hoveredIndex !== null && entries[hoveredIndex] && (
+          <span className="text-[11px] font-mono text-zinc-300 bg-surface-3 px-2.5 py-1 rounded">
+            {entries[hoveredIndex].day.slice(5)} — <span className="text-accent-violet font-semibold">{entries[hoveredIndex].count}</span> observations
+          </span>
+        )}
+      </div>
+
+      {/* Barre */}
+      <div className="flex items-end gap-[2px]" style={{ height: chartHeight }}>
         {entries.map((entry, i) => {
-          const barHeight = Math.max(2, (entry.count / maxCount) * chartHeight);
-          const x = i * (barWidth + 2);
-          const y = chartHeight - barHeight;
+          const heightPct = Math.max(1.5, (entry.count / maxCount) * 100);
           const isHovered = hoveredIndex === i;
 
           return (
-            <g key={entry.day}
+            <div
+              key={entry.day}
+              className="flex-1 min-w-0 cursor-pointer transition-all duration-150"
+              style={{ height: `${heightPct}%` }}
               onMouseEnter={() => setHoveredIndex(i)}
               onMouseLeave={() => setHoveredIndex(null)}
             >
-              <rect
-                x={x}
-                y={y}
-                width={barWidth}
-                height={barHeight}
-                rx={2}
-                className={`transition-all ${isHovered ? 'fill-accent-violet' : 'fill-accent-violet/60'}`}
+              <div
+                className={`w-full h-full rounded-t transition-colors ${
+                  isHovered ? 'bg-accent-violet' : 'bg-accent-violet/50'
+                }`}
               />
-              {/* Tooltip */}
-              {isHovered && (
-                <g>
-                  <rect
-                    x={Math.max(0, x - 30)}
-                    y={Math.max(0, y - 28)}
-                    width={70}
-                    height={22}
-                    rx={4}
-                    className="fill-surface-3"
-                  />
-                  <text
-                    x={Math.max(35, x + barWidth / 2)}
-                    y={Math.max(15, y - 13)}
-                    textAnchor="middle"
-                    className="fill-zinc-200 text-[10px] font-mono"
-                  >
-                    {entry.count} · {entry.day.slice(5)}
-                  </text>
-                </g>
-              )}
-            </g>
+            </div>
           );
         })}
+      </div>
 
-        {/* Asse X: label giorno (solo ogni 5 barre per leggibilità) */}
+      {/* Label asse X */}
+      <div className="flex">
         {entries.map((entry, i) => {
-          if (i % Math.max(1, Math.floor(entries.length / 6)) !== 0) return null;
+          const showLabel = i % labelInterval === 0 || i === entries.length - 1;
           return (
-            <text
-              key={`label-${i}`}
-              x={i * (barWidth + 2) + barWidth / 2}
-              y={chartHeight + 16}
-              textAnchor="middle"
-              className="fill-zinc-600 text-[8px] font-mono"
-            >
-              {entry.day.slice(5)}
-            </text>
+            <div key={`label-${i}`} className="flex-1 min-w-0 text-center">
+              {showLabel && (
+                <span className="text-[10px] font-mono text-zinc-600">{entry.day.slice(5)}</span>
+              )}
+            </div>
           );
         })}
-      </svg>
+      </div>
     </div>
   );
 }
@@ -293,6 +278,69 @@ function SessionStatsPanel({ stats }: { stats: { total: number; completed: numbe
       </div>
     </div>
   );
+}
+
+/* ── Token Economics Panel ── */
+function TokenEconomicsPanel({ economics }: { economics: TokenEconomics }) {
+  const { discoveryTokens, readTokens, savings, reductionPct } = economics;
+
+  return (
+    <div className="bg-surface-1 border border-border rounded-lg p-5">
+      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-4">Token Economics</h3>
+
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="rounded-lg bg-surface-2 border border-border px-4 py-3 text-center">
+          <div className="text-lg font-bold text-amber-400 tabular-nums">{formatTokens(discoveryTokens)}</div>
+          <div className="text-[10px] uppercase tracking-wider text-zinc-600 mt-0.5">Discovery</div>
+          <div className="text-[9px] text-zinc-700 mt-0.5">tokens spent</div>
+        </div>
+        <div className="rounded-lg bg-surface-2 border border-border px-4 py-3 text-center">
+          <div className="text-lg font-bold text-cyan-400 tabular-nums">{formatTokens(readTokens)}</div>
+          <div className="text-[10px] uppercase tracking-wider text-zinc-600 mt-0.5">Read Cost</div>
+          <div className="text-[9px] text-zinc-700 mt-0.5">to reuse context</div>
+        </div>
+        <div className="rounded-lg bg-surface-2 border border-border px-4 py-3 text-center">
+          <div className="text-lg font-bold text-emerald-400 tabular-nums">{formatTokens(savings)}</div>
+          <div className="text-[10px] uppercase tracking-wider text-zinc-600 mt-0.5">Savings</div>
+          <div className="text-[9px] text-zinc-700 mt-0.5">tokens saved</div>
+        </div>
+      </div>
+
+      {/* Barra visuale: quanto costa leggere vs scoprire */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-[10px] text-zinc-500">
+          <span>Read cost vs Discovery cost</span>
+          <span className="font-bold text-emerald-400">{reductionPct}% reduction</span>
+        </div>
+        <div className="h-3 bg-surface-3 rounded-full overflow-hidden flex">
+          <div
+            className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 rounded-l-full transition-all"
+            style={{ width: `${Math.min(100, discoveryTokens > 0 ? Math.round((readTokens / discoveryTokens) * 100) : 0)}%` }}
+          />
+          <div
+            className="h-full bg-gradient-to-r from-emerald-500/40 to-emerald-400/40 rounded-r-full transition-all flex-1"
+          />
+        </div>
+        <div className="flex items-center justify-between text-[9px] text-zinc-700">
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-cyan-500 inline-block" />
+            Read: {formatTokens(readTokens)}
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-emerald-500/40 inline-block" />
+            Saved: {formatTokens(savings)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Helper: formatta token in formato leggibile (1.2k, 45.3k, 1.2M) ── */
+function formatTokens(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
+  return String(tokens);
 }
 
 /* ── Helper: formatta durata in formato leggibile ── */

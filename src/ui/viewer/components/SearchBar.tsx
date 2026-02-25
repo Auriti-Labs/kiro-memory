@@ -37,6 +37,8 @@ export function SearchBar() {
     setIsOpen(false); setQuery(''); setResults(null); setSelectedIndex(0);
   }, []);
 
+  const total = results ? results.observations.length + results.summaries.length : 0;
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -45,12 +47,19 @@ export function SearchBar() {
         setTimeout(() => inputRef.current?.focus(), 50);
       }
       if (e.key === 'Escape') close();
+      if (!isOpen) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex(prev => Math.min(prev + 1, total - 1));
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex(prev => Math.max(prev - 1, 0));
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [close]);
-
-  const total = results ? results.observations.length + results.summaries.length : 0;
+  }, [close, isOpen, total]);
 
   return (
     <>
@@ -125,8 +134,10 @@ export function SearchBar() {
                   {results.summaries.length > 0 && (
                     <div>
                       <div className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 border-t border-border">Summaries</div>
-                      {results.summaries.map(sum => (
-                        <div key={`sum-${sum.id}`} className="flex items-start gap-3 px-4 py-2.5 hover:bg-surface-2/50 transition-colors">
+                      {results.summaries.map((sum, idx) => {
+                        const globalIdx = results.observations.length + idx;
+                        return (
+                        <div key={`sum-${sum.id}`} className={`flex items-start gap-3 px-4 py-2.5 transition-colors ${globalIdx === selectedIndex ? 'bg-surface-2' : 'hover:bg-surface-2/50'}`}>
                           <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-accent-cyan" />
                           <div className="flex-1 min-w-0">
                             <div className="text-sm text-zinc-200 truncate">{sum.request || 'Session Summary'}</div>
@@ -134,7 +145,8 @@ export function SearchBar() {
                             <span className="text-[10px] text-zinc-600 font-mono">{timeAgo(sum.created_at_epoch)}</span>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

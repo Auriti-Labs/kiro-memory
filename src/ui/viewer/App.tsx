@@ -9,6 +9,7 @@ import { useProjectAliases } from './hooks/useProjectAliases';
 import { Observation, Summary, UserPrompt, ViewMode } from './types';
 import { mergeAndDeduplicateByProject } from './utils/data';
 
+/* Solo tipi realmente generati dagli hook */
 const TYPE_FILTERS = ['file-write', 'file-read', 'command', 'research', 'delegation', 'tool-use'] as const;
 
 export function App() {
@@ -21,7 +22,7 @@ export function App() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
-  const { observations, summaries, prompts, projects, isConnected } = useSSE();
+  const { observations, summaries, prompts, projects, isConnected, lastEventTime } = useSSE();
   const { resolvedTheme, setThemePreference } = useTheme();
   const { getDisplayName, updateAlias } = useProjectAliases();
 
@@ -47,12 +48,29 @@ export function App() {
     [allObservations, activeTypes]
   );
 
-  // Statistiche
-  const stats = useMemo(() => ({
-    observations: allObservations.length,
-    summaries: allSummaries.length,
-    prompts: allPrompts.length
-  }), [allObservations, allSummaries, allPrompts]);
+  // Statistiche reali dal server (totali DB, non conteggi paginazione locale)
+  const [stats, setStats] = useState<{
+    observations: number; summaries: number; prompts: number;
+    tokenEconomics: { discoveryTokens: number; readTokens: number; savings: number };
+  }>({ observations: 0, summaries: 0, prompts: 0, tokenEconomics: { discoveryTokens: 0, readTokens: 0, savings: 0 } });
+
+  // Fetch stats dall'analytics overview (totali reali dal DB)
+  useEffect(() => {
+    const params = currentFilter ? `?project=${encodeURIComponent(currentFilter)}` : '';
+    fetch(`/api/analytics/overview${params}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) {
+          setStats({
+            observations: data.observations || 0,
+            summaries: data.summaries || 0,
+            prompts: data.prompts || 0,
+            tokenEconomics: data.tokenEconomics || { discoveryTokens: 0, readTokens: 0, savings: 0 },
+          });
+        }
+      })
+      .catch(() => {});
+  }, [currentFilter, allObservations.length]);
 
   const toggleType = useCallback((type: string) => {
     setActiveTypes(prev => {
@@ -151,6 +169,7 @@ export function App() {
       {/* Header */}
       <Header
         isConnected={isConnected}
+        lastEventTime={lastEventTime}
         resolvedTheme={resolvedTheme}
         onThemeToggle={() => setThemePreference(resolvedTheme === 'dark' ? 'light' : 'dark')}
         currentView={currentView}
