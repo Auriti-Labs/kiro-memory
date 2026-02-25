@@ -46,7 +46,13 @@ export function Sidebar({
   const [editingProject, setEditingProject] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [renameFeedback, setRenameFeedback] = useState<{ project: string; success: boolean } | null>(null);
+  const [projectSearch, setProjectSearch] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
+
+  /* Filtra progetti per ricerca */
+  const filteredProjects = projectSearch
+    ? projects.filter(p => getDisplayName(p).toLowerCase().includes(projectSearch.toLowerCase()) || p.toLowerCase().includes(projectSearch.toLowerCase()))
+    : projects;
 
   useEffect(() => {
     if (editingProject && editInputRef.current) {
@@ -84,6 +90,39 @@ export function Sidebar({
 
   return (
     <aside className="h-full overflow-y-auto bg-surface-1 border-r border-border flex flex-col">
+      {/* Brand con logo rete/nodi */}
+      <div className="flex items-center gap-3 px-4 h-14 border-b border-border flex-shrink-0">
+        <svg className="w-8 h-8 flex-shrink-0" viewBox="0 0 96 96">
+          <defs>
+            <linearGradient id="km-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#7C5AFF" />
+              <stop offset="100%" stopColor="#3B82F6" />
+            </linearGradient>
+          </defs>
+          {/* Anello esterno */}
+          <circle cx="48" cy="48" r="44" fill="none" stroke="url(#km-grad)" strokeWidth="1.5" opacity="0.4" />
+          {/* Nodo centrale */}
+          <circle cx="48" cy="48" r="10" fill="url(#km-grad)" opacity="0.9" />
+          {/* Nodi satellite */}
+          <circle cx="48" cy="8" r="5" fill="#7C5AFF" opacity="0.9" />
+          <circle cx="82" cy="28" r="4" fill="#6366F1" opacity="0.7" />
+          <circle cx="82" cy="68" r="3.5" fill="#3B82F6" opacity="0.5" />
+          <circle cx="48" cy="88" r="3" fill="#2563EB" opacity="0.4" />
+          <circle cx="14" cy="68" r="2.5" fill="#3B82F6" opacity="0.3" />
+          <circle cx="14" cy="28" r="2" fill="#7C5AFF" opacity="0.25" />
+          {/* Connessioni */}
+          <line x1="48" y1="13" x2="48" y2="38" stroke="#7C5AFF" strokeWidth="1" opacity="0.3" strokeDasharray="3 4" />
+          <line x1="78" y1="30" x2="56" y2="44" stroke="#6366F1" strokeWidth="1" opacity="0.25" strokeDasharray="3 4" />
+          <line x1="78" y1="66" x2="56" y2="52" stroke="#3B82F6" strokeWidth="1" opacity="0.2" strokeDasharray="3 4" />
+          <line x1="48" y1="85" x2="48" y2="58" stroke="#2563EB" strokeWidth="1" opacity="0.15" strokeDasharray="3 4" />
+          <line x1="17" y1="66" x2="40" y2="52" stroke="#3B82F6" strokeWidth="1" opacity="0.15" strokeDasharray="3 4" />
+        </svg>
+        <div>
+          <h1 className="text-[15px] font-bold text-zinc-100 leading-none">Kiro Memory</h1>
+          <span className="text-[11px] text-zinc-500 mt-0.5 block">Memory Dashboard</span>
+        </div>
+      </div>
+
       {/* Sezione: Progetti */}
       <div className="p-4">
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-3 px-2">Projects</h3>
@@ -107,9 +146,25 @@ export function Sidebar({
           <span className="text-xs text-zinc-600 font-mono tabular-nums">{projects.length}</span>
         </button>
 
-        {/* Lista progetti */}
-        <div className="flex flex-col gap-0.5 mt-1">
-          {projects.map(project => {
+        {/* Ricerca progetti (visibile con 6+ progetti) */}
+        {projects.length >= 6 && (
+          <div className="relative mt-1 mb-2">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+            </svg>
+            <input
+              type="text"
+              value={projectSearch}
+              onChange={e => setProjectSearch(e.target.value)}
+              placeholder="Filter projects..."
+              className="w-full bg-surface-2 border border-border rounded-md text-xs text-zinc-300 placeholder-zinc-600 pl-7 pr-2 py-1.5 outline-none focus:border-accent-violet/50 transition-colors"
+            />
+          </div>
+        )}
+
+        {/* Lista progetti (scrollabile con max-height) */}
+        <div className="flex flex-col gap-0.5 mt-1 max-h-[40vh] overflow-y-auto">
+          {filteredProjects.map(project => {
             const pc = getProjectColorByName(project);
             const isEditing = editingProject === project;
             const isActive = currentFilter === project;
@@ -136,9 +191,12 @@ export function Sidebar({
                     </button>
                   </div>
                 ) : (
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => onFilterChange(project)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all text-left ${
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onFilterChange(project); } }}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all text-left cursor-pointer ${
                       isActive
                         ? 'bg-surface-3 text-zinc-100 font-medium'
                         : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface-2'
@@ -164,7 +222,7 @@ export function Sidebar({
                         <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
                       </svg>
                     </button>
-                  </button>
+                  </div>
                 )}
               </div>
             );
@@ -280,7 +338,7 @@ export function Sidebar({
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg>
           </a>
         </div>
-        <div className="text-[10px] text-zinc-700 font-mono text-center">Kiro Memory v1.8.1</div>
+        <div className="text-[10px] text-zinc-700 font-mono text-center">Kiro Memory v1.9.0</div>
       </div>
     </aside>
   );

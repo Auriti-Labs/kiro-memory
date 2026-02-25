@@ -769,6 +769,10 @@ function getActiveSessions(db) {
   const query = db.query("SELECT * FROM sessions WHERE status = 'active' ORDER BY started_at_epoch DESC");
   return query.all();
 }
+function getAllSessions(db, limit = 100) {
+  const query = db.query("SELECT * FROM sessions ORDER BY started_at_epoch DESC LIMIT ?");
+  return query.all(limit);
+}
 function getSessionsByProject(db, project, limit = 100) {
   const query = db.query("SELECT * FROM sessions WHERE project = ? ORDER BY started_at_epoch DESC LIMIT ?");
   return query.all(project, limit);
@@ -1373,6 +1377,7 @@ export {
   deleteSummary,
   failSession,
   getActiveSessions,
+  getAllSessions,
   getCheckpointsBySession,
   getDatabase,
   getLatestCheckpoint,

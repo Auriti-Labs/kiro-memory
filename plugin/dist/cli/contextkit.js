@@ -2483,6 +2483,71 @@ function formatReportJson(data) {
   return JSON.stringify(data, null, 2);
 }
 
+// src/cli/banner.ts
+var G = [
+  "\x1B[38;5;135m",
+  // viola
+  "\x1B[38;5;99m",
+  // viola-blu
+  "\x1B[38;5;63m",
+  // indaco
+  "\x1B[38;5;33m",
+  // blu
+  "\x1B[38;5;39m",
+  // blu chiaro
+  "\x1B[38;5;44m"
+  // ciano
+];
+var R = "\x1B[0m";
+var B = "\x1B[1m";
+var D = "\x1B[2m";
+var U = "\x1B[4m";
+var GRN = "\x1B[32m";
+var CYN = "\x1B[36m";
+var LOGO = [
+  " \u2588\u2588\u2557  \u2588\u2588\u2557\u2588\u2588\u2557\u2588\u2588\u2588\u2588\u2588\u2588\u2557  \u2588\u2588\u2588\u2588\u2588\u2588\u2557 ",
+  " \u2588\u2588\u2551 \u2588\u2588\u2554\u255D\u2588\u2588\u2551\u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557\u2588\u2588\u2554\u2550\u2550\u2550\u2588\u2588\u2557",
+  " \u2588\u2588\u2588\u2588\u2588\u2554\u255D \u2588\u2588\u2551\u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255D\u2588\u2588\u2551   \u2588\u2588\u2551",
+  " \u2588\u2588\u2554\u2550\u2588\u2588\u2557 \u2588\u2588\u2551\u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557\u2588\u2588\u2551   \u2588\u2588\u2551",
+  " \u2588\u2588\u2551  \u2588\u2588\u2557\u2588\u2588\u2551\u2588\u2588\u2551  \u2588\u2588\u2551\u255A\u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255D",
+  " \u255A\u2550\u255D  \u255A\u2550\u255D\u255A\u2550\u255D\u255A\u2550\u255D  \u255A\u2550\u255D \u255A\u2550\u2550\u2550\u2550\u2550\u255D"
+];
+var MEMORY_TAG = "          M E M O R Y";
+var LINE = "\u2500".repeat(48);
+function supportsColor() {
+  if (process.env.NO_COLOR || process.env.TERM === "dumb") return false;
+  return process.stdout.isTTY ?? false;
+}
+function printBanner(opts) {
+  const color = supportsColor();
+  const c = (code, text) => color ? `${code}${text}${R}` : text;
+  console.log("");
+  for (let i = 0; i < LOGO.length; i++) {
+    console.log(`  ${c(G[i], LOGO[i])}`);
+  }
+  console.log(`  ${c(`${G[G.length - 1]}${B}`, MEMORY_TAG)}`);
+  console.log("");
+  console.log(`  ${c(D, LINE)}`);
+  console.log("");
+  console.log(`  ${c(`${GRN}${B}`, "\u2713 Installation complete!")}  v${opts.version}`);
+  console.log(`  ${c(D, `Editor: ${opts.editor}`)}`);
+  console.log("");
+  console.log(`  ${c(`${CYN}${B}`, "Installed:")}`);
+  for (const p of opts.configPaths) {
+    console.log(`    ${c(D, "\u2192")} ${p}`);
+  }
+  console.log(`    ${c(D, "\u2192")} Data: ${opts.dataDir}`);
+  console.log("");
+  console.log(`  ${c(`${CYN}${B}`, "Dashboard:")}  ${c(U, opts.dashboardUrl)}`);
+  console.log(`  ${c(D, "Docs:       https://auritidesign.it/docs/kiro-memory/")}`);
+  console.log("");
+  console.log(`  ${c(D, LINE)}`);
+  console.log(`  ${c(G[2], "Your AI assistant now has persistent memory.")}`);
+  console.log(`  ${c(G[3], "Every session builds on the last.")}`);
+  console.log(`  ${c(D, LINE)}`);
+  console.log("");
+}
+
 // src/cli/contextkit.ts
 import { execSync } from "child_process";
 import { existsSync as existsSync4, mkdirSync as mkdirSync3, readFileSync as readFileSync2, writeFileSync, appendFileSync as appendFileSync2 } from "fs";
@@ -2495,6 +2560,12 @@ var command = args[0];
 var __filename = fileURLToPath2(import.meta.url);
 var __dirname2 = dirname2(__filename);
 var DIST_DIR = dirname2(__dirname2);
+var PKG_VERSION = "unknown";
+try {
+  const pkgPath = join3(DIST_DIR, "..", "..", "package.json");
+  PKG_VERSION = JSON.parse(readFileSync2(pkgPath, "utf8")).version;
+} catch {
+}
 var AGENT_TEMPLATE = JSON.stringify({
   name: "kiro-memory",
   description: "Agent with persistent cross-session memory. Uses Kiro Memory to remember context from previous sessions and automatically save what it learns.",
@@ -2917,17 +2988,23 @@ ${aliasLine}
     }
   }
   console.log("\n[4/4] Done!\n");
-  console.log("  \x1B[32m\u2550\u2550\u2550 Installation complete! \u2550\u2550\u2550\x1B[0m\n");
+  printBanner({
+    editor: "Kiro CLI",
+    version: PKG_VERSION,
+    dashboardUrl: "http://localhost:3001",
+    dataDir,
+    configPaths: [
+      `Agent:    ${agentDestPath}`,
+      `MCP:      ${mcpFilePath}`,
+      `Steering: ${steeringDestPath}`
+    ]
+  });
   console.log("  Start Kiro with memory:");
   if (aliasAlreadySet) {
-    console.log("    \x1B[1mkiro\x1B[0m");
+    console.log("    \x1B[1mkiro\x1B[0m\n");
   } else {
-    console.log("    \x1B[1mkiro-cli --agent kiro-memory\x1B[0m");
+    console.log("    \x1B[1mkiro-cli --agent kiro-memory\x1B[0m\n");
   }
-  console.log("");
-  console.log("  The worker starts automatically when a Kiro session begins.");
-  console.log(`  Web dashboard: \x1B[4mhttp://localhost:3001\x1B[0m
-`);
 }
 var CLAUDE_CODE_STEERING = `# Kiro Memory - Persistent Cross-Session Memory
 
@@ -3052,12 +3129,17 @@ async function installClaudeCode() {
   }
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/3] Done!\n");
-  console.log("  \x1B[32m\u2550\u2550\u2550 Claude Code integration complete! \u2550\u2550\u2550\x1B[0m\n");
-  console.log("  Memory hooks are now active for Claude Code.");
-  console.log("  Start a new Claude Code session to begin tracking context.\n");
-  console.log("  The worker starts automatically on first session.");
-  console.log(`  Web dashboard: \x1B[4mhttp://localhost:3001\x1B[0m
-`);
+  printBanner({
+    editor: "Claude Code",
+    version: PKG_VERSION,
+    dashboardUrl: "http://localhost:3001",
+    dataDir,
+    configPaths: [
+      `Hooks:    ${settingsPath}`,
+      `MCP:      ${mcpPath}`,
+      `Steering: ${steeringPath}`
+    ]
+  });
 }
 async function installCursor() {
   console.log("\n=== Kiro Memory - Cursor Installation ===\n");
@@ -3139,12 +3221,16 @@ async function installCursor() {
   console.log(`  \u2192 MCP config:   ${mcpPath}`);
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/3] Done!\n");
-  console.log("  \x1B[32m\u2550\u2550\u2550 Cursor integration complete! \u2550\u2550\u2550\x1B[0m\n");
-  console.log("  Memory hooks are now active for Cursor IDE.");
-  console.log("  Start a new Cursor Agent session to begin tracking context.\n");
-  console.log("  The worker starts automatically on first session.");
-  console.log(`  Web dashboard: \x1B[4mhttp://localhost:3001\x1B[0m
-`);
+  printBanner({
+    editor: "Cursor",
+    version: PKG_VERSION,
+    dashboardUrl: "http://localhost:3001",
+    dataDir,
+    configPaths: [
+      `Hooks: ${hooksPath}`,
+      `MCP:   ${mcpPath}`
+    ]
+  });
 }
 async function installWindsurf() {
   console.log("\n=== Kiro Memory - Windsurf Installation ===\n");
@@ -3193,12 +3279,15 @@ async function installWindsurf() {
   console.log(`  \u2192 MCP config:   ${mcpPath}`);
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/3] Done!\n");
-  console.log("  \x1B[32m\u2550\u2550\u2550 Windsurf integration complete! \u2550\u2550\u2550\x1B[0m\n");
-  console.log("  Kiro Memory MCP server is now registered for Windsurf.");
-  console.log("  Restart Windsurf to activate the MCP server.\n");
-  console.log("  The worker starts automatically on first use.");
-  console.log(`  Web dashboard: \x1B[4mhttp://localhost:3001\x1B[0m
-`);
+  printBanner({
+    editor: "Windsurf",
+    version: PKG_VERSION,
+    dashboardUrl: "http://localhost:3001",
+    dataDir,
+    configPaths: [
+      `MCP: ${mcpPath}`
+    ]
+  });
   console.log("  \x1B[2mTip: Add a .windsurfrules file to your project with instructions");
   console.log("  to use the kiro-memory MCP tools for persistent context.\x1B[0m\n");
 }
@@ -3255,12 +3344,15 @@ async function installCline() {
   console.log(`  \u2192 MCP config:   ${mcpPath}`);
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/3] Done!\n");
-  console.log("  \x1B[32m\u2550\u2550\u2550 Cline integration complete! \u2550\u2550\u2550\x1B[0m\n");
-  console.log("  Kiro Memory MCP server is now registered for Cline.");
-  console.log("  Restart VS Code to activate the MCP server in Cline.\n");
-  console.log("  The worker starts automatically on first use.");
-  console.log(`  Web dashboard: \x1B[4mhttp://localhost:3001\x1B[0m
-`);
+  printBanner({
+    editor: "Cline",
+    version: PKG_VERSION,
+    dashboardUrl: "http://localhost:3001",
+    dataDir,
+    configPaths: [
+      `MCP: ${mcpPath}`
+    ]
+  });
   console.log("  \x1B[2mTip: Add a .clinerules file to your project with instructions");
   console.log("  to use the kiro-memory MCP tools for persistent context.\x1B[0m\n");
 }

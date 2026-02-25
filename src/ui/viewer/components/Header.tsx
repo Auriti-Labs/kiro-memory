@@ -13,6 +13,7 @@ interface HeaderProps {
   currentView: ViewMode;
   onViewChange: (view: ViewMode) => void;
   onMenuToggle?: () => void;
+  onSearchNavigate?: (project: string, observationId: number) => void;
 }
 
 /** Formatta secondi trascorsi in testo leggibile */
@@ -26,7 +27,7 @@ function formatAgo(ms: number): string {
   return `${Math.floor(min / 60)}h ago`;
 }
 
-export function Header({ isConnected, lastEventTime, resolvedTheme, themePreference, onThemeChange, currentView, onViewChange, onMenuToggle }: HeaderProps) {
+export function Header({ isConnected, lastEventTime, resolvedTheme, themePreference, onThemeChange, currentView, onViewChange, onMenuToggle, onSearchNavigate }: HeaderProps) {
   /* Cicla il tema: dark → light → system → dark */
   const cycleTheme = () => {
     const order: ThemePreference[] = ['dark', 'light', 'system'];
@@ -58,26 +59,8 @@ export function Header({ isConnected, lastEventTime, resolvedTheme, themePrefere
         </button>
       )}
 
-      {/* Brand */}
-      <div className="flex items-center gap-3 flex-shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-accent-violet flex items-center justify-center">
-          <svg className="w-[18px] h-[18px] text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93a1 1 0 0 0-.75.97V13" />
-            <path d="M12 2a4 4 0 0 0-4 4c0 1.95 1.4 3.58 3.25 3.93a1 1 0 0 1 .75.97V13" />
-            <path d="M9 18h6" /><path d="M10 22h4" /><path d="M12 13v5" />
-          </svg>
-        </div>
-        <div>
-          <h1 className="text-[15px] font-bold text-zinc-100 leading-none">Kiro Memory</h1>
-          <span className="text-[11px] text-zinc-500 mt-0.5 block">Memory Dashboard</span>
-        </div>
-      </div>
-
-      {/* Separatore */}
-      <div className="hidden md:block w-px h-6 bg-border" />
-
       {/* Cerca */}
-      <SearchBar />
+      <SearchBar onNavigate={onSearchNavigate} />
 
       {/* Spacer */}
       <div className="flex-1" />

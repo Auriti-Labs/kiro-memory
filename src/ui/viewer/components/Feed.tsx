@@ -234,10 +234,10 @@ function ObservationCard({ obs, getDisplayName }: { obs: Observation; getDisplay
   const detail = getDetailLine(obs);
 
   return (
-    <div className={`bg-surface-1 border border-border rounded-lg border-l-[3px] ${style.border} shadow-card hover:shadow-card-hover hover:border-border-hover transition-all`}>
-      <div className="px-4 py-3.5">
+    <div className={`bg-surface-1 border border-border rounded-lg border-l-[3px] ${style.border} shadow-card hover:shadow-card-hover hover:border-border-hover transition-all overflow-hidden`}>
+      <div className="px-4 py-3.5 min-w-0">
         {/* Riga 1: badge tipo + progetto + tempo */}
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
           <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md ${style.bg} ${style.text}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
             {style.label}
@@ -254,7 +254,7 @@ function ObservationCard({ obs, getDisplayName }: { obs: Observation; getDisplay
         </div>
 
         {/* Riga 2: narrativa principale */}
-        <h4 className="text-sm text-zinc-200 leading-snug">{renderMarkdown(narrative)}</h4>
+        <h4 className="text-sm text-zinc-200 leading-snug break-words">{renderMarkdown(narrative)}</h4>
 
         {/* Riga 3: subtitle (path relativo, nome comando, URL) */}
         {obs.subtitle && obs.subtitle !== obs.title && (
@@ -302,9 +302,9 @@ function SummaryCard({ summary, getDisplayName }: { summary: Summary; getDisplay
   ].filter(s => s.value);
 
   return (
-    <div className="bg-surface-1 border border-border rounded-lg border-l-[3px] border-l-cyan-500 shadow-card hover:shadow-card-hover hover:border-border-hover transition-all">
-      <div className="px-4 pt-4 pb-2">
-        <div className="flex items-center gap-2 mb-2">
+    <div className="bg-surface-1 border border-border rounded-lg border-l-[3px] border-l-cyan-500 shadow-card hover:shadow-card-hover hover:border-border-hover transition-all overflow-hidden">
+      <div className="px-4 pt-4 pb-2 min-w-0">
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400">
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
@@ -318,7 +318,7 @@ function SummaryCard({ summary, getDisplayName }: { summary: Summary; getDisplay
           <span className="text-[11px] text-zinc-500 font-mono ml-auto">{timeAgo(summary.created_at_epoch)}</span>
         </div>
         {summary.request && (
-          <h3 className="text-[15px] font-semibold text-zinc-100 leading-snug">{summary.request}</h3>
+          <h3 className="text-[15px] font-semibold text-zinc-100 leading-snug break-words">{summary.request}</h3>
         )}
       </div>
 
@@ -339,9 +339,9 @@ function SummaryCard({ summary, getDisplayName }: { summary: Summary; getDisplay
    ══════════════════════════════════════════════════════ */
 function PromptCard({ prompt, getDisplayName }: { prompt: UserPrompt; getDisplayName: (p: string) => string }) {
   return (
-    <div className="bg-surface-1 border border-border rounded-lg border-l-[3px] border-l-rose-500 shadow-card hover:shadow-card-hover hover:border-border-hover transition-all">
-      <div className="px-4 pt-4 pb-2">
-        <div className="flex items-center gap-2 mb-2">
+    <div className="bg-surface-1 border border-border rounded-lg border-l-[3px] border-l-rose-500 shadow-card hover:shadow-card-hover hover:border-border-hover transition-all overflow-hidden">
+      <div className="px-4 pt-4 pb-2 min-w-0">
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400">
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />

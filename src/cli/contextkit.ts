@@ -5,6 +5,7 @@
 
 import { createKiroMemory } from '../sdk/index.js';
 import { formatReportText, formatReportMarkdown, formatReportJson } from '../services/report-formatter.js';
+import { printBanner } from './banner.js';
 import { execSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -20,6 +21,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 // __dirname = .../plugin/dist/cli → risali per ottenere plugin/dist
 const DIST_DIR = dirname(__dirname);
+
+// Versione dal package.json (plugin/dist/cli → ../../package.json)
+let PKG_VERSION = 'unknown';
+try {
+  const pkgPath = join(DIST_DIR, '..', '..', 'package.json');
+  PKG_VERSION = JSON.parse(readFileSync(pkgPath, 'utf8')).version;
+} catch { /* fallback */ }
 
 // ─── Embedded templates (included in the npm package, no external files needed) ───
 
@@ -568,18 +576,25 @@ async function installKiro() {
     }
   }
 
-  // 4. Riepilogo finale
+  // 4. Banner finale
   console.log('\n[4/4] Done!\n');
-  console.log('  \x1b[32m═══ Installation complete! ═══\x1b[0m\n');
+  printBanner({
+    editor: 'Kiro CLI',
+    version: PKG_VERSION,
+    dashboardUrl: 'http://localhost:3001',
+    dataDir,
+    configPaths: [
+      `Agent:    ${agentDestPath}`,
+      `MCP:      ${mcpFilePath}`,
+      `Steering: ${steeringDestPath}`,
+    ],
+  });
   console.log('  Start Kiro with memory:');
   if (aliasAlreadySet) {
-    console.log('    \x1b[1mkiro\x1b[0m');
+    console.log('    \x1b[1mkiro\x1b[0m\n');
   } else {
-    console.log('    \x1b[1mkiro-cli --agent kiro-memory\x1b[0m');
+    console.log('    \x1b[1mkiro-cli --agent kiro-memory\x1b[0m\n');
   }
-  console.log('');
-  console.log('  The worker starts automatically when a Kiro session begins.');
-  console.log(`  Web dashboard: \x1b[4mhttp://localhost:3001\x1b[0m\n`);
 }
 
 // ─── Install Claude Code command ───
@@ -742,13 +757,19 @@ async function installClaudeCode() {
 
   console.log(`  → Data dir:     ${dataDir}`);
 
-  // 3. Riepilogo finale
+  // 3. Banner finale
   console.log('\n[3/3] Done!\n');
-  console.log('  \x1b[32m═══ Claude Code integration complete! ═══\x1b[0m\n');
-  console.log('  Memory hooks are now active for Claude Code.');
-  console.log('  Start a new Claude Code session to begin tracking context.\n');
-  console.log('  The worker starts automatically on first session.');
-  console.log(`  Web dashboard: \x1b[4mhttp://localhost:3001\x1b[0m\n`);
+  printBanner({
+    editor: 'Claude Code',
+    version: PKG_VERSION,
+    dashboardUrl: 'http://localhost:3001',
+    dataDir,
+    configPaths: [
+      `Hooks:    ${settingsPath}`,
+      `MCP:      ${mcpPath}`,
+      `Steering: ${steeringPath}`,
+    ],
+  });
 }
 
 // ─── Install Cursor command ───
@@ -858,13 +879,18 @@ async function installCursor() {
   console.log(`  → MCP config:   ${mcpPath}`);
   console.log(`  → Data dir:     ${dataDir}`);
 
-  // 3. Riepilogo finale
+  // 3. Banner finale
   console.log('\n[3/3] Done!\n');
-  console.log('  \x1b[32m═══ Cursor integration complete! ═══\x1b[0m\n');
-  console.log('  Memory hooks are now active for Cursor IDE.');
-  console.log('  Start a new Cursor Agent session to begin tracking context.\n');
-  console.log('  The worker starts automatically on first session.');
-  console.log(`  Web dashboard: \x1b[4mhttp://localhost:3001\x1b[0m\n`);
+  printBanner({
+    editor: 'Cursor',
+    version: PKG_VERSION,
+    dashboardUrl: 'http://localhost:3001',
+    dataDir,
+    configPaths: [
+      `Hooks: ${hooksPath}`,
+      `MCP:   ${mcpPath}`,
+    ],
+  });
 }
 
 // ─── Install Windsurf command ───
@@ -931,13 +957,17 @@ async function installWindsurf() {
   console.log(`  → MCP config:   ${mcpPath}`);
   console.log(`  → Data dir:     ${dataDir}`);
 
-  // 3. Riepilogo finale
+  // 3. Banner finale
   console.log('\n[3/3] Done!\n');
-  console.log('  \x1b[32m═══ Windsurf integration complete! ═══\x1b[0m\n');
-  console.log('  Kiro Memory MCP server is now registered for Windsurf.');
-  console.log('  Restart Windsurf to activate the MCP server.\n');
-  console.log('  The worker starts automatically on first use.');
-  console.log(`  Web dashboard: \x1b[4mhttp://localhost:3001\x1b[0m\n`);
+  printBanner({
+    editor: 'Windsurf',
+    version: PKG_VERSION,
+    dashboardUrl: 'http://localhost:3001',
+    dataDir,
+    configPaths: [
+      `MCP: ${mcpPath}`,
+    ],
+  });
   console.log('  \x1b[2mTip: Add a .windsurfrules file to your project with instructions');
   console.log('  to use the kiro-memory MCP tools for persistent context.\x1b[0m\n');
 }
@@ -1014,13 +1044,17 @@ async function installCline() {
   console.log(`  → MCP config:   ${mcpPath}`);
   console.log(`  → Data dir:     ${dataDir}`);
 
-  // 3. Riepilogo finale
+  // 3. Banner finale
   console.log('\n[3/3] Done!\n');
-  console.log('  \x1b[32m═══ Cline integration complete! ═══\x1b[0m\n');
-  console.log('  Kiro Memory MCP server is now registered for Cline.');
-  console.log('  Restart VS Code to activate the MCP server in Cline.\n');
-  console.log('  The worker starts automatically on first use.');
-  console.log(`  Web dashboard: \x1b[4mhttp://localhost:3001\x1b[0m\n`);
+  printBanner({
+    editor: 'Cline',
+    version: PKG_VERSION,
+    dashboardUrl: 'http://localhost:3001',
+    dataDir,
+    configPaths: [
+      `MCP: ${mcpPath}`,
+    ],
+  });
   console.log('  \x1b[2mTip: Add a .clinerules file to your project with instructions');
   console.log('  to use the kiro-memory MCP tools for persistent context.\x1b[0m\n');
 }

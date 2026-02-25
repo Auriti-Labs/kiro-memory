@@ -23,7 +23,7 @@ import { getEmbeddingService } from './search/EmbeddingService.js';
 import { getVectorSearch } from './search/VectorSearch.js';
 import { getObservationsTimeline, getTypeDistribution, getSessionStats, getAnalyticsOverview } from './sqlite/Analytics.js';
 import { getLatestCheckpoint, getLatestCheckpointByProject } from './sqlite/Checkpoints.js';
-import { getSessionsByProject, getActiveSessions } from './sqlite/Sessions.js';
+import { getSessionsByProject, getAllSessions } from './sqlite/Sessions.js';
 import { getReportData } from './sqlite/Reports.js';
 import { formatReportMarkdown, formatReportJson } from './report-formatter.js';
 import { logger } from '../utils/logger.js';
@@ -177,7 +177,7 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: Date.now(),
-    version: '1.0.0'
+    version: '1.9.0'
   });
 });
 
@@ -849,7 +849,7 @@ app.get('/api/sessions', (req, res) => {
   try {
     const sessions = project
       ? getSessionsByProject(db.db, project, 50)
-      : getActiveSessions(db.db);
+      : getAllSessions(db.db, 50);
     res.json(sessions);
   } catch (error) {
     logger.error('WORKER', 'Lista sessioni fallita', { project }, error as Error);

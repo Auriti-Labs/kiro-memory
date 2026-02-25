@@ -144,8 +144,8 @@ export function Sessions({ currentFilter, getDisplayName }: SessionsProps) {
                       <div className="text-zinc-400 font-mono text-[11px] truncate">{session.content_session_id}</div>
                     </div>
                     <div>
-                      <span className="text-zinc-600">Memory ID</span>
-                      <div className="text-zinc-400 font-mono text-[11px] truncate">{session.memory_session_id || '—'}</div>
+                      <span className="text-zinc-600">Duration</span>
+                      <div className="text-zinc-400 font-mono text-[11px]">{formatDuration(duration)}</div>
                     </div>
                     <div>
                       <span className="text-zinc-600">Started</span>
@@ -154,14 +154,14 @@ export function Sessions({ currentFilter, getDisplayName }: SessionsProps) {
                     <div>
                       <span className="text-zinc-600">Completed</span>
                       <div className="text-zinc-400 font-mono text-[11px]">
-                        {session.completed_at_epoch ? new Date(session.completed_at_epoch).toLocaleString() : '—'}
+                        {session.completed_at_epoch ? new Date(session.completed_at_epoch).toLocaleString() : session.status === 'completed' ? 'Before tracking' : '—'}
                       </div>
                     </div>
                   </div>
                   {session.user_prompt && (
                     <div>
                       <span className="text-[11px] text-zinc-600">Prompt</span>
-                      <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed">{session.user_prompt}</p>
+                      <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed break-words">{session.user_prompt}</p>
                     </div>
                   )}
                 </div>

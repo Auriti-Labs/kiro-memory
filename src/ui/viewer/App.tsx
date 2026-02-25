@@ -23,6 +23,7 @@ export function App() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState({ observations: true, summaries: true, prompts: true });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [highlightObsId, setHighlightObsId] = useState<number | null>(null);
 
   const { observations, summaries, prompts, projects, isConnected, lastEventTime } = useSSE();
   const { preference: themePreference, resolvedTheme, setThemePreference } = useTheme();
@@ -170,60 +171,93 @@ export function App() {
     }
   }, [currentFilter, fetchForProject]);
 
+  // Scroll + highlight dopo navigazione dalla ricerca
+  useEffect(() => {
+    if (highlightObsId === null) return;
+    const targetId = `obs-${highlightObsId}`;
+    // Tenta scroll con retry (i dati potrebbero non essere ancora nel DOM)
+    let attempts = 0;
+    const tryScroll = () => {
+      const el = document.querySelector(`[data-id="${targetId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('ring-2', 'ring-accent-violet', 'ring-offset-2', 'ring-offset-surface-0');
+        setTimeout(() => {
+          el.classList.remove('ring-2', 'ring-accent-violet', 'ring-offset-2', 'ring-offset-surface-0');
+          setHighlightObsId(null);
+        }, 3000);
+      } else if (attempts < 10) {
+        attempts++;
+        setTimeout(tryScroll, 200);
+      } else {
+        setHighlightObsId(null);
+      }
+    };
+    tryScroll();
+  }, [highlightObsId, paginatedObservations, allObservations]);
+
+  // Callback navigazione dalla ricerca
+  const handleSearchNavigate = useCallback((project: string, obsId: number) => {
+    setCurrentView('feed');
+    setCurrentFilter(project);
+    setHighlightObsId(obsId);
+  }, []);
+
   return (
-    <div className="h-screen overflow-hidden flex flex-col bg-surface-0">
-      {/* Header */}
-      <Header
-        isConnected={isConnected}
-        lastEventTime={lastEventTime}
-        resolvedTheme={resolvedTheme}
-        themePreference={themePreference}
-        onThemeChange={setThemePreference}
-        currentView={currentView}
-        onViewChange={setCurrentView}
-        onMenuToggle={() => setIsMobileMenuOpen(prev => !prev)}
-      />
+    <div className="h-screen overflow-hidden flex bg-surface-0">
+      {/* Sidebar desktop */}
+      <div className="hidden md:flex w-[260px] flex-shrink-0">
+        <Sidebar
+          projects={projects}
+          currentFilter={currentFilter}
+          onFilterChange={setCurrentFilter}
+          activeTypes={activeTypes}
+          onToggleType={toggleType}
+          stats={stats}
+          getDisplayName={getDisplayName}
+          onRenameProject={updateAlias}
+        />
+      </div>
 
-      {/* Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar desktop */}
-        <div className="hidden md:flex w-[260px] flex-shrink-0">
-          <Sidebar
-            projects={projects}
-            currentFilter={currentFilter}
-            onFilterChange={setCurrentFilter}
-            activeTypes={activeTypes}
-            onToggleType={toggleType}
-            stats={stats}
-            getDisplayName={getDisplayName}
-            onRenameProject={updateAlias}
+      {/* Sidebar mobile (drawer) */}
+      {isMobileMenuOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
           />
-        </div>
-
-        {/* Sidebar mobile (drawer) */}
-        {isMobileMenuOpen && (
-          <>
-            <div
-              className="fixed inset-0 bg-black/50 z-40 md:hidden"
-              onClick={() => setIsMobileMenuOpen(false)}
+          <div className="fixed inset-y-0 left-0 w-[280px] z-50 md:hidden animate-slide-in-left">
+            <Sidebar
+              projects={projects}
+              currentFilter={currentFilter}
+              onFilterChange={(p) => { setCurrentFilter(p); setIsMobileMenuOpen(false); }}
+              activeTypes={activeTypes}
+              onToggleType={toggleType}
+              stats={stats}
+              getDisplayName={getDisplayName}
+              onRenameProject={updateAlias}
             />
-            <div className="fixed inset-y-0 left-0 w-[280px] z-50 md:hidden animate-slide-in-left">
-              <Sidebar
-                projects={projects}
-                currentFilter={currentFilter}
-                onFilterChange={(p) => { setCurrentFilter(p); setIsMobileMenuOpen(false); }}
-                activeTypes={activeTypes}
-                onToggleType={toggleType}
-                stats={stats}
-                getDisplayName={getDisplayName}
-                onRenameProject={updateAlias}
-              />
-            </div>
-          </>
-        )}
+          </div>
+        </>
+      )}
+
+      {/* Colonna destra: header + contenuto */}
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        {/* Header (solo sopra il contenuto, non sulla sidebar) */}
+        <Header
+          isConnected={isConnected}
+          lastEventTime={lastEventTime}
+          resolvedTheme={resolvedTheme}
+          themePreference={themePreference}
+          onThemeChange={setThemePreference}
+          currentView={currentView}
+          onViewChange={setCurrentView}
+          onMenuToggle={() => setIsMobileMenuOpen(prev => !prev)}
+          onSearchNavigate={handleSearchNavigate}
+        />
 
         {/* Main feed */}
-        <main className="flex-1 overflow-y-auto bg-surface-0">
+        <main className="flex-1 min-w-0 overflow-y-auto bg-surface-0">
           <div className="max-w-3xl mx-auto px-6 py-6">
             {/* Filtro attivo */}
             {currentFilter && (

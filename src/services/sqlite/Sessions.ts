@@ -66,6 +66,11 @@ export function getActiveSessions(db: Database): DBSession[] {
   return query.all() as DBSession[];
 }
 
+export function getAllSessions(db: Database, limit: number = 100): DBSession[] {
+  const query = db.query('SELECT * FROM sessions ORDER BY started_at_epoch DESC LIMIT ?');
+  return query.all(limit) as DBSession[];
+}
+
 export function getSessionsByProject(db: Database, project: string, limit: number = 100): DBSession[] {
   const query = db.query('SELECT * FROM sessions WHERE project = ? ORDER BY started_at_epoch DESC LIMIT ?');
   return query.all(project, limit) as DBSession[];

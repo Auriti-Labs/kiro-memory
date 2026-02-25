@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-02-25
+
+### Added
+
+- **ASCII Art Banner**: Logo "KIRO MEMORY" con gradient ANSI viola→blu→ciano dopo ogni installazione
+- **Postinstall Message**: Messaggio informativo con comandi e link alla dashboard dopo `npm install`
+- **Cross-Project Search Navigation**: Click su un risultato di ricerca naviga al progetto e scrolla fino alla memoria con highlight viola per 3 secondi
+- **Project Search Filter**: Input di ricerca nella sidebar per filtrare progetti (visibile con 6+ progetti)
+- **Project Badge in Search**: Badge con nome progetto nei risultati di ricerca per contesto immediato
+
+### Fixed
+
+- **Sessions API**: Endpoint `/api/sessions` ora restituisce tutte le sessioni, non solo quelle attive
+- **Theme System**: Sistema di temi light/dark funzionante con CSS custom properties (prima non si switchava)
+- **Card Overflow**: Testi nelle card del feed non escono più dalle card (fix `min-w-0`, `break-words`, `flex-wrap`)
+- **Nested Button Warning**: Risolto `<button>` annidato nella sidebar progetto (ora `<div role="button">`)
+- **Session Details**: Mostra durata e "Before tracking" invece di campi vuoti
+
+### Changed
+
+- **Dashboard Layout**: Sidebar affiancata al contenuto principale (non più sotto l'header)
+- **Sidebar Brand**: Logo network/nodi con brand "Kiro Memory" spostato nella sidebar
+- **Scrollbar**: Più visibili (8px), colorate con accent viola al hover, supporto Firefox
+- **Dark Mode Palette**: Contrasti migliorati con CSS variables per superfici, bordi e scala zinc
+
 ## [1.8.1] - 2026-02-25
 
 ### Fixed
@@ -184,6 +209,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session Summaries**: Structured summaries generated automatically at session end
 - **Web Dashboard**: Real-time viewer at `http://localhost:3001`
 
+[1.9.0]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.8.1...v1.9.0
 [1.8.1]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.7.0...v1.7.1

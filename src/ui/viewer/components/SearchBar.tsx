@@ -18,7 +18,11 @@ const SOURCE_BADGE: Record<string, { bg: string; text: string; label: string }> 
   hybrid: { bg: 'bg-cyan-500/15', text: 'text-cyan-400', label: 'hybrid' },
 };
 
-export function SearchBar() {
+interface SearchBarProps {
+  onNavigate?: (project: string, observationId: number) => void;
+}
+
+export function SearchBar({ onNavigate }: SearchBarProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<HybridResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -54,18 +58,16 @@ export function SearchBar() {
 
   const total = results.length;
 
-  /** Naviga al risultato selezionato: scrolla alla card nel feed */
+  /** Naviga al risultato selezionato: cambia progetto + vista feed + scroll + highlight */
   const openSelected = useCallback(() => {
     if (total === 0) return;
     const item = results[selectedIndex];
     if (!item) return;
-    const targetId = `obs-${item.id}`;
     close();
-    setTimeout(() => {
-      const el = document.querySelector(`[data-id="${targetId}"]`);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
-  }, [results, selectedIndex, total, close]);
+    if (onNavigate) {
+      onNavigate(item.project, parseInt(String(item.id), 10));
+    }
+  }, [results, selectedIndex, total, close, onNavigate]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -162,8 +164,9 @@ export function SearchBar() {
                       <div className="flex-1 min-w-0">
                         <div className="text-sm text-zinc-200 truncate">{item.title}</div>
                         {item.content && <div className="text-xs text-zinc-500 truncate mt-0.5">{item.content.substring(0, 120)}</div>}
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${badge.bg} ${badge.text}`}>{item.type}</span>
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent-violet/10 text-accent-violet">{item.project}</span>
                           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${srcBadge.bg} ${srcBadge.text}`}>{srcBadge.label}</span>
                           <span className="text-[10px] text-zinc-600 font-mono">{timeAgo(item.created_at_epoch)}</span>
                           {item.score > 0 && <span className="text-[10px] text-zinc-700 font-mono">{(item.score * 100).toFixed(0)}%</span>}

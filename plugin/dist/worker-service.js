@@ -4595,9 +4595,9 @@ function getLatestCheckpointByProject(db2, project) {
 }
 
 // src/services/sqlite/Sessions.ts
-function getActiveSessions(db2) {
-  const query = db2.query("SELECT * FROM sessions WHERE status = 'active' ORDER BY started_at_epoch DESC");
-  return query.all();
+function getAllSessions(db2, limit = 100) {
+  const query = db2.query("SELECT * FROM sessions ORDER BY started_at_epoch DESC LIMIT ?");
+  return query.all(limit);
 }
 function getSessionsByProject(db2, project, limit = 100) {
   const query = db2.query("SELECT * FROM sessions WHERE project = ? ORDER BY started_at_epoch DESC LIMIT ?");
@@ -4915,7 +4915,7 @@ app.get("/health", (req, res) => {
   res.json({
     status: "ok",
     timestamp: Date.now(),
-    version: "1.0.0"
+    version: "1.9.0"
   });
 });
 app.get("/events", (req, res) => {
@@ -5475,7 +5475,7 @@ app.get("/api/sessions", (req, res) => {
     return;
   }
   try {
-    const sessions = project ? getSessionsByProject(db.db, project, 50) : getActiveSessions(db.db);
+    const sessions = project ? getSessionsByProject(db.db, project, 50) : getAllSessions(db.db, 50);
     res.json(sessions);
   } catch (error) {
     logger.error("WORKER", "Lista sessioni fallita", { project }, error);

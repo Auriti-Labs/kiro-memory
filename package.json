@@ -1,6 +1,6 @@
 {
   "name": "kiro-memory",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "description": "Persistent cross-session memory for AI coding assistants. Works with Claude Code, Cursor, Windsurf, Cline, and any MCP-compatible editor.",
   "keywords": [
     "kiro",
@@ -41,7 +41,8 @@
   },
   "files": [
     "dist",
-    "plugin"
+    "plugin",
+    "scripts/postinstall.cjs"
   ],
   "bin": {
     "kiro-memory": "./plugin/dist/cli/contextkit.js"
@@ -75,6 +76,7 @@
     "test:infra": "bun test tests/infrastructure/",
     "test:server": "bun test tests/server/",
     "install:kiro": "bash scripts/install-kiro.sh",
+    "postinstall": "node scripts/postinstall.cjs",
     "prepublishOnly": "npm run build",
     "release": "np",
     "release:patch": "np patch --no-cleanup",
