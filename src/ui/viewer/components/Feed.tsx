@@ -39,6 +39,9 @@ const CONCEPT_COLORS: Record<string, string> = {
   'networking': 'bg-blue-500/15 text-blue-400 ring-blue-500/25',
   'module-system': 'bg-indigo-500/15 text-indigo-400 ring-indigo-500/25',
   'tech-debt': 'bg-red-500/15 text-red-400 ring-red-500/25',
+  'security': 'bg-red-500/15 text-red-400 ring-red-500/25',
+  'performance': 'bg-amber-500/15 text-amber-400 ring-amber-500/25',
+  'error-handling': 'bg-rose-500/15 text-rose-400 ring-rose-500/25',
 };
 
 /* ── Utilità ── */

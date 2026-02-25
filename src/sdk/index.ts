@@ -539,18 +539,23 @@ export class KiroMemorySDK {
       // Modalita CONTEXT: ranking per recency + project match
       const observations = getObservationsByProject(this.db.db, this.project, 30);
 
-      items = observations.map(obs => {
+      // Separa knowledge items (prioritari) da osservazioni normali
+      const knowledgeTypes = new Set(KNOWLEDGE_TYPES as readonly string[]);
+      const knowledgeObs: typeof observations = [];
+      const normalObs: typeof observations = [];
+      for (const obs of observations) {
+        if (knowledgeTypes.has(obs.type)) knowledgeObs.push(obs);
+        else normalObs.push(obs);
+      }
+
+      const scoreObs = (obs: typeof observations[0]) => {
         const signals = {
           semantic: 0,
           fts5: 0,
           recency: recencyScore(obs.created_at_epoch),
           projectMatch: projectMatchScore(obs.project, this.project)
         };
-
-        // Boost per tipi knowledge (constraint, decision, heuristic, rejected)
         const baseScore = computeCompositeScore(signals, CONTEXT_WEIGHTS);
-        const boostedScore = Math.min(1, baseScore * knowledgeTypeBoost(obs.type));
-
         return {
           id: obs.id,
           title: obs.title,
@@ -559,21 +564,27 @@ export class KiroMemorySDK {
           project: obs.project,
           created_at: obs.created_at,
           created_at_epoch: obs.created_at_epoch,
-          score: boostedScore,
+          score: Math.min(1, baseScore * knowledgeTypeBoost(obs.type)),
           signals
         };
-      });
+      };
 
-      // Ordina per score decrescente
-      items.sort((a, b) => b.score - a.score);
+      // Knowledge sempre in cima (ordinati per score), poi osservazioni normali
+      const scoredKnowledge = knowledgeObs.map(scoreObs).sort((a, b) => b.score - a.score);
+      const scoredNormal = normalObs.map(scoreObs).sort((a, b) => b.score - a.score);
+      items = [...scoredKnowledge, ...scoredNormal];
     }
 
-    // Calcola token usati (stima approssimativa)
+    // Tronca al budget token (knowledge items hanno priorità essendo in cima)
     let tokensUsed = 0;
+    const budgetItems: ScoredItem[] = [];
     for (const item of items) {
-      tokensUsed += Math.ceil((item.title.length + item.content.length) / 4);
-      if (tokensUsed > tokenBudget) break;
+      const itemTokens = Math.ceil((item.title.length + item.content.length) / 4);
+      if (tokensUsed + itemTokens > tokenBudget) break;
+      tokensUsed += itemTokens;
+      budgetItems.push(item);
     }
+    items = budgetItems;
 
     return {
       project: this.project,

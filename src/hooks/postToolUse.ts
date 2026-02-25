@@ -329,7 +329,42 @@ function extractConcepts(toolName: string, toolInput: any, files: string[]): str
     if (lowerPattern.includes('todo') || lowerPattern.includes('fixme') || lowerPattern.includes('hack')) concepts.add('tech-debt');
   }
 
+  // Analizza contenuto codice (new_string di Edit, content di Write)
+  const codeContent = (toolInput?.new_string || toolInput?.content || '').substring(0, 2000).toLowerCase();
+  if (codeContent.length > 20) {
+    extractConceptsFromCode(codeContent, concepts);
+  }
+
   return [...concepts].slice(0, 5); // Massimo 5 concept per osservazione
+}
+
+/** Estrae concept dal contenuto effettivo del codice */
+function extractConceptsFromCode(code: string, concepts: Set<string>): void {
+  // React patterns
+  if (/\b(usestate|useeffect|usememo|usecallback|useref|usecontext)\b/.test(code)) concepts.add('hooks');
+  if (/\b(jsx|tsx|component|<\/?\w+[^>]*>)\b/.test(code)) concepts.add('ui-component');
+
+  // API / networking
+  if (/\bfetch\s*\(|\.then\s*\(|async\s+|await\s+|axios|\.get\s*\(|\.post\s*\(/.test(code)) concepts.add('api');
+
+  // Database / SQL
+  if (/\b(select|insert|update|delete|create\s+table|alter\s+table|migration)\b/.test(code)) concepts.add('database');
+  if (/\b(sqlite|postgres|mysql|prisma|drizzle|knex)\b/.test(code)) concepts.add('database');
+
+  // Testing
+  if (/\b(describe|it|test|expect|assert|mock|spy|beforeeach|aftereach)\b/.test(code)) concepts.add('testing');
+
+  // Type system
+  if (/\b(interface|type\s+\w+|generic|extends|implements)\b/.test(code)) concepts.add('types');
+
+  // Security
+  if (/\b(sanitize|escape|nonce|csrf|xss|inject|auth|permission|token)\b/.test(code)) concepts.add('security');
+
+  // Performance
+  if (/\b(cache|memoize|lazy|debounce|throttle|virtualize|index)\b/.test(code)) concepts.add('performance');
+
+  // Error handling
+  if (/\btry\s*\{|catch\s*\(|throw\s+new|\.catch\s*\(|onerror/.test(code)) concepts.add('error-handling');
 }
 
 /* ── Generazione subtitle distinto dal titolo ── */
