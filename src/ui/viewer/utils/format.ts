@@ -22,73 +22,12 @@ export function getTypeBadgeClasses(type: string): { bg: string; text: string; d
 }
 
 /**
- * Returns border accent class for the left side of cards.
+ * Converts an epoch to a readable relative time string.
+ * Accetta sia secondi che millisecondi (auto-detect: se > 1e12 → millisecondi).
  */
-export function getTypeAccentBorder(type: string): string {
-  const map: Record<string, string> = {
-    'file-write': 'border-l-emerald-500/60',
-    'file-read': 'border-l-cyan-500/60',
-    'command': 'border-l-amber-500/60',
-    'research': 'border-l-blue-500/60',
-    'delegation': 'border-l-violet-500/60',
-    'tool-use': 'border-l-zinc-500/60',
-    'constraint': 'border-l-red-500/60',
-    'decision': 'border-l-orange-500/60',
-    'heuristic': 'border-l-indigo-500/60',
-    'rejected': 'border-l-slate-500/60',
-    'summary': 'border-l-teal-500/60',
-    'prompt': 'border-l-pink-500/60',
-  };
-  return map[type] || 'border-l-zinc-500/60';
-}
-
-/**
- * Returns a deterministic color set for a project name.
- */
-export function getProjectColor(project: string): { bg: string; text: string; border: string } {
-  const colors = [
-    { bg: 'bg-indigo-500/10', text: 'text-indigo-600 dark:text-indigo-400', border: 'border-indigo-500/20' },
-    { bg: 'bg-emerald-500/10', text: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-500/20' },
-    { bg: 'bg-amber-500/10', text: 'text-amber-600 dark:text-amber-400', border: 'border-amber-500/20' },
-    { bg: 'bg-rose-500/10', text: 'text-rose-600 dark:text-rose-400', border: 'border-rose-500/20' },
-    { bg: 'bg-cyan-500/10', text: 'text-cyan-600 dark:text-cyan-400', border: 'border-cyan-500/20' },
-    { bg: 'bg-violet-500/10', text: 'text-violet-600 dark:text-violet-400', border: 'border-violet-500/20' },
-    { bg: 'bg-orange-500/10', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-500/20' },
-    { bg: 'bg-teal-500/10', text: 'text-teal-600 dark:text-teal-400', border: 'border-teal-500/20' },
-  ];
-  let hash = 0;
-  for (let i = 0; i < project.length; i++) {
-    hash = ((hash << 5) - hash) + project.charCodeAt(i);
-    hash |= 0;
-  }
-  return colors[Math.abs(hash) % colors.length];
-}
-
-/**
- * Backward-compatible badge class (for legacy CSS).
- */
-export function getBadgeClass(type: string): string {
-  const map: Record<string, string> = {
-    'file-write': 'badge--file-write',
-    'file-read': 'badge--file-read',
-    'command': 'badge--command',
-    'research': 'badge--research',
-    'delegation': 'badge--delegation',
-    'tool-use': 'badge--tool-use',
-    'constraint': 'badge--constraint',
-    'decision': 'badge--decision',
-    'heuristic': 'badge--heuristic',
-    'rejected': 'badge--rejected'
-  };
-  return map[type] || 'badge--default';
-}
-
-/**
- * Converts an epoch (seconds) to a readable relative time string.
- */
-export function timeAgo(epochSeconds: number): string {
-  const now = Date.now() / 1000;
-  const diff = Math.max(0, now - epochSeconds);
+export function timeAgo(epoch: number): string {
+  const epochMs = epoch > 1e12 ? epoch : epoch * 1000;
+  const diff = Math.max(0, (Date.now() - epochMs) / 1000);
 
   if (diff < 60) return 'just now';
   if (diff < 3600) {

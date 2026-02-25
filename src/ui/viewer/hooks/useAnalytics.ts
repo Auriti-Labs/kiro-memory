@@ -9,9 +9,12 @@ interface AnalyticsData {
   isLoading: boolean;
 }
 
+/** Intervallo polling analytics (ms) — sincronizzato col polling di useSSE */
+const POLL_INTERVAL = 30_000;
+
 /**
- * Hook per fetch dati analytics con refresh su SSE events.
- * Ascolta EventSource globale per aggiornamenti in tempo reale.
+ * Hook per fetch dati analytics con polling automatico.
+ * NON apre EventSource propria — usa polling a 30s per aggiornamenti.
  */
 export function useAnalytics(project: string): AnalyticsData {
   const [data, setData] = useState<AnalyticsData>({
@@ -23,7 +26,6 @@ export function useAnalytics(project: string): AnalyticsData {
   });
 
   const mountedRef = useRef(true);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchAnalytics = useCallback(async () => {
     if (!mountedRef.current) return;
@@ -54,14 +56,6 @@ export function useAnalytics(project: string): AnalyticsData {
     }
   }, [project]);
 
-  // Refresh con debounce per evitare flood da SSE events
-  const debouncedRefresh = useCallback(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      fetchAnalytics();
-    }, 2000);
-  }, [fetchAnalytics]);
-
   useEffect(() => {
     mountedRef.current = true;
 
@@ -69,24 +63,16 @@ export function useAnalytics(project: string): AnalyticsData {
     setData(prev => ({ ...prev, isLoading: true }));
     fetchAnalytics();
 
-    // Ascolta SSE events per refresh automatico
-    const eventSource = new EventSource('/events');
-
-    const onUpdate = () => debouncedRefresh();
-
-    eventSource.addEventListener('observation-created', onUpdate);
-    eventSource.addEventListener('summary-created', onUpdate);
-    eventSource.addEventListener('session-created', onUpdate);
+    // Polling automatico ogni 30s
+    const interval = setInterval(() => {
+      if (mountedRef.current) fetchAnalytics();
+    }, POLL_INTERVAL);
 
     return () => {
       mountedRef.current = false;
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      eventSource.removeEventListener('observation-created', onUpdate);
-      eventSource.removeEventListener('summary-created', onUpdate);
-      eventSource.removeEventListener('session-created', onUpdate);
-      eventSource.close();
+      clearInterval(interval);
     };
-  }, [fetchAnalytics, debouncedRefresh]);
+  }, [fetchAnalytics]);
 
   return data;
 }

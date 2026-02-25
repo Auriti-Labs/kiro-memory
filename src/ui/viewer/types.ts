@@ -59,6 +59,13 @@ export type ThemePreference = 'light' | 'dark' | 'system';
 
 // ── Analytics Types ──
 
+export interface TokenEconomics {
+  discoveryTokens: number;
+  readTokens: number;
+  savings: number;
+  reductionPct: number;
+}
+
 export interface AnalyticsOverview {
   observations: number;
   summaries: number;
@@ -68,6 +75,7 @@ export interface AnalyticsOverview {
   observationsThisWeek: number;
   staleCount: number;
   knowledgeCount: number;
+  tokenEconomics: TokenEconomics;
 }
 
 export interface TimelineEntry {

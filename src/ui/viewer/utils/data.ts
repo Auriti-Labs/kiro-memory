@@ -1,5 +1,3 @@
-import { Observation, Summary, UserPrompt } from '../types';
-
 export function mergeAndDeduplicateByProject<T extends { id: number; project: string }>(
   liveData: T[],
   paginatedData: T[]

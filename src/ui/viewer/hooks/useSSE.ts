@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Observation, Summary, UserPrompt } from '../types';
 
 interface SSEState {
@@ -7,10 +7,15 @@ interface SSEState {
   prompts: UserPrompt[];
   projects: string[];
   isConnected: boolean;
+  lastEventTime: number;
 }
 
+/** Intervallo polling di fallback (ms) */
+const POLL_INTERVAL = 30_000;
+
 /**
- * Hook SSE con auto-reconnect e fetch iniziale completo.
+ * Hook SSE con auto-reconnect, polling fallback e timestamp ultimo aggiornamento.
+ * EventSource singola per tutta l'app — gli altri hook NON devono aprire connessioni SSE proprie.
  */
 export function useSSE(): SSEState {
   const [state, setState] = useState<SSEState>({
@@ -18,15 +23,24 @@ export function useSSE(): SSEState {
     summaries: [],
     prompts: [],
     projects: [],
-    isConnected: false
+    isConnected: false,
+    lastEventTime: 0
   });
 
   const mountedRef = useRef(true);
+
+  /** Aggiorna il timestamp dell'ultimo refresh riuscito */
+  const touchLastEvent = useCallback(() => {
+    if (mountedRef.current) {
+      setState(prev => ({ ...prev, lastEventTime: Date.now() }));
+    }
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
     let eventSource: EventSource | null = null;
     let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
     let retryCount = 0;
     const MAX_RETRY_DELAY = 30000;
 
@@ -36,7 +50,7 @@ export function useSSE(): SSEState {
         const res = await fetch('/api/observations?limit=50');
         if (res.ok && mountedRef.current) {
           const observations = await res.json();
-          setState(prev => ({ ...prev, observations }));
+          setState(prev => ({ ...prev, observations, lastEventTime: Date.now() }));
         }
       } catch (err) {
         console.error('Failed to fetch observations:', err);
@@ -79,7 +93,7 @@ export function useSSE(): SSEState {
       }
     };
 
-    /** Re-fetch completo di tutti i dati (usato al reconnect per recuperare eventi persi) */
+    /** Re-fetch completo di tutti i dati */
     const fetchAll = () => {
       fetchObservations();
       fetchSummaries();
@@ -87,10 +101,19 @@ export function useSSE(): SSEState {
       fetchProjects();
     };
 
-    /* ── Handler SSE nominati (reference stabile per add/removeEventListener) ── */
+    /* ── Handler SSE ── */
     const onObservation = () => { fetchObservations(); fetchProjects(); };
     const onSummary = () => { fetchSummaries(); };
     const onPrompt = () => { fetchPrompts(); };
+    const onSession = () => { fetchProjects(); };
+
+    /* ── Polling fallback: safety net per aggiornamenti persi ── */
+    const startPolling = () => {
+      if (pollInterval) clearInterval(pollInterval);
+      pollInterval = setInterval(() => {
+        if (mountedRef.current) fetchAll();
+      }, POLL_INTERVAL);
+    };
 
     /* ── SSE con exponential backoff ── */
     let wasConnected = false;
@@ -108,7 +131,7 @@ export function useSSE(): SSEState {
         }
         wasConnected = true;
         retryCount = 0;
-        setState(prev => ({ ...prev, isConnected: true }));
+        setState(prev => ({ ...prev, isConnected: true, lastEventTime: Date.now() }));
       };
 
       eventSource.onerror = () => {
@@ -120,6 +143,7 @@ export function useSSE(): SSEState {
           eventSource.removeEventListener('observation-created', onObservation);
           eventSource.removeEventListener('summary-created', onSummary);
           eventSource.removeEventListener('prompt-created', onPrompt);
+          eventSource.removeEventListener('session-created', onSession);
           eventSource.close();
         }
         eventSource = null;
@@ -132,6 +156,7 @@ export function useSSE(): SSEState {
       eventSource.addEventListener('observation-created', onObservation);
       eventSource.addEventListener('summary-created', onSummary);
       eventSource.addEventListener('prompt-created', onPrompt);
+      eventSource.addEventListener('session-created', onSession);
     };
 
     // Fetch iniziale di tutti i dati
@@ -140,15 +165,20 @@ export function useSSE(): SSEState {
     // Avvia connessione SSE
     connect();
 
+    // Avvia polling di fallback (safety net)
+    startPolling();
+
     return () => {
       mountedRef.current = false;
       if (eventSource) {
         eventSource.removeEventListener('observation-created', onObservation);
         eventSource.removeEventListener('summary-created', onSummary);
         eventSource.removeEventListener('prompt-created', onPrompt);
+        eventSource.removeEventListener('session-created', onSession);
         eventSource.close();
       }
       if (retryTimeout) clearTimeout(retryTimeout);
+      if (pollInterval) clearInterval(pollInterval);
     };
   }, []);
 
