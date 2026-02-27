@@ -5,8 +5,12 @@ export function mergeAndDeduplicateByProject<T extends { id: number; project: st
   const seen = new Set<number>();
   const merged: T[] = [];
 
+  // Difesa: se i dati non sono array (es. errore API), ritorna lista vuota
+  const live = Array.isArray(liveData) ? liveData : [];
+  const paginated = Array.isArray(paginatedData) ? paginatedData : [];
+
   // Add live data first
-  for (const item of liveData) {
+  for (const item of live) {
     if (!seen.has(item.id)) {
       seen.add(item.id);
       merged.push(item);
@@ -14,7 +18,7 @@ export function mergeAndDeduplicateByProject<T extends { id: number; project: st
   }
 
   // Add paginated data
-  for (const item of paginatedData) {
+  for (const item of paginated) {
     if (!seen.has(item.id)) {
       seen.add(item.id);
       merged.push(item);

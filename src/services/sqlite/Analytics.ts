@@ -203,11 +203,11 @@ export function getAnalyticsOverview(
   `;
 
   const params: Record<string, any> = {
-    '@todayStart': todayStart,
-    '@weekStart': weekStart
+    todayStart,
+    weekStart
   };
   if (project) {
-    params['@project'] = project;
+    params['project'] = project;
   }
 
   const row = db.query(sql).get(params) as any;
