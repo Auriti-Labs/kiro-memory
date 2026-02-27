@@ -3053,13 +3053,248 @@ function printBanner(opts) {
   console.log("");
 }
 
+// src/cli/cli-utils.ts
+import { existsSync as existsSync4, statSync as statSync2, readFileSync as readFileSync2, writeFileSync, mkdirSync as mkdirSync3 } from "fs";
+import { join as join3 } from "path";
+import { homedir as homedir3 } from "os";
+function observationToJsonl(obs) {
+  return JSON.stringify(obs);
+}
+function generateJsonlOutput(observations) {
+  return observations.map(observationToJsonl).join("\n");
+}
+function generateJsonOutput(observations) {
+  return JSON.stringify(observations, null, 2);
+}
+function observationToMarkdown(obs) {
+  const date = new Date(obs.created_at).toLocaleDateString("it-IT", {
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  });
+  const lines = [
+    `## ${obs.title}`,
+    "",
+    `- **Tipo:** ${obs.type}`,
+    `- **Progetto:** ${obs.project}`,
+    `- **Data:** ${date}`
+  ];
+  if (obs.subtitle) lines.push(`- **Sottotitolo:** ${obs.subtitle}`);
+  if (obs.files_modified) lines.push(`- **File modificati:** ${obs.files_modified}`);
+  if (obs.files_read) lines.push(`- **File letti:** ${obs.files_read}`);
+  if (obs.text) {
+    lines.push("", "### Contenuto", "", obs.text);
+  }
+  if (obs.narrative) {
+    lines.push("", "### Narrativa", "", obs.narrative);
+  }
+  if (obs.facts) {
+    lines.push("", "### Fatti", "", obs.facts);
+  }
+  lines.push("");
+  return lines.join("\n");
+}
+function generateMarkdownOutput(observations) {
+  if (observations.length === 0) return "# Nessuna observation trovata\n";
+  const header = [
+    "# Kiro Memory \u2014 Export Observations",
+    "",
+    `> Progetto: ${observations[0].project} | Totale: ${observations.length}`,
+    "",
+    "---",
+    ""
+  ].join("\n");
+  return header + observations.map(observationToMarkdown).join("\n---\n\n");
+}
+function generateExportOutput(observations, format) {
+  switch (format) {
+    case "jsonl":
+      return generateJsonlOutput(observations);
+    case "json":
+      return generateJsonOutput(observations);
+    case "md":
+      return generateMarkdownOutput(observations);
+  }
+}
+function validateImportRecord(raw) {
+  if (!raw || typeof raw !== "object") {
+    return "Record non \xE8 un oggetto JSON valido";
+  }
+  const rec = raw;
+  if (!rec.project || typeof rec.project !== "string" || rec.project.trim() === "") {
+    return 'Campo "project" obbligatorio (stringa non vuota)';
+  }
+  if (!rec.type || typeof rec.type !== "string" || rec.type.trim() === "") {
+    return 'Campo "type" obbligatorio (stringa non vuota)';
+  }
+  if (!rec.title || typeof rec.title !== "string" || rec.title.trim() === "") {
+    return 'Campo "title" obbligatorio (stringa non vuota)';
+  }
+  if (rec.project.length > 200) return '"project" troppo lungo (max 200 caratteri)';
+  if (rec.type.length > 100) return '"type" troppo lungo (max 100 caratteri)';
+  if (rec.title.length > 500) return '"title" troppo lungo (max 500 caratteri)';
+  for (const field of ["subtitle", "text", "narrative", "facts", "concepts", "files_read", "files_modified", "content_hash"]) {
+    const val = rec[field];
+    if (val !== void 0 && val !== null && typeof val !== "string") {
+      return `Campo "${field}" deve essere stringa o null`;
+    }
+  }
+  return null;
+}
+function parseJsonlFile(content) {
+  const lines = content.split("\n");
+  const results = [];
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i].trim();
+    if (!raw || raw.startsWith("#")) continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      results.push({ line: i + 1, error: `JSON non valido: ${raw.substring(0, 50)}` });
+      continue;
+    }
+    const validationError = validateImportRecord(parsed);
+    if (validationError) {
+      results.push({ line: i + 1, error: validationError });
+      continue;
+    }
+    results.push({ line: i + 1, record: parsed });
+  }
+  return results;
+}
+function getConfigPath() {
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join3(homedir3(), ".contextkit");
+  return join3(dataDir, "config.json");
+}
+var CONFIG_DEFAULTS = {
+  "worker.port": 3001,
+  "worker.host": "127.0.0.1",
+  "log.level": "INFO",
+  "search.limit": 20,
+  "embeddings.enabled": false,
+  "decay.staleThresholdDays": 30
+};
+function readConfig(configPath) {
+  const path = configPath || getConfigPath();
+  if (!existsSync4(path)) return {};
+  try {
+    const raw = readFileSync2(path, "utf8");
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === "object" && parsed !== null) return parsed;
+    return {};
+  } catch {
+    return {};
+  }
+}
+function writeConfig(config, configPath) {
+  const path = configPath || getConfigPath();
+  const dir = path.substring(0, path.lastIndexOf("/"));
+  mkdirSync3(dir, { recursive: true });
+  writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
+}
+function getConfigValue(key, configPath) {
+  const config = readConfig(configPath);
+  if (key in config) return config[key];
+  if (key in CONFIG_DEFAULTS) return CONFIG_DEFAULTS[key];
+  return null;
+}
+function setConfigValue(key, rawValue, configPath) {
+  const config = readConfig(configPath);
+  let value = rawValue;
+  if (rawValue === "true") value = true;
+  else if (rawValue === "false") value = false;
+  else {
+    const num = Number(rawValue);
+    if (!isNaN(num) && rawValue.trim() !== "") value = num;
+  }
+  config[key] = value;
+  writeConfig(config, configPath);
+  return value;
+}
+function listConfig(configPath) {
+  const config = readConfig(configPath);
+  const merged = { ...CONFIG_DEFAULTS };
+  for (const [k, v] of Object.entries(config)) {
+    merged[k] = v;
+  }
+  return merged;
+}
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+function getDbFileSize(dbPath) {
+  try {
+    if (!existsSync4(dbPath)) return 0;
+    return statSync2(dbPath).size;
+  } catch {
+    return 0;
+  }
+}
+function formatStatsOutput(stats) {
+  const lines = [
+    "",
+    "=== Kiro Memory \u2014 Statistiche Database ===",
+    "",
+    `  Observations totali:   ${stats.totalObservations}`,
+    `  Sessioni totali:       ${stats.totalSessions}`,
+    `  Progetti distinti:     ${stats.totalProjects}`,
+    `  Dimensione DB:         ${formatBytes(stats.dbSizeBytes)}`
+  ];
+  if (stats.mostActiveProject) {
+    lines.push(`  Progetto piu' attivo:  ${stats.mostActiveProject}`);
+  }
+  const coverage = stats.embeddingCoverage;
+  const coverageBar = buildProgressBar(coverage, 20);
+  lines.push(`  Copertura embeddings:  ${coverageBar} ${coverage}%`);
+  lines.push("");
+  return lines.join("\n");
+}
+function buildProgressBar(percent, width = 20) {
+  const filled = Math.round(percent / 100 * width);
+  const empty = width - filled;
+  return `[${"#".repeat(filled)}${"-".repeat(empty)}]`;
+}
+function rebuildFtsIndex(db) {
+  try {
+    db.run("INSERT INTO observations_fts(observations_fts) VALUES('rebuild')");
+    return true;
+  } catch {
+    return false;
+  }
+}
+function removeOrphanedEmbeddings(db) {
+  try {
+    const result = db.run(
+      `DELETE FROM observation_embeddings
+       WHERE observation_id NOT IN (SELECT id FROM observations)`
+    );
+    return Number(result.changes);
+  } catch {
+    return 0;
+  }
+}
+function vacuumDatabase(db) {
+  try {
+    db.run("VACUUM");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // src/cli/contextkit.ts
+init_Observations();
 import { execSync } from "child_process";
-import { existsSync as existsSync4, mkdirSync as mkdirSync3, readFileSync as readFileSync2, writeFileSync, appendFileSync as appendFileSync2 } from "fs";
-import { join as join3, dirname as dirname2 } from "path";
-import { homedir as homedir3, platform, release } from "os";
+import { existsSync as existsSync5, mkdirSync as mkdirSync4, readFileSync as readFileSync3, writeFileSync as writeFileSync2, appendFileSync as appendFileSync2 } from "fs";
+import { join as join4, dirname as dirname2 } from "path";
+import { homedir as homedir4, platform, release } from "os";
 import { fileURLToPath as fileURLToPath2 } from "url";
 import { createInterface } from "readline";
+import { createHash as createHash2 } from "crypto";
 var args = process.argv.slice(2);
 var command = args[0];
 var __filename = fileURLToPath2(import.meta.url);
@@ -3067,8 +3302,8 @@ var __dirname2 = dirname2(__filename);
 var DIST_DIR = dirname2(__dirname2);
 var PKG_VERSION = "unknown";
 try {
-  const pkgPath = join3(DIST_DIR, "..", "..", "package.json");
-  PKG_VERSION = JSON.parse(readFileSync2(pkgPath, "utf8")).version;
+  const pkgPath = join4(DIST_DIR, "..", "..", "package.json");
+  PKG_VERSION = JSON.parse(readFileSync3(pkgPath, "utf8")).version;
 } catch {
 }
 var AGENT_TEMPLATE = JSON.stringify({
@@ -3122,8 +3357,8 @@ function isWSL() {
   try {
     const rel = release().toLowerCase();
     if (rel.includes("microsoft") || rel.includes("wsl")) return true;
-    if (existsSync4("/proc/version")) {
-      const proc = readFileSync2("/proc/version", "utf8").toLowerCase();
+    if (existsSync5("/proc/version")) {
+      const proc = readFileSync3("/proc/version", "utf8").toLowerCase();
       return proc.includes("microsoft") || proc.includes("wsl");
     }
     return false;
@@ -3262,9 +3497,9 @@ function askUser(question) {
 }
 function detectShellRc() {
   const shell = process.env.SHELL || "/bin/bash";
-  if (shell.includes("zsh")) return { name: "zsh", rcFile: join3(homedir3(), ".zshrc") };
-  if (shell.includes("fish")) return { name: "fish", rcFile: join3(homedir3(), ".config/fish/config.fish") };
-  return { name: "bash", rcFile: join3(homedir3(), ".bashrc") };
+  if (shell.includes("zsh")) return { name: "zsh", rcFile: join4(homedir4(), ".zshrc") };
+  if (shell.includes("fish")) return { name: "fish", rcFile: join4(homedir4(), ".config/fish/config.fish") };
+  return { name: "bash", rcFile: join4(homedir4(), ".bashrc") };
 }
 var AUTOFIXABLE_CHECKS = /* @__PURE__ */ new Set([
   "WSL: npm global prefix",
@@ -3294,14 +3529,14 @@ async function tryAutoFix(failedChecks) {
   if (prefixCheck) {
     console.log("  Fixing npm global prefix...");
     try {
-      const npmGlobalDir = join3(homedir3(), ".npm-global");
-      mkdirSync3(npmGlobalDir, { recursive: true });
+      const npmGlobalDir = join4(homedir4(), ".npm-global");
+      mkdirSync4(npmGlobalDir, { recursive: true });
       const { spawnSync: spawnNpmConfig } = __require("child_process");
       spawnNpmConfig("npm", ["config", "set", "prefix", npmGlobalDir], { stdio: "ignore" });
       const exportLine = 'export PATH="$HOME/.npm-global/bin:$PATH"';
       let alreadyInRc = false;
-      if (existsSync4(rcFile)) {
-        const content = readFileSync2(rcFile, "utf8");
+      if (existsSync5(rcFile)) {
+        const content = readFileSync3(rcFile, "utf8");
         alreadyInRc = content.includes(".npm-global/bin");
       }
       if (!alreadyInRc) {
@@ -3321,9 +3556,9 @@ ${exportLine}
   const npmBinaryCheck = fixable.find((c) => c.name === "WSL: npm binary");
   if (npmBinaryCheck) {
     console.log("\n  Fixing npm binary (installing nvm + Node.js 22)...");
-    const nvmDir = join3(homedir3(), ".nvm");
+    const nvmDir = join4(homedir4(), ".nvm");
     try {
-      if (existsSync4(nvmDir)) {
+      if (existsSync5(nvmDir)) {
         console.log(`  nvm already installed at ${nvmDir}`);
       } else {
         console.log("  Downloading nvm...");
@@ -3371,8 +3606,8 @@ ${exportLine}
       const { spawnSync: spawnRebuild } = __require("child_process");
       const globalDirResult = spawnRebuild("npm", ["prefix", "-g"], { encoding: "utf8", stdio: ["pipe", "pipe", "ignore"] });
       const globalDir = (globalDirResult.stdout || "").trim();
-      const sqlitePkg = join3(globalDir, "lib", "node_modules", "kiro-memory");
-      if (existsSync4(sqlitePkg)) {
+      const sqlitePkg = join4(globalDir, "lib", "node_modules", "kiro-memory");
+      if (existsSync5(sqlitePkg)) {
         spawnRebuild("npm", ["rebuild", "better-sqlite3"], {
           cwd: sqlitePkg,
           stdio: "inherit",
@@ -3420,44 +3655,44 @@ async function installKiro() {
     }
   }
   const distDir = DIST_DIR;
-  const kiroDir = process.env.KIRO_CONFIG_DIR || join3(homedir3(), ".kiro");
-  const agentsDir = join3(kiroDir, "agents");
-  const settingsDir = join3(kiroDir, "settings");
-  const steeringDir = join3(kiroDir, "steering");
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join3(homedir3(), ".contextkit");
+  const kiroDir = process.env.KIRO_CONFIG_DIR || join4(homedir4(), ".kiro");
+  const agentsDir = join4(kiroDir, "agents");
+  const settingsDir = join4(kiroDir, "settings");
+  const steeringDir = join4(kiroDir, "steering");
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join4(homedir4(), ".contextkit");
   console.log("[2/4] Installing Kiro configuration...\n");
   for (const dir of [agentsDir, settingsDir, steeringDir, dataDir]) {
-    mkdirSync3(dir, { recursive: true });
+    mkdirSync4(dir, { recursive: true });
   }
   const agentConfig = AGENT_TEMPLATE.replace(/__DIST_DIR__/g, distDir);
-  const agentDestPath = join3(agentsDir, "kiro-memory.json");
-  writeFileSync(agentDestPath, agentConfig, "utf8");
+  const agentDestPath = join4(agentsDir, "kiro-memory.json");
+  writeFileSync2(agentDestPath, agentConfig, "utf8");
   console.log(`  \u2192 Agent config: ${agentDestPath}`);
-  const mcpFilePath = join3(settingsDir, "mcp.json");
+  const mcpFilePath = join4(settingsDir, "mcp.json");
   let mcpConfig = { mcpServers: {} };
-  if (existsSync4(mcpFilePath)) {
+  if (existsSync5(mcpFilePath)) {
     try {
-      mcpConfig = JSON.parse(readFileSync2(mcpFilePath, "utf8"));
+      mcpConfig = JSON.parse(readFileSync3(mcpFilePath, "utf8"));
       if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
     } catch {
     }
   }
   mcpConfig.mcpServers["kiro-memory"] = {
     command: "node",
-    args: [join3(distDir, "servers", "mcp-server.js")]
+    args: [join4(distDir, "servers", "mcp-server.js")]
   };
-  writeFileSync(mcpFilePath, JSON.stringify(mcpConfig, null, 2), "utf8");
+  writeFileSync2(mcpFilePath, JSON.stringify(mcpConfig, null, 2), "utf8");
   console.log(`  \u2192 MCP config:   ${mcpFilePath}`);
-  const steeringDestPath = join3(steeringDir, "kiro-memory.md");
-  writeFileSync(steeringDestPath, STEERING_CONTENT, "utf8");
+  const steeringDestPath = join4(steeringDir, "kiro-memory.md");
+  writeFileSync2(steeringDestPath, STEERING_CONTENT, "utf8");
   console.log(`  \u2192 Steering:     ${steeringDestPath}`);
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/4] Shell alias setup\n");
   const { rcFile } = detectShellRc();
   const aliasLine = 'alias kiro="kiro-cli --agent kiro-memory"';
   let aliasAlreadySet = false;
-  if (existsSync4(rcFile)) {
-    const rcContent = readFileSync2(rcFile, "utf8");
+  if (existsSync5(rcFile)) {
+    const rcContent = readFileSync3(rcFile, "utf8");
     aliasAlreadySet = rcContent.includes("alias kiro=") && rcContent.includes("kiro-memory");
   }
   if (aliasAlreadySet) {
@@ -3564,16 +3799,16 @@ async function installClaudeCode() {
     }
   }
   const distDir = DIST_DIR;
-  const claudeDir = join3(homedir3(), ".claude");
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join3(homedir3(), ".kiro-memory");
+  const claudeDir = join4(homedir4(), ".claude");
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join4(homedir4(), ".kiro-memory");
   console.log("[2/3] Installing Claude Code configuration...\n");
-  mkdirSync3(claudeDir, { recursive: true });
-  mkdirSync3(dataDir, { recursive: true });
-  const settingsPath = join3(claudeDir, "settings.json");
+  mkdirSync4(claudeDir, { recursive: true });
+  mkdirSync4(dataDir, { recursive: true });
+  const settingsPath = join4(claudeDir, "settings.json");
   let settings = {};
-  if (existsSync4(settingsPath)) {
+  if (existsSync5(settingsPath)) {
     try {
-      settings = JSON.parse(readFileSync2(settingsPath, "utf8"));
+      settings = JSON.parse(readFileSync3(settingsPath, "utf8"));
     } catch {
     }
   }
@@ -3588,7 +3823,7 @@ async function installClaudeCode() {
       matcher: "",
       hooks: [{
         type: "command",
-        command: `node ${join3(distDir, config.script)}`,
+        command: `node ${join4(distDir, config.script)}`,
         timeout: config.timeout
       }]
     };
@@ -3603,31 +3838,31 @@ async function installClaudeCode() {
       settings[event].push(hookEntry);
     }
   }
-  writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf8");
+  writeFileSync2(settingsPath, JSON.stringify(settings, null, 2), "utf8");
   console.log(`  \u2192 Hooks config: ${settingsPath}`);
-  const mcpPath = join3(homedir3(), ".mcp.json");
+  const mcpPath = join4(homedir4(), ".mcp.json");
   let mcpConfig = {};
-  if (existsSync4(mcpPath)) {
+  if (existsSync5(mcpPath)) {
     try {
-      mcpConfig = JSON.parse(readFileSync2(mcpPath, "utf8"));
+      mcpConfig = JSON.parse(readFileSync3(mcpPath, "utf8"));
     } catch {
     }
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
   mcpConfig.mcpServers["kiro-memory"] = {
     command: "node",
-    args: [join3(distDir, "servers", "mcp-server.js")]
+    args: [join4(distDir, "servers", "mcp-server.js")]
   };
-  writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
+  writeFileSync2(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
   console.log(`  \u2192 MCP config:   ${mcpPath}`);
-  const steeringPath = join3(claudeDir, "CLAUDE.md");
+  const steeringPath = join4(claudeDir, "CLAUDE.md");
   let existingSteering = "";
-  if (existsSync4(steeringPath)) {
-    existingSteering = readFileSync2(steeringPath, "utf8");
+  if (existsSync5(steeringPath)) {
+    existingSteering = readFileSync3(steeringPath, "utf8");
   }
   if (!existingSteering.includes("Kiro Memory")) {
     const separator = existingSteering.length > 0 ? "\n\n---\n\n" : "";
-    writeFileSync(steeringPath, existingSteering + separator + CLAUDE_CODE_STEERING, "utf8");
+    writeFileSync2(steeringPath, existingSteering + separator + CLAUDE_CODE_STEERING, "utf8");
     console.log(`  \u2192 Steering:     ${steeringPath}`);
   } else {
     console.log(`  \u2192 Steering:     ${steeringPath} (already configured)`);
@@ -3671,16 +3906,16 @@ async function installCursor() {
     }
   }
   const distDir = DIST_DIR;
-  const cursorDir = join3(homedir3(), ".cursor");
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join3(homedir3(), ".kiro-memory");
+  const cursorDir = join4(homedir4(), ".cursor");
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join4(homedir4(), ".kiro-memory");
   console.log("[2/3] Installing Cursor configuration...\n");
-  mkdirSync3(cursorDir, { recursive: true });
-  mkdirSync3(dataDir, { recursive: true });
-  const hooksPath = join3(cursorDir, "hooks.json");
+  mkdirSync4(cursorDir, { recursive: true });
+  mkdirSync4(dataDir, { recursive: true });
+  const hooksPath = join4(cursorDir, "hooks.json");
   let hooksConfig = { version: 1, hooks: {} };
-  if (existsSync4(hooksPath)) {
+  if (existsSync5(hooksPath)) {
     try {
-      hooksConfig = JSON.parse(readFileSync2(hooksPath, "utf8"));
+      hooksConfig = JSON.parse(readFileSync3(hooksPath, "utf8"));
       if (!hooksConfig.hooks) hooksConfig.hooks = {};
       if (!hooksConfig.version) hooksConfig.version = 1;
     } catch {
@@ -3696,7 +3931,7 @@ async function installCursor() {
   };
   for (const [event, script] of Object.entries(cursorHookMap)) {
     const hookEntry = {
-      command: `node ${join3(distDir, script)}`
+      command: `node ${join4(distDir, script)}`
     };
     if (!hooksConfig.hooks[event]) {
       hooksConfig.hooks[event] = [hookEntry];
@@ -3707,22 +3942,22 @@ async function installCursor() {
       hooksConfig.hooks[event].push(hookEntry);
     }
   }
-  writeFileSync(hooksPath, JSON.stringify(hooksConfig, null, 2), "utf8");
+  writeFileSync2(hooksPath, JSON.stringify(hooksConfig, null, 2), "utf8");
   console.log(`  \u2192 Hooks config: ${hooksPath}`);
-  const mcpPath = join3(cursorDir, "mcp.json");
+  const mcpPath = join4(cursorDir, "mcp.json");
   let mcpConfig = {};
-  if (existsSync4(mcpPath)) {
+  if (existsSync5(mcpPath)) {
     try {
-      mcpConfig = JSON.parse(readFileSync2(mcpPath, "utf8"));
+      mcpConfig = JSON.parse(readFileSync3(mcpPath, "utf8"));
     } catch {
     }
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
   mcpConfig.mcpServers["kiro-memory"] = {
     command: "node",
-    args: [join3(distDir, "servers", "mcp-server.js")]
+    args: [join4(distDir, "servers", "mcp-server.js")]
   };
-  writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
+  writeFileSync2(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
   console.log(`  \u2192 MCP config:   ${mcpPath}`);
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/3] Done!\n");
@@ -3762,25 +3997,25 @@ async function installWindsurf() {
     }
   }
   const distDir = DIST_DIR;
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join3(homedir3(), ".kiro-memory");
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join4(homedir4(), ".kiro-memory");
   console.log("[2/3] Installing Windsurf configuration...\n");
-  mkdirSync3(dataDir, { recursive: true });
-  const windsurfDir = join3(homedir3(), ".codeium", "windsurf");
-  mkdirSync3(windsurfDir, { recursive: true });
-  const mcpPath = join3(windsurfDir, "mcp_config.json");
+  mkdirSync4(dataDir, { recursive: true });
+  const windsurfDir = join4(homedir4(), ".codeium", "windsurf");
+  mkdirSync4(windsurfDir, { recursive: true });
+  const mcpPath = join4(windsurfDir, "mcp_config.json");
   let mcpConfig = {};
-  if (existsSync4(mcpPath)) {
+  if (existsSync5(mcpPath)) {
     try {
-      mcpConfig = JSON.parse(readFileSync2(mcpPath, "utf8"));
+      mcpConfig = JSON.parse(readFileSync3(mcpPath, "utf8"));
     } catch {
     }
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
   mcpConfig.mcpServers["kiro-memory"] = {
     command: "node",
-    args: [join3(distDir, "servers", "mcp-server.js")]
+    args: [join4(distDir, "servers", "mcp-server.js")]
   };
-  writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
+  writeFileSync2(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
   console.log(`  \u2192 MCP config:   ${mcpPath}`);
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/3] Done!\n");
@@ -3821,31 +4056,31 @@ async function installCline() {
     }
   }
   const distDir = DIST_DIR;
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join3(homedir3(), ".kiro-memory");
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join4(homedir4(), ".kiro-memory");
   console.log("[2/3] Installing Cline configuration...\n");
-  mkdirSync3(dataDir, { recursive: true });
+  mkdirSync4(dataDir, { recursive: true });
   const platform2 = process.platform;
   let clineSettingsDir;
   if (platform2 === "darwin") {
-    clineSettingsDir = join3(homedir3(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
+    clineSettingsDir = join4(homedir4(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
   } else {
-    clineSettingsDir = join3(homedir3(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
+    clineSettingsDir = join4(homedir4(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
   }
-  mkdirSync3(clineSettingsDir, { recursive: true });
-  const mcpPath = join3(clineSettingsDir, "cline_mcp_settings.json");
+  mkdirSync4(clineSettingsDir, { recursive: true });
+  const mcpPath = join4(clineSettingsDir, "cline_mcp_settings.json");
   let mcpConfig = {};
-  if (existsSync4(mcpPath)) {
+  if (existsSync5(mcpPath)) {
     try {
-      mcpConfig = JSON.parse(readFileSync2(mcpPath, "utf8"));
+      mcpConfig = JSON.parse(readFileSync3(mcpPath, "utf8"));
     } catch {
     }
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
   mcpConfig.mcpServers["kiro-memory"] = {
     command: "node",
-    args: [join3(distDir, "servers", "mcp-server.js")]
+    args: [join4(distDir, "servers", "mcp-server.js")]
   };
-  writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
+  writeFileSync2(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
   console.log(`  \u2192 MCP config:   ${mcpPath}`);
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/3] Done!\n");
@@ -3864,20 +4099,20 @@ async function installCline() {
 async function runDoctor() {
   console.log("\n=== Kiro Memory - Diagnostics ===");
   const checks = runEnvironmentChecks();
-  const kiroDir = process.env.KIRO_CONFIG_DIR || join3(homedir3(), ".kiro");
-  const agentPath = join3(kiroDir, "agents", "kiro-memory.json");
-  const mcpPath = join3(kiroDir, "settings", "mcp.json");
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join3(homedir3(), ".contextkit");
+  const kiroDir = process.env.KIRO_CONFIG_DIR || join4(homedir4(), ".kiro");
+  const agentPath = join4(kiroDir, "agents", "kiro-memory.json");
+  const mcpPath = join4(kiroDir, "settings", "mcp.json");
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join4(homedir4(), ".contextkit");
   checks.push({
     name: "Kiro agent config",
-    ok: existsSync4(agentPath),
-    message: existsSync4(agentPath) ? agentPath : "Not found",
-    fix: !existsSync4(agentPath) ? "Run: kiro-memory install" : void 0
+    ok: existsSync5(agentPath),
+    message: existsSync5(agentPath) ? agentPath : "Not found",
+    fix: !existsSync5(agentPath) ? "Run: kiro-memory install" : void 0
   });
   let mcpOk = false;
-  if (existsSync4(mcpPath)) {
+  if (existsSync5(mcpPath)) {
     try {
-      const mcp = JSON.parse(readFileSync2(mcpPath, "utf8"));
+      const mcp = JSON.parse(readFileSync3(mcpPath, "utf8"));
       mcpOk = !!mcp.mcpServers?.["kiro-memory"] || !!mcp.mcpServers?.contextkit;
     } catch {
     }
@@ -3890,15 +4125,15 @@ async function runDoctor() {
   });
   checks.push({
     name: "Data directory",
-    ok: existsSync4(dataDir),
-    message: existsSync4(dataDir) ? dataDir : "Not created (will be created on first use)"
+    ok: existsSync5(dataDir),
+    message: existsSync5(dataDir) ? dataDir : "Not created (will be created on first use)"
   });
-  const claudeDir = join3(homedir3(), ".claude");
-  const claudeSettingsPath = join3(claudeDir, "settings.json");
+  const claudeDir = join4(homedir4(), ".claude");
+  const claudeSettingsPath = join4(claudeDir, "settings.json");
   let claudeHooksOk = false;
-  if (existsSync4(claudeSettingsPath)) {
+  if (existsSync5(claudeSettingsPath)) {
     try {
-      const claudeSettings = JSON.parse(readFileSync2(claudeSettingsPath, "utf8"));
+      const claudeSettings = JSON.parse(readFileSync3(claudeSettingsPath, "utf8"));
       claudeHooksOk = !!(claudeSettings?.SessionStart || claudeSettings?.PostToolUse);
       if (claudeHooksOk) {
         const allSettings = JSON.stringify(claudeSettings);
@@ -3907,11 +4142,11 @@ async function runDoctor() {
     } catch {
     }
   }
-  const claudeMcpPath = join3(homedir3(), ".mcp.json");
+  const claudeMcpPath = join4(homedir4(), ".mcp.json");
   let claudeMcpOk = false;
-  if (existsSync4(claudeMcpPath)) {
+  if (existsSync5(claudeMcpPath)) {
     try {
-      const claudeMcp = JSON.parse(readFileSync2(claudeMcpPath, "utf8"));
+      const claudeMcp = JSON.parse(readFileSync3(claudeMcpPath, "utf8"));
       claudeMcpOk = !!claudeMcp.mcpServers?.["kiro-memory"];
     } catch {
     }
@@ -3928,12 +4163,12 @@ async function runDoctor() {
     // Non-blocking: optional installation
     message: claudeMcpOk ? "kiro-memory registered in ~/.mcp.json" : "Not configured (optional: run kiro-memory install --claude-code)"
   });
-  const cursorDir = join3(homedir3(), ".cursor");
-  const cursorHooksPath = join3(cursorDir, "hooks.json");
+  const cursorDir = join4(homedir4(), ".cursor");
+  const cursorHooksPath = join4(cursorDir, "hooks.json");
   let cursorHooksOk = false;
-  if (existsSync4(cursorHooksPath)) {
+  if (existsSync5(cursorHooksPath)) {
     try {
-      const cursorHooks = JSON.parse(readFileSync2(cursorHooksPath, "utf8"));
+      const cursorHooks = JSON.parse(readFileSync3(cursorHooksPath, "utf8"));
       cursorHooksOk = !!(cursorHooks.hooks?.sessionStart || cursorHooks.hooks?.afterFileEdit);
       if (cursorHooksOk) {
         const allHooks = JSON.stringify(cursorHooks.hooks);
@@ -3942,11 +4177,11 @@ async function runDoctor() {
     } catch {
     }
   }
-  const cursorMcpPath = join3(cursorDir, "mcp.json");
+  const cursorMcpPath = join4(cursorDir, "mcp.json");
   let cursorMcpOk = false;
-  if (existsSync4(cursorMcpPath)) {
+  if (existsSync5(cursorMcpPath)) {
     try {
-      const cursorMcp = JSON.parse(readFileSync2(cursorMcpPath, "utf8"));
+      const cursorMcp = JSON.parse(readFileSync3(cursorMcpPath, "utf8"));
       cursorMcpOk = !!cursorMcp.mcpServers?.["kiro-memory"];
     } catch {
     }
@@ -3963,11 +4198,11 @@ async function runDoctor() {
     // Non-blocking: optional installation
     message: cursorMcpOk ? "kiro-memory registered in ~/.cursor/mcp.json" : "Not configured (optional: run kiro-memory install --cursor)"
   });
-  const windsurfMcpPath = join3(homedir3(), ".codeium", "windsurf", "mcp_config.json");
+  const windsurfMcpPath = join4(homedir4(), ".codeium", "windsurf", "mcp_config.json");
   let windsurfMcpOk = false;
-  if (existsSync4(windsurfMcpPath)) {
+  if (existsSync5(windsurfMcpPath)) {
     try {
-      const windsurfMcp = JSON.parse(readFileSync2(windsurfMcpPath, "utf8"));
+      const windsurfMcp = JSON.parse(readFileSync3(windsurfMcpPath, "utf8"));
       windsurfMcpOk = !!windsurfMcp.mcpServers?.["kiro-memory"];
     } catch {
     }
@@ -3981,15 +4216,15 @@ async function runDoctor() {
   const clinePlatform = process.platform;
   let clineSettingsBase;
   if (clinePlatform === "darwin") {
-    clineSettingsBase = join3(homedir3(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
+    clineSettingsBase = join4(homedir4(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
   } else {
-    clineSettingsBase = join3(homedir3(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
+    clineSettingsBase = join4(homedir4(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
   }
-  const clineMcpPath = join3(clineSettingsBase, "cline_mcp_settings.json");
+  const clineMcpPath = join4(clineSettingsBase, "cline_mcp_settings.json");
   let clineMcpOk = false;
-  if (existsSync4(clineMcpPath)) {
+  if (existsSync5(clineMcpPath)) {
     try {
-      const clineMcp = JSON.parse(readFileSync2(clineMcpPath, "utf8"));
+      const clineMcp = JSON.parse(readFileSync3(clineMcpPath, "utf8"));
       clineMcpOk = !!clineMcp.mcpServers?.["kiro-memory"];
     } catch {
     }
@@ -4040,7 +4275,32 @@ async function main() {
     return;
   }
   if (command === "doctor") {
+    if (args.includes("--fix")) {
+      await runDoctorFix();
+      return;
+    }
     await runDoctor();
+    return;
+  }
+  if (command === "export") {
+    const sdk2 = createKiroMemory();
+    try {
+      await exportObservations(sdk2, args.slice(1));
+    } finally {
+      sdk2.close();
+    }
+    return;
+  }
+  if (command === "import") {
+    await importObservations(args.slice(1));
+    return;
+  }
+  if (command === "stats") {
+    await showStats();
+    return;
+  }
+  if (command === "config") {
+    await handleConfig(args.slice(1));
     return;
   }
   const sdk = createKiroMemory();
@@ -4051,7 +4311,11 @@ async function main() {
         await showContext(sdk);
         break;
       case "search":
-        await searchContext(sdk, args[1]);
+        if (args.includes("--interactive") || args.includes("-i")) {
+          await searchInteractive(sdk, args.slice(1));
+        } else {
+          await searchContext(sdk, args[1]);
+        }
         break;
       case "observations":
       case "obs":
@@ -4404,7 +4668,7 @@ async function generateReportCli(sdk, cliArgs) {
       output = formatReportText(data);
   }
   if (outputArg) {
-    writeFileSync(outputArg, output, "utf8");
+    writeFileSync2(outputArg, output, "utf8");
     console.log(`
   Report saved to: ${outputArg}
 `);
@@ -4448,6 +4712,348 @@ async function resumeSession(sdk, sessionId) {
   }
   console.log("");
 }
+async function searchInteractive(sdk, cliArgs) {
+  const projectArg = cliArgs.find((a, i) => cliArgs[i - 1] === "--project") || cliArgs.find((a) => a.startsWith("--project="))?.split("=").slice(1).join("=");
+  const isInteractive = cliArgs.includes("--interactive") || cliArgs.includes("-i");
+  if (!isInteractive || !process.stdin.isTTY) {
+    const queryArg = cliArgs.find((a) => !a.startsWith("-") && a !== "search");
+    if (!queryArg) {
+      console.error("Errore: fornisci un termine di ricerca o usa --interactive con un TTY");
+      process.exit(1);
+    }
+    const results = projectArg ? await sdk.searchAdvanced(queryArg, { project: projectArg }) : await sdk.search(queryArg);
+    const obs = results.observations.slice(0, 20);
+    if (obs.length === 0) {
+      console.log("\nNessun risultato trovato.\n");
+      return;
+    }
+    console.log(`
+Risultati per: "${queryArg}"
+`);
+    obs.forEach((o, i) => {
+      const date = new Date(o.created_at).toLocaleDateString("it-IT");
+      console.log(`  ${i + 1}. [${o.type}] ${o.title} \u2014 ${o.project} (${date})`);
+    });
+    console.log("");
+    return;
+  }
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const prompt = (question) => new Promise((resolve) => rl.question(question, (answer) => resolve(answer.trim())));
+  const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
+  const cyan = (s) => useColor ? `\x1B[36m${s}\x1B[0m` : s;
+  const bold = (s) => useColor ? `\x1B[1m${s}\x1B[0m` : s;
+  const dim = (s) => useColor ? `\x1B[2m${s}\x1B[0m` : s;
+  console.log(`
+${cyan("=== Kiro Memory \u2014 Ricerca Interattiva ===")}`);
+  if (projectArg) console.log(dim(`  Filtro progetto: ${projectArg}`));
+  console.log(dim('  Premi Ctrl+C o digita "exit" per uscire.\n'));
+  while (true) {
+    let query;
+    try {
+      query = await prompt(cyan("> "));
+    } catch {
+      break;
+    }
+    if (!query || query.toLowerCase() === "exit" || query.toLowerCase() === "quit") break;
+    const results = projectArg ? await sdk.searchAdvanced(query, { project: projectArg }) : await sdk.search(query);
+    const obs = results.observations.slice(0, 20);
+    if (obs.length === 0) {
+      console.log(dim("\n  Nessun risultato trovato.\n"));
+      continue;
+    }
+    console.log(`
+  ${bold(`${obs.length} risultato/i:`)}
+`);
+    obs.forEach((o, i) => {
+      const date = new Date(o.created_at).toLocaleDateString("it-IT");
+      console.log(`    ${bold(`${i + 1}.`)} [${o.type}] ${o.title}`);
+      console.log(dim(`       ${o.project} \u2014 ${date}`));
+    });
+    console.log("");
+    const selRaw = await prompt(`  Numero per dettagli (Invio per saltare): `);
+    const selIdx = parseInt(selRaw) - 1;
+    if (!isNaN(selIdx) && selIdx >= 0 && selIdx < obs.length) {
+      const o = obs[selIdx];
+      console.log("");
+      console.log(`  ${bold("Titolo:")}     ${o.title}`);
+      console.log(`  ${bold("Tipo:")}       ${o.type}`);
+      console.log(`  ${bold("Progetto:")}   ${o.project}`);
+      console.log(`  ${bold("Data:")}       ${new Date(o.created_at).toLocaleString("it-IT")}`);
+      if (o.text) {
+        console.log(`  ${bold("Contenuto:")}`);
+        console.log(`    ${o.text.substring(0, 500)}${o.text.length > 500 ? "..." : ""}`);
+      }
+      if (o.narrative) {
+        console.log(`  ${bold("Narrativa:")}`);
+        console.log(`    ${o.narrative.substring(0, 300)}${o.narrative.length > 300 ? "..." : ""}`);
+      }
+      console.log("");
+    }
+  }
+  rl.close();
+  console.log("\n  Uscita dalla modalit\xE0 interattiva.\n");
+}
+async function exportObservations(sdk, cliArgs) {
+  const formatArg = cliArgs.find((a) => a.startsWith("--format="))?.split("=").slice(1).join("=") || cliArgs.find((a, i) => cliArgs[i - 1] === "--format");
+  const projectArg = cliArgs.find((a) => a.startsWith("--project="))?.split("=").slice(1).join("=") || cliArgs.find((a, i) => cliArgs[i - 1] === "--project");
+  const outputArg = cliArgs.find((a) => a.startsWith("--output="))?.split("=").slice(1).join("=") || cliArgs.find((a, i) => cliArgs[i - 1] === "--output");
+  if (!projectArg) {
+    console.error("Errore: --project <nome> \xE8 obbligatorio per il comando export");
+    process.exit(1);
+  }
+  const validFormats = ["jsonl", "json", "md"];
+  const format = validFormats.includes(formatArg) ? formatArg : "jsonl";
+  const kmDb = new KiroMemoryDatabase();
+  let observations;
+  try {
+    observations = getObservationsByProject(kmDb.db, projectArg, 1e4);
+  } finally {
+    kmDb.close();
+  }
+  if (observations.length === 0) {
+    console.error(`Nessuna observation trovata per il progetto "${projectArg}"`);
+    process.exit(1);
+  }
+  const output = generateExportOutput(observations, format);
+  if (outputArg) {
+    writeFileSync2(outputArg, output, "utf8");
+    console.error(`
+  Esportate ${observations.length} observations in: ${outputArg}
+`);
+  } else {
+    process.stdout.write(output + "\n");
+  }
+}
+async function importObservations(cliArgs) {
+  const filePath = cliArgs.find((a) => !a.startsWith("-"));
+  if (!filePath) {
+    console.error("Errore: specifica il percorso del file JSONL\n  kiro-memory import <file.jsonl>");
+    process.exit(1);
+  }
+  if (!existsSync5(filePath)) {
+    console.error(`Errore: file non trovato: ${filePath}`);
+    process.exit(1);
+  }
+  let content;
+  try {
+    content = readFileSync3(filePath, "utf8");
+  } catch (err) {
+    console.error(`Errore lettura file: ${err.message}`);
+    process.exit(1);
+  }
+  const parsed = parseJsonlFile(content);
+  const validRecords = parsed.filter((r) => r.record);
+  const invalidRecords = parsed.filter((r) => r.error);
+  if (invalidRecords.length > 0) {
+    console.warn(`
+  Avviso: ${invalidRecords.length} righe non valide (saltate):`);
+    for (const inv of invalidRecords.slice(0, 5)) {
+      console.warn(`    Riga ${inv.line}: ${inv.error}`);
+    }
+    if (invalidRecords.length > 5) {
+      console.warn(`    ... e altri ${invalidRecords.length - 5} errori`);
+    }
+  }
+  const total = validRecords.length;
+  if (total === 0) {
+    console.error("\nNessun record valido da importare.");
+    process.exit(1);
+  }
+  console.log(`
+  Trovati ${total} record validi. Importazione in corso...
+`);
+  const kmDb = new KiroMemoryDatabase();
+  let imported = 0;
+  let duplicates = 0;
+  try {
+    for (const { record: rec } of validRecords) {
+      if (!rec) continue;
+      const hashPayload = `${rec.project}|${rec.type}|${rec.title}|${rec.narrative || ""}`;
+      const contentHash = createHash2("sha256").update(hashPayload).digest("hex");
+      const exists = kmDb.db.query(
+        "SELECT id FROM observations WHERE content_hash = ? LIMIT 1"
+      ).get(contentHash);
+      if (exists) {
+        duplicates++;
+        continue;
+      }
+      createObservation(
+        kmDb.db,
+        rec.memory_session_id || `import-${Date.now()}`,
+        rec.project,
+        rec.type,
+        rec.title,
+        rec.subtitle || null,
+        rec.text || null,
+        rec.narrative || null,
+        rec.facts || null,
+        rec.concepts || null,
+        rec.files_read || null,
+        rec.files_modified || null,
+        rec.prompt_number || 0,
+        contentHash,
+        rec.discovery_tokens || 0
+      );
+      imported++;
+      if ((imported + duplicates) % 100 === 0) {
+        process.stdout.write(`  Processati: ${imported + duplicates}/${total}\r`);
+      }
+    }
+  } finally {
+    kmDb.close();
+  }
+  console.log(`
+  Importate ${imported}/${total} observations (${duplicates} duplicati saltati)
+`);
+}
+async function runDoctorFix() {
+  console.log("\n=== Kiro Memory \u2014 Riparazione Database ===\n");
+  const kmDb = new KiroMemoryDatabase();
+  const db = kmDb.db;
+  const messages = [];
+  try {
+    process.stdout.write("  [1/3] Ricostruzione indice FTS5... ");
+    const ftsOk = rebuildFtsIndex(db);
+    if (ftsOk) {
+      console.log("\x1B[32m\u2713\x1B[0m");
+      messages.push("Indice FTS5 ricostruito");
+    } else {
+      console.log("\x1B[33m~\x1B[0m (FTS non disponibile o gia' integro)");
+    }
+    process.stdout.write("  [2/3] Rimozione embeddings orfani... ");
+    const removed = removeOrphanedEmbeddings(db);
+    console.log(`\x1B[32m\u2713\x1B[0m (${removed} rimossi)`);
+    if (removed > 0) messages.push(`${removed} embedding/s orfani rimossi`);
+    process.stdout.write("  [3/3] VACUUM database...             ");
+    const vacuumOk = vacuumDatabase(db);
+    if (vacuumOk) {
+      console.log("\x1B[32m\u2713\x1B[0m");
+      messages.push("VACUUM completato");
+    } else {
+      console.log("\x1B[31m\u2717\x1B[0m");
+    }
+  } finally {
+    kmDb.close();
+  }
+  if (messages.length > 0) {
+    console.log("\n  Operazioni completate:");
+    for (const msg of messages) {
+      console.log(`    \x1B[32m\u2713\x1B[0m ${msg}`);
+    }
+  }
+  console.log("");
+}
+async function showStats() {
+  const kmDb = new KiroMemoryDatabase();
+  const db = kmDb.db;
+  try {
+    const obsRow = db.query(
+      "SELECT COUNT(*) as total FROM observations"
+    ).get();
+    const sessRow = db.query(
+      "SELECT COUNT(*) as total FROM sessions"
+    ).get();
+    const projRow = db.query(
+      "SELECT COUNT(DISTINCT project) as cnt FROM observations"
+    ).get();
+    const topProject = db.query(
+      `SELECT project, COUNT(*) as cnt
+       FROM observations
+       GROUP BY project
+       ORDER BY cnt DESC
+       LIMIT 1`
+    ).get();
+    let embCoverage = 0;
+    try {
+      const embStats = db.query(
+        `SELECT
+           (SELECT COUNT(*) FROM observations) as total,
+           COUNT(DISTINCT observation_id) as embedded
+         FROM observation_embeddings`
+      ).get();
+      if (embStats && embStats.total > 0) {
+        embCoverage = Math.round(embStats.embedded / embStats.total * 100);
+      }
+    } catch {
+    }
+    const dbSize = getDbFileSize(DB_PATH);
+    const stats = {
+      totalObservations: obsRow?.total || 0,
+      totalSessions: sessRow?.total || 0,
+      totalProjects: projRow?.cnt || 0,
+      dbSizeBytes: dbSize,
+      mostActiveProject: topProject?.project || null,
+      embeddingCoverage: embCoverage
+    };
+    console.log(formatStatsOutput(stats));
+  } finally {
+    kmDb.close();
+  }
+}
+async function handleConfig(subArgs) {
+  const subcommand = subArgs[0];
+  const configPath = getConfigPath();
+  switch (subcommand) {
+    case "list": {
+      const config = listConfig(configPath);
+      console.log("\n=== Configurazione Kiro Memory ===\n");
+      console.log(`  File: ${configPath}
+`);
+      for (const [key, value] of Object.entries(config)) {
+        const displayValue = value === null ? "(non impostato)" : String(value);
+        console.log(`  ${key.padEnd(35)} ${displayValue}`);
+      }
+      console.log("");
+      break;
+    }
+    case "get": {
+      const key = subArgs[1];
+      if (!key) {
+        console.error("Errore: specifica una chiave\n  kiro-memory config get <chiave>");
+        process.exit(1);
+      }
+      const val = getConfigValue(key, configPath);
+      if (val === null) {
+        console.log(`
+  "${key}" non impostato (nessun valore di default)
+`);
+      } else {
+        console.log(`
+  ${key} = ${val}
+`);
+      }
+      break;
+    }
+    case "set": {
+      const key = subArgs[1];
+      const rawValue = subArgs[2];
+      if (!key) {
+        console.error("Errore: specifica chiave e valore\n  kiro-memory config set <chiave> <valore>");
+        process.exit(1);
+      }
+      if (rawValue === void 0) {
+        console.error(`Errore: valore mancante per "${key}"
+  kiro-memory config set ${key} <valore>`);
+        process.exit(1);
+      }
+      const saved = setConfigValue(key, rawValue, configPath);
+      console.log(`
+  Impostato: ${key} = ${saved}
+`);
+      break;
+    }
+    default:
+      console.log("\nUtilizzo: kiro-memory config <subcommand>\n");
+      console.log("Subcommands:");
+      console.log("  list                         Mostra tutte le impostazioni");
+      console.log("  get <chiave>                 Legge un valore");
+      console.log("  set <chiave> <valore>        Imposta un valore\n");
+      console.log("Esempio:");
+      console.log("  kiro-memory config list");
+      console.log("  kiro-memory config get worker.port");
+      console.log("  kiro-memory config set log.level DEBUG\n");
+  }
+}
 function showHelp() {
   console.log(`Usage: kiro-memory <command> [options]
 
@@ -4458,6 +5064,7 @@ Setup:
   install --windsurf        Install MCP server for Windsurf IDE
   install --cline           Install MCP server for Cline (VS Code)
   doctor                    Run environment diagnostics (checks Node, build tools, WSL, etc.)
+  doctor --fix              Auto-repair: rebuild FTS5, remove orphaned embeddings, VACUUM
 
 Commands:
   context, ctx              Show current project context
@@ -4466,8 +5073,18 @@ Commands:
     --period=weekly|monthly   Time period (default: weekly)
     --format=text|md|json     Output format (default: text)
     --output=<file>           Write to file instead of stdout
+  stats                     Quick database overview (totals, size, active project, embeddings)
   search <query>            Search across all context (keyword FTS5)
+  search --interactive      Interactive REPL search with result selection
+    --project <name>          Filter results by project
   semantic-search <query>   Hybrid search: vector + keyword (semantic)
+  export --project <name>   Export observations to JSONL/JSON/Markdown
+    --format=jsonl|json|md    Output format (default: jsonl)
+    --output=<file>           Write to file instead of stdout
+  import <file>             Import observations from JSONL file (deduplication by content_hash)
+  config list               Show all configuration settings
+  config get <key>          Show a single configuration value
+  config set <key> <value>  Set a configuration value
   observations [limit]      Show recent observations (default: 10)
   summaries [limit]         Show recent summaries (default: 5)
   add-observation <title> <content>   Add a new observation
@@ -4487,13 +5104,22 @@ Commands:
 Examples:
   kiro-memory install
   kiro-memory doctor
+  kiro-memory doctor --fix
+  kiro-memory stats
   kiro-memory context
   kiro-memory resume
   kiro-memory resume 42
   kiro-memory report
   kiro-memory report --period=monthly --format=md --output=report.md
   kiro-memory search "authentication"
+  kiro-memory search --interactive --project myapp
   kiro-memory semantic-search "how did I fix the auth bug"
+  kiro-memory export --project myapp --format jsonl --output backup.jsonl
+  kiro-memory export --project myapp --format md > notes.md
+  kiro-memory import backup.jsonl
+  kiro-memory config list
+  kiro-memory config get worker.port
+  kiro-memory config set log.level DEBUG
   kiro-memory add-knowledge constraint "No any in TypeScript" "Never use any type" --severity=hard
   kiro-memory add-knowledge decision "PostgreSQL over MongoDB" "Chosen for ACID" --alternatives=MongoDB,DynamoDB
   kiro-memory embeddings stats
