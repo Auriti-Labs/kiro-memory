@@ -130,14 +130,13 @@ async function build() {
     ...nodeCommon,
     entryPoints: [
       join(SRC_DIR, 'services', 'search', 'index.ts'),
-      join(SRC_DIR, 'services', 'search', 'ChromaManager.ts'),
       join(SRC_DIR, 'services', 'search', 'HybridSearch.ts'),
       join(SRC_DIR, 'services', 'search', 'EmbeddingService.ts'),
       join(SRC_DIR, 'services', 'search', 'VectorSearch.ts'),
       join(SRC_DIR, 'services', 'search', 'ScoringEngine.ts')
     ],
     outdir: join(DIST_DIR, 'services', 'search'),
-    external: ['better-sqlite3', 'chromadb', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
+    external: ['better-sqlite3', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
   });
 
   // Build shared
@@ -170,7 +169,7 @@ async function build() {
     ...nodeCommon,
     entryPoints: [join(SRC_DIR, 'index.ts')],
     outfile: join(DIST_DIR, 'index.js'),
-    external: ['better-sqlite3', 'express', 'cors', 'chromadb', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
+    external: ['better-sqlite3', 'express', 'cors', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
   });
 
   // Build Tailwind CSS (da CDN a build-time)

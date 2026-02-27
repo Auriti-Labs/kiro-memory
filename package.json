@@ -91,11 +91,9 @@
     "2fa": false
   },
   "dependencies": {
-    "@chroma-core/default-embed": "^0.1.9",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "ansi-to-html": "^0.7.2",
     "better-sqlite3": "^12.6.2",
-    "chromadb": "^3.2.2",
     "class-variance-authority": "^0.7.1",
     "cors": "^2.8.5",
     "dompurify": "^3.3.1",
