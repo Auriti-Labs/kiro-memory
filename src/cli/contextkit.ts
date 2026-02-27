@@ -21,16 +21,15 @@ import {
   vacuumDatabase,
 } from './cli-utils.js';
 import { KiroMemoryDatabase } from '../services/sqlite/Database.js';
-import { getObservationsByProject, createObservation } from '../services/sqlite/Observations.js';
+import { getObservationsByProject } from '../services/sqlite/Observations.js';
 import { DB_PATH } from '../shared/paths.js';
 import { execSync } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, createReadStream } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir, platform, release } from 'os';
 import { fileURLToPath } from 'url';
 import { createInterface } from 'readline';
 import * as http from 'http';
-import { createHash } from 'crypto';
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -1921,51 +1920,125 @@ async function exportObservations(sdk: ReturnType<typeof createKiroMemory>, cliA
     || cliArgs.find((a, i) => cliArgs[i - 1] === '--format')) as string | undefined;
   const projectArg = cliArgs.find(a => a.startsWith('--project='))?.split('=').slice(1).join('=')
     || cliArgs.find((a, i) => cliArgs[i - 1] === '--project');
-  const outputArg = cliArgs.find(a => a.startsWith('--output='))?.split('=').slice(1).join('=')
-    || cliArgs.find((a, i) => cliArgs[i - 1] === '--output');
-
-  if (!projectArg) {
-    console.error('Errore: --project <nome> è obbligatorio per il comando export');
-    process.exit(1);
-  }
+  const outputArg = cliArgs.find(a => a.startsWith('-o='))?.split('=').slice(1).join('=')
+    || cliArgs.find(a => a.startsWith('--output='))?.split('=').slice(1).join('=')
+    || cliArgs.find((a, i) => (cliArgs[i - 1] === '--output' || cliArgs[i - 1] === '-o') && !a.startsWith('-'));
+  const fromArg = cliArgs.find(a => a.startsWith('--from='))?.split('=').slice(1).join('=')
+    || cliArgs.find((a, i) => cliArgs[i - 1] === '--from' && !a.startsWith('-'));
+  const toArg = cliArgs.find(a => a.startsWith('--to='))?.split('=').slice(1).join('=')
+    || cliArgs.find((a, i) => cliArgs[i - 1] === '--to' && !a.startsWith('-'));
+  const typeArg = cliArgs.find(a => a.startsWith('--type='))?.split('=').slice(1).join('=')
+    || cliArgs.find((a, i) => cliArgs[i - 1] === '--type' && !a.startsWith('-'));
 
   const validFormats = ['jsonl', 'json', 'md'] as const;
   const format = (validFormats.includes(formatArg as any) ? formatArg : 'jsonl') as 'jsonl' | 'json' | 'md';
 
-  // Recupera le observations via SDK (accesso al db tramite getObservationsByProject)
+  // Per il formato legacy (json/md) usa la vecchia implementazione
+  if (format === 'json' || format === 'md') {
+    if (!projectArg) {
+      console.error('Errore: --project <nome> è obbligatorio per il formato json/md');
+      process.exit(1);
+    }
+
+    const kmDb = new KiroMemoryDatabase();
+    let observations;
+    try {
+      observations = getObservationsByProject(kmDb.db, projectArg, 10_000);
+    } finally {
+      kmDb.close();
+    }
+
+    if (observations.length === 0) {
+      console.error(`Nessuna observation trovata per il progetto "${projectArg}"`);
+      process.exit(1);
+    }
+
+    const output = generateExportOutput(observations, format);
+
+    if (outputArg) {
+      writeFileSync(outputArg, output, 'utf8');
+      console.error(`\n  Esportate ${observations.length} observations in: ${outputArg}\n`);
+    } else {
+      process.stdout.write(output + '\n');
+    }
+    return;
+  }
+
+  // Formato JSONL: usa il nuovo sistema completo con streaming e filtri
+  const { generateMetaRecord, exportObservationsStreaming, exportSummariesStreaming, exportPromptsStreaming } =
+    await import('../services/sqlite/ImportExport.js');
+
+  const filters: import('../services/sqlite/ImportExport.js').ExportFilters = {};
+  if (projectArg) filters.project = projectArg;
+  if (typeArg) filters.type = typeArg;
+  if (fromArg) filters.from = fromArg;
+  if (toArg) filters.to = toArg;
+
   const kmDb = new KiroMemoryDatabase();
-  let observations;
+
   try {
-    observations = getObservationsByProject(kmDb.db, projectArg, 10_000);
+    // Modalità streaming su file oppure su stdout
+    if (outputArg) {
+      // Scrivi su file (append line per line)
+      const { createWriteStream } = await import('fs');
+      const stream = createWriteStream(outputArg, { encoding: 'utf8' });
+
+      let obsCount = 0;
+      let sumCount = 0;
+      let promptCount = 0;
+
+      // Prima riga: metadati
+      stream.write(generateMetaRecord(kmDb.db, filters) + '\n');
+
+      // Export observations
+      obsCount = exportObservationsStreaming(kmDb.db, filters, (line) => {
+        stream.write(line + '\n');
+      });
+
+      // Export summaries
+      sumCount = exportSummariesStreaming(kmDb.db, filters, (line) => {
+        stream.write(line + '\n');
+      });
+
+      // Export prompts
+      promptCount = exportPromptsStreaming(kmDb.db, filters, (line) => {
+        stream.write(line + '\n');
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        stream.end((err?: Error | null) => err ? reject(err) : resolve());
+      });
+
+      console.error(`\n  Export JSONL completato:`);
+      console.error(`    Observations: ${obsCount}`);
+      console.error(`    Summaries:    ${sumCount}`);
+      console.error(`    Prompts:      ${promptCount}`);
+      console.error(`    File:         ${outputArg}\n`);
+    } else {
+      // Streaming su stdout
+      process.stdout.write(generateMetaRecord(kmDb.db, filters) + '\n');
+      exportObservationsStreaming(kmDb.db, filters, (line) => process.stdout.write(line + '\n'));
+      exportSummariesStreaming(kmDb.db, filters, (line) => process.stdout.write(line + '\n'));
+      exportPromptsStreaming(kmDb.db, filters, (line) => process.stdout.write(line + '\n'));
+    }
   } finally {
     kmDb.close();
-  }
-
-  if (observations.length === 0) {
-    console.error(`Nessuna observation trovata per il progetto "${projectArg}"`);
-    process.exit(1);
-  }
-
-  const output = generateExportOutput(observations, format);
-
-  if (outputArg) {
-    writeFileSync(outputArg, output, 'utf8');
-    console.error(`\n  Esportate ${observations.length} observations in: ${outputArg}\n`);
-  } else {
-    process.stdout.write(output + '\n');
   }
 }
 
 // ─── Comando: import ───
 
 /**
- * Importa observations da un file JSONL con deduplication tramite content_hash.
+ * Importa observations, summaries e prompts da un file JSONL.
+ * Supporta deduplication e dry-run.
  */
 async function importObservations(cliArgs: string[]) {
+  // Argomento posizionale: percorso file
   const filePath = cliArgs.find(a => !a.startsWith('-'));
+  const dryRun = cliArgs.includes('--dry-run');
 
   if (!filePath) {
-    console.error('Errore: specifica il percorso del file JSONL\n  kiro-memory import <file.jsonl>');
+    console.error('Errore: specifica il percorso del file JSONL\n  kiro-memory import <file.jsonl> [--dry-run]');
     process.exit(1);
   }
 
@@ -1982,80 +2055,39 @@ async function importObservations(cliArgs: string[]) {
     process.exit(1);
   }
 
-  const parsed = parseJsonlFile(content);
-  const validRecords = parsed.filter(r => r.record);
-  const invalidRecords = parsed.filter(r => r.error);
-
-  if (invalidRecords.length > 0) {
-    console.warn(`\n  Avviso: ${invalidRecords.length} righe non valide (saltate):`);
-    for (const inv of invalidRecords.slice(0, 5)) {
-      console.warn(`    Riga ${inv.line}: ${inv.error}`);
-    }
-    if (invalidRecords.length > 5) {
-      console.warn(`    ... e altri ${invalidRecords.length - 5} errori`);
-    }
+  if (dryRun) {
+    console.log(`\n  [DRY RUN] Analisi di "${filePath}"...\n`);
+  } else {
+    console.log(`\n  Importazione di "${filePath}"...\n`);
   }
 
-  const total = validRecords.length;
-  if (total === 0) {
-    console.error('\nNessun record valido da importare.');
-    process.exit(1);
-  }
-
-  console.log(`\n  Trovati ${total} record validi. Importazione in corso...\n`);
+  const { importJsonl } = await import('../services/sqlite/ImportExport.js');
+  const { formatImportResult } = await import('./cli-utils.js');
 
   const kmDb = new KiroMemoryDatabase();
-  let imported = 0;
-  let duplicates = 0;
+  let result;
 
   try {
-    for (const { record: rec } of validRecords) {
-      if (!rec) continue;
-
-      // Calcola hash per deduplication: SHA256(project|type|title|narrative)
-      const hashPayload = `${rec.project}|${rec.type}|${rec.title}|${rec.narrative || ''}`;
-      const contentHash = createHash('sha256').update(hashPayload).digest('hex');
-
-      // Controlla se esiste già un record con questo content_hash (finestra 0 = controlla tutto)
-      const exists = kmDb.db.query(
-        'SELECT id FROM observations WHERE content_hash = ? LIMIT 1'
-      ).get(contentHash);
-
-      if (exists) {
-        duplicates++;
-        continue;
-      }
-
-      // Inserisce il record
-      createObservation(
-        kmDb.db,
-        rec.memory_session_id || `import-${Date.now()}`,
-        rec.project,
-        rec.type,
-        rec.title,
-        rec.subtitle || null,
-        rec.text || null,
-        rec.narrative || null,
-        rec.facts || null,
-        rec.concepts || null,
-        rec.files_read || null,
-        rec.files_modified || null,
-        rec.prompt_number || 0,
-        contentHash,
-        rec.discovery_tokens || 0
-      );
-      imported++;
-
-      // Mostra progresso ogni 100 record
-      if ((imported + duplicates) % 100 === 0) {
-        process.stdout.write(`  Processati: ${imported + duplicates}/${total}\r`);
-      }
-    }
+    result = importJsonl(kmDb.db, content, dryRun);
   } finally {
     kmDb.close();
   }
 
-  console.log(`\n  Importate ${imported}/${total} observations (${duplicates} duplicati saltati)\n`);
+  const output = formatImportResult({
+    imported: result.imported,
+    skipped: result.skipped,
+    errors: result.errors,
+    total: result.total,
+    dryRun,
+    errorDetails: result.errorDetails,
+  });
+
+  console.log(output);
+
+  // Exit con codice 1 se ci sono solo errori e nessun import
+  if (result.imported === 0 && result.errors > 0 && result.skipped === 0) {
+    process.exit(1);
+  }
 }
 
 // ─── Comando: doctor --fix ───

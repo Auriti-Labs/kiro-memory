@@ -40,6 +40,8 @@ import { createProjectsRouter } from './routes/projects.js';
 import { createDataRouter } from './routes/data.js';
 // Router webhook GitHub
 import { createWebhooksRouter } from './routes/webhooks.js';
+// Router import/export JSONL
+import { createImportExportRouter } from './routes/importexport.js';
 // Router documentazione OpenAPI
 import { createDocsRouter } from './openapi/index.js';
 
@@ -110,8 +112,10 @@ app.use(cors({
   maxAge: 86400
 }));
 
-// Body size limit: 1MB
-app.use(express.json({ limit: '1mb' }));
+// Body size limit: 50MB (per supportare import JSONL grandi)
+app.use(express.json({ limit: '50mb' }));
+// Supporto text/plain per endpoint import JSONL
+app.use(express.text({ limit: '50mb', type: 'text/plain' }));
 
 // Global rate limiting: 200 req/min per IP
 app.use('/api/', rateLimit({
@@ -134,6 +138,8 @@ app.use(createProjectsRouter(ctx));
 app.use(createDataRouter(ctx, WORKER_TOKEN));
 // Webhook GitHub e API query link
 app.use(createWebhooksRouter(ctx));
+// Import/export JSONL
+app.use(createImportExportRouter(ctx));
 // Documentazione OpenAPI interattiva (Swagger UI + spec JSON)
 app.use(createDocsRouter());
 

@@ -119,7 +119,8 @@ async function build() {
       join(SRC_DIR, 'services', 'sqlite', 'Observations.ts'),
       join(SRC_DIR, 'services', 'sqlite', 'Summaries.ts'),
       join(SRC_DIR, 'services', 'sqlite', 'Prompts.ts'),
-      join(SRC_DIR, 'services', 'sqlite', 'Search.ts')
+      join(SRC_DIR, 'services', 'sqlite', 'Search.ts'),
+      join(SRC_DIR, 'services', 'sqlite', 'ImportExport.ts')
     ],
     outdir: join(DIST_DIR, 'services', 'sqlite')
   });

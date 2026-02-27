@@ -404,6 +404,64 @@ export function buildProgressBar(percent: number, width: number = 20): string {
   return `[${'#'.repeat(filled)}${'-'.repeat(empty)}]`;
 }
 
+// ─── Import/Export JSONL: opzioni CLI ───
+
+/** Opzioni per il comando CLI export JSONL */
+export interface JsonlExportOptions {
+  output?: string;         // percorso file output; se omesso, stampa su stdout
+  project?: string;        // filtra per progetto
+  type?: string;           // filtra per tipo observation
+  from?: string;           // data inizio ISO
+  to?: string;             // data fine ISO
+}
+
+/** Opzioni per il comando CLI import JSONL */
+export interface JsonlImportOptions {
+  dryRun?: boolean;        // dry-run: mostra conteggio senza inserire
+}
+
+/**
+ * Formatta il risultato di un import JSONL in testo leggibile.
+ */
+export function formatImportResult(result: {
+  imported: number;
+  skipped: number;
+  errors: number;
+  total: number;
+  dryRun: boolean;
+  errorDetails?: Array<{ line: number; error: string }>;
+}): string {
+  const prefix = result.dryRun ? '[DRY RUN] ' : '';
+  const lines: string[] = [
+    '',
+    `=== ${prefix}Kiro Memory — Import JSONL ===`,
+    '',
+    `  Record totali analizzati: ${result.total}`,
+    `  Importati:                ${result.imported}`,
+    `  Saltati (duplicati):      ${result.skipped}`,
+    `  Errori di validazione:    ${result.errors}`,
+  ];
+
+  if (result.dryRun) {
+    lines.push('');
+    lines.push('  (Dry run: nessun dato inserito. Rimuovi --dry-run per applicare.)');
+  }
+
+  if (result.errorDetails && result.errorDetails.length > 0) {
+    lines.push('');
+    lines.push('  Errori:');
+    for (const err of result.errorDetails.slice(0, 20)) {
+      lines.push(`    Riga ${err.line}: ${err.error}`);
+    }
+    if (result.errorDetails.length > 20) {
+      lines.push(`    ... e altri ${result.errorDetails.length - 20} errori`);
+    }
+  }
+
+  lines.push('');
+  return lines.join('\n');
+}
+
 // ─── Doctor fix: operazioni riparazione ───
 
 /**
