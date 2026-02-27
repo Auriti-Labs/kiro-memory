@@ -7,6 +7,7 @@
  */
 
 import { Router } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import type { WorkerContext } from '../worker-context.js';
 import { isValidProject } from '../worker-context.js';
 import {
@@ -188,9 +189,9 @@ export function createImportExportRouter(ctx: WorkerContext): Router {
  * Necessario perché Express di default parsa solo JSON.
  */
 function express_text_middleware(
-  req: import('express').Request,
-  res: import('express').Response,
-  next: import('express').NextFunction
+  req: Request,
+  res: Response,
+  next: NextFunction
 ): void {
   const contentType = req.headers['content-type'] || '';
 

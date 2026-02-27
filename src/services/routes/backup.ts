@@ -8,6 +8,7 @@
  */
 
 import { Router } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { join } from 'path';
 import type { WorkerContext } from '../worker-context.js';
 import { createBackup, listBackups, restoreBackup, rotateBackups } from '../sqlite/Backup.js';
@@ -20,9 +21,9 @@ export function createBackupRouter(ctx: WorkerContext, workerToken?: string): Ro
 
   /** Middleware: richiede X-Worker-Token per operazioni distruttive */
   function requireAuth(
-    req: import('express').Request,
-    res: import('express').Response,
-    next: import('express').NextFunction
+    req: Request,
+    res: Response,
+    next: NextFunction
   ): void {
     if (!workerToken) { next(); return; }
     const token = req.headers['x-worker-token'] as string;

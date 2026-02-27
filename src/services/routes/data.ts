@@ -4,6 +4,7 @@
  */
 
 import { Router } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import type { WorkerContext } from '../worker-context.js';
 import { isValidProject, parseIntSafe } from '../worker-context.js';
 import { getEmbeddingService } from '../search/EmbeddingService.js';
@@ -17,8 +18,8 @@ import { logger } from '../../utils/logger.js';
 export function createDataRouter(ctx: WorkerContext, workerToken?: string): Router {
   const router = Router();
 
-  /** Middleware: requires X-Worker-Token for destructive endpoints */
-  function requireAuth(req: import('express').Request, res: import('express').Response, next: import('express').NextFunction): void {
+  /** Middleware: richiede X-Worker-Token per gli endpoint distruttivi */
+  function requireAuth(req: Request, res: Response, next: NextFunction): void {
     if (!workerToken) { next(); return; } // No token configured, skip
     const token = req.headers['x-worker-token'] as string;
     if (token !== workerToken) {
@@ -30,7 +31,9 @@ export function createDataRouter(ctx: WorkerContext, workerToken?: string): Rout
 
   // ── Embeddings ──
 
-  // Backfill embeddings for observations without embeddings
+  // Backfill embedding per le osservazioni senza vettore
+  // Express 5: le Promise rifiutate vengono propagate automaticamente all'error handler;
+  // il try/catch interno è mantenuto per restituire una risposta HTTP 500 controllata.
   router.post('/api/embeddings/backfill', requireAuth, async (req, res) => {
     const { batchSize } = req.body || {};
 

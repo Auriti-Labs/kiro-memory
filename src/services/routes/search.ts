@@ -40,7 +40,9 @@ export function createSearchRouter(ctx: WorkerContext): Router {
     }
   });
 
-  // Hybrid search (vector + keyword)
+  // Ricerca ibrida (vettoriale + keyword)
+  // Express 5: le Promise rifiutate vengono propagate automaticamente all'error handler;
+  // il try/catch interno è mantenuto per restituire una risposta HTTP 500 controllata.
   router.get('/api/hybrid-search', async (req, res) => {
     const { q, project, limit } = req.query as { q: string; project?: string; limit?: string };
 

@@ -9,7 +9,7 @@
  */
 
 import { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 import type { WorkerContext } from '../worker-context.js';
@@ -200,7 +200,7 @@ function processPushEvent(ctx: WorkerContext, payload: any, repo: string): void 
 // Legge il body come Buffer prima che express.json() lo consumi,
 // necessario per la validazione HMAC della firma GitHub.
 
-function rawBodyMiddleware(req: Request, _res: Response, next: () => void): void {
+function rawBodyMiddleware(req: Request, _res: Response, next: NextFunction): void {
   const chunks: Buffer[] = [];
 
   req.on('data', (chunk: Buffer) => {
