@@ -229,7 +229,7 @@ export class VectorSearch {
     if (rows.length === 0) return 0;
 
     let count = 0;
-    const model = embeddingService.getProvider() || 'unknown';
+    const model = embeddingService.getModelName();
 
     for (const row of rows) {
       // Compose text for embedding: title + text + concepts
