@@ -193,26 +193,38 @@ function getTimeline(db, anchorId, depthBefore = 5, depthAfter = 5) {
   return [...before, ...self, ...after];
 }
 function getProjectStats(db, project) {
-  const obsStmt = db.query("SELECT COUNT(*) as count FROM observations WHERE project = ?");
-  const sumStmt = db.query("SELECT COUNT(*) as count FROM summaries WHERE project = ?");
-  const sesStmt = db.query("SELECT COUNT(*) as count FROM sessions WHERE project = ?");
-  const prmStmt = db.query("SELECT COUNT(*) as count FROM prompts WHERE project = ?");
-  const discoveryStmt = db.query(
-    "SELECT COALESCE(SUM(discovery_tokens), 0) as total FROM observations WHERE project = ?"
-  );
-  const discoveryTokens = discoveryStmt.get(project)?.total || 0;
-  const readStmt = db.query(
-    `SELECT COALESCE(SUM(
-      CAST((LENGTH(COALESCE(title, '')) + LENGTH(COALESCE(narrative, ''))) / 4 AS INTEGER)
-    ), 0) as total FROM observations WHERE project = ?`
-  );
-  const readTokens = readStmt.get(project)?.total || 0;
+  const sql = `
+    WITH
+      obs_stats AS (
+        SELECT
+          COUNT(*) as count,
+          COALESCE(SUM(discovery_tokens), 0) as discovery_tokens,
+          COALESCE(SUM(
+            CAST((LENGTH(COALESCE(title, '')) + LENGTH(COALESCE(narrative, ''))) / 4 AS INTEGER)
+          ), 0) as read_tokens
+        FROM observations WHERE project = ?
+      ),
+      sum_count AS (SELECT COUNT(*) as count FROM summaries WHERE project = ?),
+      ses_count AS (SELECT COUNT(*) as count FROM sessions WHERE project = ?),
+      prm_count AS (SELECT COUNT(*) as count FROM prompts WHERE project = ?)
+    SELECT
+      obs_stats.count as observations,
+      obs_stats.discovery_tokens,
+      obs_stats.read_tokens,
+      sum_count.count as summaries,
+      ses_count.count as sessions,
+      prm_count.count as prompts
+    FROM obs_stats, sum_count, ses_count, prm_count
+  `;
+  const row = db.query(sql).get(project, project, project, project);
+  const discoveryTokens = row?.discovery_tokens || 0;
+  const readTokens = row?.read_tokens || 0;
   const savings = Math.max(0, discoveryTokens - readTokens);
   return {
-    observations: obsStmt.get(project)?.count || 0,
-    summaries: sumStmt.get(project)?.count || 0,
-    sessions: sesStmt.get(project)?.count || 0,
-    prompts: prmStmt.get(project)?.count || 0,
+    observations: row?.observations || 0,
+    summaries: row?.summaries || 0,
+    sessions: row?.sessions || 0,
+    prompts: row?.prompts || 0,
     tokenEconomics: { discoveryTokens, readTokens, savings }
   };
 }

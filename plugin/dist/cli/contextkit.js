@@ -565,26 +565,38 @@ function getTimeline(db, anchorId, depthBefore = 5, depthAfter = 5) {
   return [...before, ...self, ...after];
 }
 function getProjectStats(db, project) {
-  const obsStmt = db.query("SELECT COUNT(*) as count FROM observations WHERE project = ?");
-  const sumStmt = db.query("SELECT COUNT(*) as count FROM summaries WHERE project = ?");
-  const sesStmt = db.query("SELECT COUNT(*) as count FROM sessions WHERE project = ?");
-  const prmStmt = db.query("SELECT COUNT(*) as count FROM prompts WHERE project = ?");
-  const discoveryStmt = db.query(
-    "SELECT COALESCE(SUM(discovery_tokens), 0) as total FROM observations WHERE project = ?"
-  );
-  const discoveryTokens = discoveryStmt.get(project)?.total || 0;
-  const readStmt = db.query(
-    `SELECT COALESCE(SUM(
-      CAST((LENGTH(COALESCE(title, '')) + LENGTH(COALESCE(narrative, ''))) / 4 AS INTEGER)
-    ), 0) as total FROM observations WHERE project = ?`
-  );
-  const readTokens = readStmt.get(project)?.total || 0;
+  const sql = `
+    WITH
+      obs_stats AS (
+        SELECT
+          COUNT(*) as count,
+          COALESCE(SUM(discovery_tokens), 0) as discovery_tokens,
+          COALESCE(SUM(
+            CAST((LENGTH(COALESCE(title, '')) + LENGTH(COALESCE(narrative, ''))) / 4 AS INTEGER)
+          ), 0) as read_tokens
+        FROM observations WHERE project = ?
+      ),
+      sum_count AS (SELECT COUNT(*) as count FROM summaries WHERE project = ?),
+      ses_count AS (SELECT COUNT(*) as count FROM sessions WHERE project = ?),
+      prm_count AS (SELECT COUNT(*) as count FROM prompts WHERE project = ?)
+    SELECT
+      obs_stats.count as observations,
+      obs_stats.discovery_tokens,
+      obs_stats.read_tokens,
+      sum_count.count as summaries,
+      ses_count.count as sessions,
+      prm_count.count as prompts
+    FROM obs_stats, sum_count, ses_count, prm_count
+  `;
+  const row = db.query(sql).get(project, project, project, project);
+  const discoveryTokens = row?.discovery_tokens || 0;
+  const readTokens = row?.read_tokens || 0;
   const savings = Math.max(0, discoveryTokens - readTokens);
   return {
-    observations: obsStmt.get(project)?.count || 0,
-    summaries: sumStmt.get(project)?.count || 0,
-    sessions: sesStmt.get(project)?.count || 0,
-    prompts: prmStmt.get(project)?.count || 0,
+    observations: row?.observations || 0,
+    summaries: row?.summaries || 0,
+    sessions: row?.sessions || 0,
+    prompts: row?.prompts || 0,
     tokenEconomics: { discoveryTokens, readTokens, savings }
   };
 }
@@ -790,6 +802,7 @@ var init_EmbeddingService = __esm({
 import BetterSqlite3 from "better-sqlite3";
 var Database = class {
   _db;
+  _stmtCache = /* @__PURE__ */ new Map();
   constructor(path, options) {
     this._db = new BetterSqlite3(path, {
       // better-sqlite3 creates the file by default ('create' not needed)
@@ -805,10 +818,16 @@ var Database = class {
     return result;
   }
   /**
-   * Prepare a query with bun:sqlite-compatible interface
+   * Prepare a query with bun:sqlite-compatible interface.
+   * Returns a cached prepared statement for repeated queries.
    */
   query(sql) {
-    return new BunQueryCompat(this._db, sql);
+    let cached = this._stmtCache.get(sql);
+    if (!cached) {
+      cached = new BunQueryCompat(this._db, sql);
+      this._stmtCache.set(sql, cached);
+    }
+    return cached;
   }
   /**
    * Create a transaction
@@ -820,36 +839,32 @@ var Database = class {
    * Close the connection
    */
   close() {
+    this._stmtCache.clear();
     this._db.close();
   }
 };
 var BunQueryCompat = class {
-  _db;
-  _sql;
+  _stmt;
   constructor(db, sql) {
-    this._db = db;
-    this._sql = sql;
+    this._stmt = db.prepare(sql);
   }
   /**
    * Returns all rows
    */
   all(...params) {
-    const stmt = this._db.prepare(this._sql);
-    return params.length > 0 ? stmt.all(...params) : stmt.all();
+    return params.length > 0 ? this._stmt.all(...params) : this._stmt.all();
   }
   /**
    * Returns the first row or null
    */
   get(...params) {
-    const stmt = this._db.prepare(this._sql);
-    return params.length > 0 ? stmt.get(...params) : stmt.get();
+    return params.length > 0 ? this._stmt.get(...params) : this._stmt.get();
   }
   /**
    * Execute without results
    */
   run(...params) {
-    const stmt = this._db.prepare(this._sql);
-    return params.length > 0 ? stmt.run(...params) : stmt.run();
+    return params.length > 0 ? this._stmt.run(...params) : this._stmt.run();
   }
 };
 
@@ -892,7 +907,14 @@ init_logger();
 var SQLITE_MMAP_SIZE_BYTES = 256 * 1024 * 1024;
 var SQLITE_CACHE_SIZE_PAGES = 1e4;
 var KiroMemoryDatabase = class {
-  db;
+  _db;
+  /**
+   * Readonly accessor for the underlying Database instance.
+   * Prefer using query() and run() proxy methods directly.
+   */
+  get db() {
+    return this._db;
+  }
   /**
    * @param dbPath - Path to the SQLite file (default: DB_PATH)
    * @param skipMigrations - If true, skip the migration runner (for high-frequency hooks)
@@ -901,32 +923,46 @@ var KiroMemoryDatabase = class {
     if (dbPath !== ":memory:") {
       ensureDir(DATA_DIR);
     }
-    this.db = new Database(dbPath, { create: true, readwrite: true });
-    this.db.run("PRAGMA journal_mode = WAL");
-    this.db.run("PRAGMA busy_timeout = 5000");
-    this.db.run("PRAGMA synchronous = NORMAL");
-    this.db.run("PRAGMA foreign_keys = ON");
-    this.db.run("PRAGMA temp_store = memory");
-    this.db.run(`PRAGMA mmap_size = ${SQLITE_MMAP_SIZE_BYTES}`);
-    this.db.run(`PRAGMA cache_size = ${SQLITE_CACHE_SIZE_PAGES}`);
+    this._db = new Database(dbPath, { create: true, readwrite: true });
+    this._db.run("PRAGMA journal_mode = WAL");
+    this._db.run("PRAGMA busy_timeout = 5000");
+    this._db.run("PRAGMA synchronous = NORMAL");
+    this._db.run("PRAGMA foreign_keys = ON");
+    this._db.run("PRAGMA temp_store = memory");
+    this._db.run(`PRAGMA mmap_size = ${SQLITE_MMAP_SIZE_BYTES}`);
+    this._db.run(`PRAGMA cache_size = ${SQLITE_CACHE_SIZE_PAGES}`);
     if (!skipMigrations) {
-      const migrationRunner = new MigrationRunner(this.db);
+      const migrationRunner = new MigrationRunner(this._db);
       migrationRunner.runAllMigrations();
     }
+  }
+  /**
+   * Prepare a query (delegates to underlying Database).
+   * Proxy method to avoid ctx.db.db.query() double access.
+   */
+  query(sql) {
+    return this._db.query(sql);
+  }
+  /**
+   * Execute a SQL statement without results (delegates to underlying Database).
+   * Proxy method to avoid ctx.db.db.run() double access.
+   */
+  run(sql, params) {
+    return this._db.run(sql, params);
   }
   /**
    * Executes a function within an atomic transaction.
    * If fn() throws an error, the transaction is automatically rolled back.
    */
   withTransaction(fn) {
-    const transaction = this.db.transaction(fn);
-    return transaction(this.db);
+    const transaction = this._db.transaction(fn);
+    return transaction(this._db);
   }
   /**
    * Close the database connection
    */
   close() {
-    this.db.close();
+    this._db.close();
   }
 };
 var MigrationRunner = class {

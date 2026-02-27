@@ -4,6 +4,7 @@ import { createRequire } from 'module';const require = createRequire(import.meta
 import BetterSqlite3 from "better-sqlite3";
 var Database = class {
   _db;
+  _stmtCache = /* @__PURE__ */ new Map();
   constructor(path, options) {
     this._db = new BetterSqlite3(path, {
       // better-sqlite3 creates the file by default ('create' not needed)
@@ -19,10 +20,16 @@ var Database = class {
     return result;
   }
   /**
-   * Prepare a query with bun:sqlite-compatible interface
+   * Prepare a query with bun:sqlite-compatible interface.
+   * Returns a cached prepared statement for repeated queries.
    */
   query(sql) {
-    return new BunQueryCompat(this._db, sql);
+    let cached = this._stmtCache.get(sql);
+    if (!cached) {
+      cached = new BunQueryCompat(this._db, sql);
+      this._stmtCache.set(sql, cached);
+    }
+    return cached;
   }
   /**
    * Create a transaction
@@ -34,36 +41,32 @@ var Database = class {
    * Close the connection
    */
   close() {
+    this._stmtCache.clear();
     this._db.close();
   }
 };
 var BunQueryCompat = class {
-  _db;
-  _sql;
+  _stmt;
   constructor(db, sql) {
-    this._db = db;
-    this._sql = sql;
+    this._stmt = db.prepare(sql);
   }
   /**
    * Returns all rows
    */
   all(...params) {
-    const stmt = this._db.prepare(this._sql);
-    return params.length > 0 ? stmt.all(...params) : stmt.all();
+    return params.length > 0 ? this._stmt.all(...params) : this._stmt.all();
   }
   /**
    * Returns the first row or null
    */
   get(...params) {
-    const stmt = this._db.prepare(this._sql);
-    return params.length > 0 ? stmt.get(...params) : stmt.get();
+    return params.length > 0 ? this._stmt.get(...params) : this._stmt.get();
   }
   /**
    * Execute without results
    */
   run(...params) {
-    const stmt = this._db.prepare(this._sql);
-    return params.length > 0 ? stmt.run(...params) : stmt.run();
+    return params.length > 0 ? this._stmt.run(...params) : this._stmt.run();
   }
 };
 
@@ -325,7 +328,14 @@ function ensureDir(dirPath) {
 var SQLITE_MMAP_SIZE_BYTES = 256 * 1024 * 1024;
 var SQLITE_CACHE_SIZE_PAGES = 1e4;
 var KiroMemoryDatabase = class {
-  db;
+  _db;
+  /**
+   * Readonly accessor for the underlying Database instance.
+   * Prefer using query() and run() proxy methods directly.
+   */
+  get db() {
+    return this._db;
+  }
   /**
    * @param dbPath - Path to the SQLite file (default: DB_PATH)
    * @param skipMigrations - If true, skip the migration runner (for high-frequency hooks)
@@ -334,32 +344,46 @@ var KiroMemoryDatabase = class {
     if (dbPath !== ":memory:") {
       ensureDir(DATA_DIR);
     }
-    this.db = new Database(dbPath, { create: true, readwrite: true });
-    this.db.run("PRAGMA journal_mode = WAL");
-    this.db.run("PRAGMA busy_timeout = 5000");
-    this.db.run("PRAGMA synchronous = NORMAL");
-    this.db.run("PRAGMA foreign_keys = ON");
-    this.db.run("PRAGMA temp_store = memory");
-    this.db.run(`PRAGMA mmap_size = ${SQLITE_MMAP_SIZE_BYTES}`);
-    this.db.run(`PRAGMA cache_size = ${SQLITE_CACHE_SIZE_PAGES}`);
+    this._db = new Database(dbPath, { create: true, readwrite: true });
+    this._db.run("PRAGMA journal_mode = WAL");
+    this._db.run("PRAGMA busy_timeout = 5000");
+    this._db.run("PRAGMA synchronous = NORMAL");
+    this._db.run("PRAGMA foreign_keys = ON");
+    this._db.run("PRAGMA temp_store = memory");
+    this._db.run(`PRAGMA mmap_size = ${SQLITE_MMAP_SIZE_BYTES}`);
+    this._db.run(`PRAGMA cache_size = ${SQLITE_CACHE_SIZE_PAGES}`);
     if (!skipMigrations) {
-      const migrationRunner = new MigrationRunner(this.db);
+      const migrationRunner = new MigrationRunner(this._db);
       migrationRunner.runAllMigrations();
     }
+  }
+  /**
+   * Prepare a query (delegates to underlying Database).
+   * Proxy method to avoid ctx.db.db.query() double access.
+   */
+  query(sql) {
+    return this._db.query(sql);
+  }
+  /**
+   * Execute a SQL statement without results (delegates to underlying Database).
+   * Proxy method to avoid ctx.db.db.run() double access.
+   */
+  run(sql, params) {
+    return this._db.run(sql, params);
   }
   /**
    * Executes a function within an atomic transaction.
    * If fn() throws an error, the transaction is automatically rolled back.
    */
   withTransaction(fn) {
-    const transaction = this.db.transaction(fn);
-    return transaction(this.db);
+    const transaction = this._db.transaction(fn);
+    return transaction(this._db);
   }
   /**
    * Close the database connection
    */
   close() {
-    this.db.close();
+    this._db.close();
   }
 };
 var MigrationRunner = class {
