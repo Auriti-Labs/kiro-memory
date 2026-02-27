@@ -449,6 +449,19 @@ class MigrationRunner {
           db.run('CREATE INDEX IF NOT EXISTS idx_github_links_repo_issue ON github_links(repo, issue_number)');
           db.run('CREATE INDEX IF NOT EXISTS idx_github_links_repo_pr ON github_links(repo, pr_number)');
         }
+      },
+      {
+        version: 13,
+        up: (db) => {
+          // Indici compositi (created_at_epoch DESC, id DESC) per keyset pagination efficiente.
+          // Permettono WHERE (created_at_epoch, id) < (?, ?) senza full-scan.
+          db.run('CREATE INDEX IF NOT EXISTS idx_observations_keyset ON observations(created_at_epoch DESC, id DESC)');
+          db.run('CREATE INDEX IF NOT EXISTS idx_observations_project_keyset ON observations(project, created_at_epoch DESC, id DESC)');
+          db.run('CREATE INDEX IF NOT EXISTS idx_summaries_keyset ON summaries(created_at_epoch DESC, id DESC)');
+          db.run('CREATE INDEX IF NOT EXISTS idx_summaries_project_keyset ON summaries(project, created_at_epoch DESC, id DESC)');
+          db.run('CREATE INDEX IF NOT EXISTS idx_prompts_keyset ON prompts(created_at_epoch DESC, id DESC)');
+          db.run('CREATE INDEX IF NOT EXISTS idx_prompts_project_keyset ON prompts(project, created_at_epoch DESC, id DESC)');
+        }
       }
     ];
   }

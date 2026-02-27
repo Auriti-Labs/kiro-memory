@@ -20,6 +20,12 @@ export function App() {
   const [paginatedPrompts, setPaginatedPrompts] = useState<UserPrompt[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState({ observations: true, summaries: true, prompts: true });
+  // Cursors per keyset pagination (null = nessuna pagina caricata o fine dati)
+  const [cursors, setCursors] = useState<{
+    observations: string | null;
+    summaries: string | null;
+    prompts: string | null;
+  }>({ observations: null, summaries: null, prompts: null });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [highlightObsId, setHighlightObsId] = useState<number | null>(null);
   // Selezione iniziale per il DiffViewer (passata dal bottone "Confronta" nel Feed)
@@ -118,7 +124,8 @@ export function App() {
       .catch(() => {});
   }, [currentFilter, allObservations.length]);
 
-  // Fetch paginato per progetto specifico con supporto al filtro date
+  // Fetch paginato per progetto specifico con supporto al filtro date.
+  // Prima pagina: nessun cursor, reset completo dei dati.
   const fetchForProject = useCallback(async (
     project: string,
     dateFrom?: string,
@@ -127,7 +134,6 @@ export function App() {
     setIsLoadingMore(true);
     try {
       const params = new URLSearchParams({
-        offset: '0',
         limit: '30',
         ...(project && { project }),
         ...(dateFrom && { from: dateFrom }),
@@ -140,9 +146,24 @@ export function App() {
         fetch(`/api/prompts?${params}`)
       ]);
 
-      if (obsRes.ok) setPaginatedObservations(await obsRes.json());
-      if (sumRes.ok) setPaginatedSummaries(await sumRes.json());
-      if (promptRes.ok) setPaginatedPrompts(await promptRes.json());
+      if (obsRes.ok) {
+        const json = await obsRes.json();
+        setPaginatedObservations(json.data ?? json);
+        setCursors(prev => ({ ...prev, observations: json.next_cursor ?? null }));
+        setHasMore(prev => ({ ...prev, observations: json.has_more ?? false }));
+      }
+      if (sumRes.ok) {
+        const json = await sumRes.json();
+        setPaginatedSummaries(json.data ?? json);
+        setCursors(prev => ({ ...prev, summaries: json.next_cursor ?? null }));
+        setHasMore(prev => ({ ...prev, summaries: json.has_more ?? false }));
+      }
+      if (promptRes.ok) {
+        const json = await promptRes.json();
+        setPaginatedPrompts(json.data ?? json);
+        setCursors(prev => ({ ...prev, prompts: json.next_cursor ?? null }));
+        setHasMore(prev => ({ ...prev, prompts: json.has_more ?? false }));
+      }
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -150,7 +171,8 @@ export function App() {
     }
   }, []);
 
-  // Caricamento incrementale — recupera solo i tipi che hanno ancora dati
+  // Caricamento incrementale con keyset pagination — usa il cursor dell'ultima pagina.
+  // Recupera solo i tipi che hanno ancora dati disponibili.
   const handleLoadMore = useCallback(async () => {
     if (isLoadingMore) return;
     if (!hasMore.observations && !hasMore.summaries && !hasMore.prompts) return;
@@ -165,49 +187,71 @@ export function App() {
 
       const fetches = await Promise.all([
         hasMore.observations
-          ? fetch(`/api/observations?offset=${paginatedObservations.length}&limit=${limit}${projectParam}${dateParams}`)
+          ? fetch(`/api/observations?cursor=${encodeURIComponent(cursors.observations ?? '')}&limit=${limit}${projectParam}${dateParams}`)
           : null,
         hasMore.summaries
-          ? fetch(`/api/summaries?offset=${paginatedSummaries.length}&limit=${limit}${projectParam}${dateParams}`)
+          ? fetch(`/api/summaries?cursor=${encodeURIComponent(cursors.summaries ?? '')}&limit=${limit}${projectParam}${dateParams}`)
           : null,
         hasMore.prompts
-          ? fetch(`/api/prompts?offset=${paginatedPrompts.length}&limit=${limit}${projectParam}${dateParams}`)
+          ? fetch(`/api/prompts?cursor=${encodeURIComponent(cursors.prompts ?? '')}&limit=${limit}${projectParam}${dateParams}`)
           : null,
       ]);
 
       const [obsRes, sumRes, promptRes] = fetches;
       const nextHasMore = { ...hasMore };
+      const nextCursors = { ...cursors };
 
       if (obsRes?.ok) {
-        const newObs = await obsRes.json();
-        if (newObs.length === 0) nextHasMore.observations = false;
-        else setPaginatedObservations(prev => [...prev, ...newObs]);
+        const json = await obsRes.json();
+        const newObs = json.data ?? json;
+        if (newObs.length === 0 || !json.has_more) {
+          nextHasMore.observations = false;
+          nextCursors.observations = null;
+        } else {
+          setPaginatedObservations(prev => [...prev, ...newObs]);
+          nextCursors.observations = json.next_cursor ?? null;
+        }
       }
       if (sumRes?.ok) {
-        const newSum = await sumRes.json();
-        if (newSum.length === 0) nextHasMore.summaries = false;
-        else setPaginatedSummaries(prev => [...prev, ...newSum]);
+        const json = await sumRes.json();
+        const newSum = json.data ?? json;
+        if (newSum.length === 0 || !json.has_more) {
+          nextHasMore.summaries = false;
+          nextCursors.summaries = null;
+        } else {
+          setPaginatedSummaries(prev => [...prev, ...newSum]);
+          nextCursors.summaries = json.next_cursor ?? null;
+        }
       }
       if (promptRes?.ok) {
-        const newPrompts = await promptRes.json();
-        if (newPrompts.length === 0) nextHasMore.prompts = false;
-        else setPaginatedPrompts(prev => [...prev, ...newPrompts]);
+        const json = await promptRes.json();
+        const newPrompts = json.data ?? json;
+        if (newPrompts.length === 0 || !json.has_more) {
+          nextHasMore.prompts = false;
+          nextCursors.prompts = null;
+        } else {
+          setPaginatedPrompts(prev => [...prev, ...newPrompts]);
+          nextCursors.prompts = json.next_cursor ?? null;
+        }
       }
 
       setHasMore(nextHasMore);
+      setCursors(nextCursors);
     } catch (error) {
       console.error('Failed to load more data:', error);
     } finally {
       setIsLoadingMore(false);
     }
-  }, [currentFilter, filters.dateRange, paginatedObservations.length, paginatedSummaries.length, paginatedPrompts.length, isLoadingMore, hasMore]);
+  }, [currentFilter, filters.dateRange, cursors, isLoadingMore, hasMore]);
 
-  // Reset + fetch automatico quando cambiano il progetto o il range di date
+  // Reset + fetch automatico quando cambiano il progetto o il range di date.
+  // Azzera anche i cursors keyset per ripartire dalla prima pagina.
   useEffect(() => {
     setPaginatedObservations([]);
     setPaginatedSummaries([]);
     setPaginatedPrompts([]);
     setHasMore({ observations: true, summaries: true, prompts: true });
+    setCursors({ observations: null, summaries: null, prompts: null });
 
     if (currentFilter) {
       fetchForProject(currentFilter, filters.dateRange.from || undefined, filters.dateRange.to || undefined);

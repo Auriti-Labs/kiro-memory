@@ -5,6 +5,8 @@
  */
 
 import { KiroMemoryDatabase } from '../services/sqlite/index.js';
+import { encodeCursor, decodeCursor } from '../services/sqlite/cursor.js';
+import type { KeysetPageResult } from '../services/sqlite/cursor.js';
 import { getObservationsByProject, createObservation, searchObservations, updateLastAccessed, consolidateObservations as dbConsolidateObservations, isDuplicateObservation } from '../services/sqlite/Observations.js';
 import { createHash } from 'crypto';
 import { getSummariesByProject, createSummary, searchSummaries } from '../services/sqlite/Summaries.js';
@@ -714,6 +716,116 @@ export class KiroMemorySDK {
   }
 
   /**
+   * Lista osservazioni con keyset pagination.
+   * Restituisce un oggetto { data, next_cursor, has_more }.
+   *
+   * Esempio:
+   *   const page1 = await sdk.listObservations({ limit: 50 });
+   *   const page2 = await sdk.listObservations({ cursor: page1.next_cursor });
+   */
+  async listObservations(options: {
+    cursor?: string | null;
+    limit?: number;
+    project?: string;
+  } = {}): Promise<KeysetPageResult<Observation>> {
+    const limit = Math.min(Math.max(options.limit ?? 50, 1), 200);
+    const project = options.project ?? this.project;
+
+    let rows: Observation[];
+
+    if (options.cursor) {
+      // Modalità keyset: decodifica il cursor e applica la WHERE clause
+      const decoded = decodeCursor(options.cursor);
+      if (!decoded) throw new Error('Cursor non valido');
+
+      const sql = project
+        ? `SELECT * FROM observations
+           WHERE project = ? AND (created_at_epoch < ? OR (created_at_epoch = ? AND id < ?))
+           ORDER BY created_at_epoch DESC, id DESC
+           LIMIT ?`
+        : `SELECT * FROM observations
+           WHERE (created_at_epoch < ? OR (created_at_epoch = ? AND id < ?))
+           ORDER BY created_at_epoch DESC, id DESC
+           LIMIT ?`;
+
+      rows = project
+        ? this.db.db.query(sql).all(project, decoded.epoch, decoded.epoch, decoded.id, limit) as Observation[]
+        : this.db.db.query(sql).all(decoded.epoch, decoded.epoch, decoded.id, limit) as Observation[];
+    } else {
+      // Prima pagina (nessun cursor)
+      const sql = project
+        ? 'SELECT * FROM observations WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT ?'
+        : 'SELECT * FROM observations ORDER BY created_at_epoch DESC, id DESC LIMIT ?';
+
+      rows = project
+        ? this.db.db.query(sql).all(project, limit) as Observation[]
+        : this.db.db.query(sql).all(limit) as Observation[];
+    }
+
+    // Costruisce il cursor per la pagina successiva se la pagina è piena
+    const next_cursor = rows.length >= limit
+      ? encodeCursor(rows[rows.length - 1].id, rows[rows.length - 1].created_at_epoch)
+      : null;
+
+    return { data: rows, next_cursor, has_more: next_cursor !== null };
+  }
+
+  /**
+   * Lista sommari con keyset pagination.
+   * Restituisce un oggetto { data, next_cursor, has_more }.
+   *
+   * Esempio:
+   *   const page1 = await sdk.listSummaries({ limit: 20 });
+   *   const page2 = await sdk.listSummaries({ cursor: page1.next_cursor });
+   */
+  async listSummaries(options: {
+    cursor?: string | null;
+    limit?: number;
+    project?: string;
+  } = {}): Promise<KeysetPageResult<Summary>> {
+    const limit = Math.min(Math.max(options.limit ?? 20, 1), 200);
+    const project = options.project ?? this.project;
+
+    let rows: Summary[];
+
+    if (options.cursor) {
+      // Modalità keyset: decodifica il cursor e applica la WHERE clause
+      const decoded = decodeCursor(options.cursor);
+      if (!decoded) throw new Error('Cursor non valido');
+
+      const sql = project
+        ? `SELECT * FROM summaries
+           WHERE project = ? AND (created_at_epoch < ? OR (created_at_epoch = ? AND id < ?))
+           ORDER BY created_at_epoch DESC, id DESC
+           LIMIT ?`
+        : `SELECT * FROM summaries
+           WHERE (created_at_epoch < ? OR (created_at_epoch = ? AND id < ?))
+           ORDER BY created_at_epoch DESC, id DESC
+           LIMIT ?`;
+
+      rows = project
+        ? this.db.db.query(sql).all(project, decoded.epoch, decoded.epoch, decoded.id, limit) as Summary[]
+        : this.db.db.query(sql).all(decoded.epoch, decoded.epoch, decoded.id, limit) as Summary[];
+    } else {
+      // Prima pagina (nessun cursor)
+      const sql = project
+        ? 'SELECT * FROM summaries WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT ?'
+        : 'SELECT * FROM summaries ORDER BY created_at_epoch DESC, id DESC LIMIT ?';
+
+      rows = project
+        ? this.db.db.query(sql).all(project, limit) as Summary[]
+        : this.db.db.query(sql).all(limit) as Summary[];
+    }
+
+    // Costruisce il cursor per la pagina successiva se la pagina è piena
+    const next_cursor = rows.length >= limit
+      ? encodeCursor(rows[rows.length - 1].id, rows[rows.length - 1].created_at_epoch)
+      : null;
+
+    return { data: rows, next_cursor, has_more: next_cursor !== null };
+  }
+
+  /**
    * Getter for direct database access (for API routes)
    */
   getDb(): any {
@@ -754,3 +866,4 @@ export type {
 export { KNOWLEDGE_TYPES } from '../types/worker-types.js';
 
 export type { SearchResult } from '../services/search/HybridSearch.js';
+export type { KeysetPageResult } from '../services/sqlite/cursor.js';
