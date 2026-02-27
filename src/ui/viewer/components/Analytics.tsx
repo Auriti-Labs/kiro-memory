@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { formatTokenCount, formatDuration } from '../utils/format';
 import type { TimelineEntry, TypeDistributionEntry, TokenEconomics } from '../types';
+import { ActivityHeatmap } from './ActivityHeatmap';
 
 /* Colori per tipo osservazione (stessi del Feed) */
 const TYPE_COLORS: Record<string, { bar: string; text: string }> = {
@@ -24,9 +25,11 @@ function getTypeColor(type: string) {
 interface AnalyticsProps {
   currentFilter: string;
   getDisplayName: (project: string) => string;
+  /** Callback opzionale per filtrare il feed per giorno dalla heatmap */
+  onDayClick?: (date: string) => void;
 }
 
-export function Analytics({ currentFilter, getDisplayName }: AnalyticsProps) {
+export function Analytics({ currentFilter, getDisplayName, onDayClick }: AnalyticsProps) {
   const { overview, timeline, typeDistribution, sessionStats, isLoading } = useAnalytics(currentFilter);
 
   if (isLoading) {
@@ -56,6 +59,12 @@ export function Analytics({ currentFilter, getDisplayName }: AnalyticsProps) {
 
   return (
     <div className="space-y-6">
+      {/* Sezione 0: Activity Heatmap (issue #23) — posizionata in cima alla view */}
+      <ActivityHeatmap
+        currentFilter={currentFilter}
+        onDayClick={onDayClick}
+      />
+
       {/* Sezione A: Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard

@@ -359,6 +359,14 @@ export function App() {
               <Analytics
                 currentFilter={currentFilter}
                 getDisplayName={getDisplayName}
+                onDayClick={(date) => {
+                  // Click su cella heatmap: filtra il feed per quel giorno specifico
+                  setCurrentView('feed');
+                  dispatchFilter({
+                    type: 'SET_DATE_RANGE',
+                    payload: { from: date, to: date },
+                  });
+                }}
               />
             )}
           </div>

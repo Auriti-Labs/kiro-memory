@@ -89,7 +89,34 @@ export interface SessionStatsData {
   avgDurationMinutes: number;
 }
 
-export type ViewMode = 'feed' | 'analytics' | 'sessions' | 'timeline';
+export type ViewMode = 'feed' | 'analytics' | 'sessions' | 'timeline' | 'diff';
+
+// ── Diff Types (issue #22) ──
+
+/** Singolo blocco risultante dall'algoritmo diff (LCS-based) */
+export interface DiffChunk {
+  /** Tipo del blocco: linea uguale, aggiunta o rimossa */
+  type: 'equal' | 'add' | 'remove';
+  /** Righe di testo appartenti a questo blocco */
+  lines: string[];
+  /** Numero di riga iniziale sul pannello sinistro (1-based, -1 se non applicabile) */
+  leftStart: number;
+  /** Numero di riga iniziale sul pannello destro (1-based, -1 se non applicabile) */
+  rightStart: number;
+}
+
+/** Identificatore di un elemento comparabile */
+export type DiffItemKind = 'observation' | 'summary';
+
+/** Riferimento a un elemento selezionato per il diff */
+export interface DiffSelection {
+  kind: DiffItemKind;
+  id: number;
+  title: string;
+  date: string;
+  project: string;
+  content: string;
+}
 
 // ── Timeline / Heatmap Types (issue #21) ──
 
