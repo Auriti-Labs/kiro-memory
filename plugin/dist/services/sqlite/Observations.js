@@ -36,6 +36,242 @@ function redactSecrets(text) {
   return redacted;
 }
 
+// src/utils/categorizer.ts
+var CATEGORY_RULES = [
+  {
+    category: "security",
+    keywords: [
+      "security",
+      "vulnerability",
+      "cve",
+      "xss",
+      "csrf",
+      "injection",
+      "sanitize",
+      "escape",
+      "auth",
+      "authentication",
+      "authorization",
+      "permission",
+      "helmet",
+      "cors",
+      "rate-limit",
+      "token",
+      "encrypt",
+      "decrypt",
+      "secret",
+      "redact",
+      "owasp"
+    ],
+    filePatterns: [/security/i, /auth/i, /secrets?\.ts/i],
+    weight: 10
+  },
+  {
+    category: "testing",
+    keywords: [
+      "test",
+      "spec",
+      "expect",
+      "assert",
+      "mock",
+      "stub",
+      "fixture",
+      "coverage",
+      "jest",
+      "vitest",
+      "bun test",
+      "unit test",
+      "integration test",
+      "e2e"
+    ],
+    types: ["test"],
+    filePatterns: [/\.test\./i, /\.spec\./i, /tests?\//i, /__tests__/i],
+    weight: 8
+  },
+  {
+    category: "debugging",
+    keywords: [
+      "debug",
+      "fix",
+      "bug",
+      "error",
+      "crash",
+      "stacktrace",
+      "stack trace",
+      "exception",
+      "breakpoint",
+      "investigate",
+      "root cause",
+      "troubleshoot",
+      "diagnose",
+      "bisect",
+      "regression"
+    ],
+    types: ["bugfix"],
+    weight: 8
+  },
+  {
+    category: "architecture",
+    keywords: [
+      "architect",
+      "design",
+      "pattern",
+      "modular",
+      "migration",
+      "schema",
+      "database",
+      "api design",
+      "abstract",
+      "dependency injection",
+      "singleton",
+      "factory",
+      "observer",
+      "middleware",
+      "pipeline",
+      "microservice",
+      "monolith"
+    ],
+    types: ["decision", "constraint"],
+    weight: 7
+  },
+  {
+    category: "refactoring",
+    keywords: [
+      "refactor",
+      "rename",
+      "extract",
+      "inline",
+      "move",
+      "split",
+      "merge",
+      "simplify",
+      "cleanup",
+      "clean up",
+      "dead code",
+      "consolidate",
+      "reorganize",
+      "restructure",
+      "decouple"
+    ],
+    weight: 6
+  },
+  {
+    category: "config",
+    keywords: [
+      "config",
+      "configuration",
+      "env",
+      "environment",
+      "dotenv",
+      ".env",
+      "settings",
+      "tsconfig",
+      "eslint",
+      "prettier",
+      "webpack",
+      "vite",
+      "esbuild",
+      "docker",
+      "ci/cd",
+      "github actions",
+      "deploy",
+      "build",
+      "bundle",
+      "package.json"
+    ],
+    filePatterns: [
+      /\.config\./i,
+      /\.env/i,
+      /tsconfig/i,
+      /\.ya?ml/i,
+      /Dockerfile/i,
+      /docker-compose/i
+    ],
+    weight: 5
+  },
+  {
+    category: "docs",
+    keywords: [
+      "document",
+      "readme",
+      "changelog",
+      "jsdoc",
+      "comment",
+      "explain",
+      "guide",
+      "tutorial",
+      "api doc",
+      "openapi",
+      "swagger"
+    ],
+    types: ["docs"],
+    filePatterns: [/\.md$/i, /docs?\//i, /readme/i, /changelog/i],
+    weight: 5
+  },
+  {
+    category: "feature-dev",
+    keywords: [
+      "feature",
+      "implement",
+      "add",
+      "create",
+      "new",
+      "endpoint",
+      "component",
+      "module",
+      "service",
+      "handler",
+      "route",
+      "hook",
+      "plugin",
+      "integration"
+    ],
+    types: ["feature", "file-write"],
+    weight: 3
+    // lowest — generic catch-all for development
+  }
+];
+function categorize(input) {
+  const scores = /* @__PURE__ */ new Map();
+  const searchText = [
+    input.title,
+    input.text || "",
+    input.narrative || "",
+    input.concepts || ""
+  ].join(" ").toLowerCase();
+  const allFiles = [input.filesModified || "", input.filesRead || ""].join(",");
+  for (const rule of CATEGORY_RULES) {
+    let score = 0;
+    for (const kw of rule.keywords) {
+      if (searchText.includes(kw.toLowerCase())) {
+        score += rule.weight;
+      }
+    }
+    if (rule.types && rule.types.includes(input.type)) {
+      score += rule.weight * 2;
+    }
+    if (rule.filePatterns && allFiles) {
+      for (const pattern of rule.filePatterns) {
+        if (pattern.test(allFiles)) {
+          score += rule.weight;
+        }
+      }
+    }
+    if (score > 0) {
+      scores.set(rule.category, (scores.get(rule.category) || 0) + score);
+    }
+  }
+  let bestCategory = "general";
+  let bestScore = 0;
+  for (const [category, score] of scores) {
+    if (score > bestScore) {
+      bestScore = score;
+      bestCategory = category;
+    }
+  }
+  return bestCategory;
+}
+
 // src/services/sqlite/Observations.ts
 function escapeLikePattern(input) {
   return input.replace(/[%_\\]/g, "\\$&");
@@ -53,11 +289,20 @@ function createObservation(db, memorySessionId, project, type, title, subtitle, 
   const safeTitle = redactSecrets(title);
   const safeText = text ? redactSecrets(text) : text;
   const safeNarrative = narrative ? redactSecrets(narrative) : narrative;
+  const autoCategory = categorize({
+    type,
+    title: safeTitle,
+    text: safeText,
+    narrative: safeNarrative,
+    concepts,
+    filesModified,
+    filesRead
+  });
   const result = db.run(
     `INSERT INTO observations
-     (memory_session_id, project, type, title, subtitle, text, narrative, facts, concepts, files_read, files_modified, prompt_number, created_at, created_at_epoch, content_hash, discovery_tokens)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [memorySessionId, project, type, safeTitle, subtitle, safeText, safeNarrative, facts, concepts, filesRead, filesModified, promptNumber, now.toISOString(), now.getTime(), contentHash, discoveryTokens]
+     (memory_session_id, project, type, title, subtitle, text, narrative, facts, concepts, files_read, files_modified, prompt_number, created_at, created_at_epoch, content_hash, discovery_tokens, auto_category)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [memorySessionId, project, type, safeTitle, subtitle, safeText, safeNarrative, facts, concepts, filesRead, filesModified, promptNumber, now.toISOString(), now.getTime(), contentHash, discoveryTokens, autoCategory]
   );
   return Number(result.lastInsertRowid);
 }

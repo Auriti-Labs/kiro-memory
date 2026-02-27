@@ -283,6 +283,248 @@ var init_secrets = __esm({
   }
 });
 
+// src/utils/categorizer.ts
+function categorize(input) {
+  const scores = /* @__PURE__ */ new Map();
+  const searchText = [
+    input.title,
+    input.text || "",
+    input.narrative || "",
+    input.concepts || ""
+  ].join(" ").toLowerCase();
+  const allFiles = [input.filesModified || "", input.filesRead || ""].join(",");
+  for (const rule of CATEGORY_RULES) {
+    let score = 0;
+    for (const kw of rule.keywords) {
+      if (searchText.includes(kw.toLowerCase())) {
+        score += rule.weight;
+      }
+    }
+    if (rule.types && rule.types.includes(input.type)) {
+      score += rule.weight * 2;
+    }
+    if (rule.filePatterns && allFiles) {
+      for (const pattern of rule.filePatterns) {
+        if (pattern.test(allFiles)) {
+          score += rule.weight;
+        }
+      }
+    }
+    if (score > 0) {
+      scores.set(rule.category, (scores.get(rule.category) || 0) + score);
+    }
+  }
+  let bestCategory = "general";
+  let bestScore = 0;
+  for (const [category, score] of scores) {
+    if (score > bestScore) {
+      bestScore = score;
+      bestCategory = category;
+    }
+  }
+  return bestCategory;
+}
+var CATEGORY_RULES;
+var init_categorizer = __esm({
+  "src/utils/categorizer.ts"() {
+    "use strict";
+    CATEGORY_RULES = [
+      {
+        category: "security",
+        keywords: [
+          "security",
+          "vulnerability",
+          "cve",
+          "xss",
+          "csrf",
+          "injection",
+          "sanitize",
+          "escape",
+          "auth",
+          "authentication",
+          "authorization",
+          "permission",
+          "helmet",
+          "cors",
+          "rate-limit",
+          "token",
+          "encrypt",
+          "decrypt",
+          "secret",
+          "redact",
+          "owasp"
+        ],
+        filePatterns: [/security/i, /auth/i, /secrets?\.ts/i],
+        weight: 10
+      },
+      {
+        category: "testing",
+        keywords: [
+          "test",
+          "spec",
+          "expect",
+          "assert",
+          "mock",
+          "stub",
+          "fixture",
+          "coverage",
+          "jest",
+          "vitest",
+          "bun test",
+          "unit test",
+          "integration test",
+          "e2e"
+        ],
+        types: ["test"],
+        filePatterns: [/\.test\./i, /\.spec\./i, /tests?\//i, /__tests__/i],
+        weight: 8
+      },
+      {
+        category: "debugging",
+        keywords: [
+          "debug",
+          "fix",
+          "bug",
+          "error",
+          "crash",
+          "stacktrace",
+          "stack trace",
+          "exception",
+          "breakpoint",
+          "investigate",
+          "root cause",
+          "troubleshoot",
+          "diagnose",
+          "bisect",
+          "regression"
+        ],
+        types: ["bugfix"],
+        weight: 8
+      },
+      {
+        category: "architecture",
+        keywords: [
+          "architect",
+          "design",
+          "pattern",
+          "modular",
+          "migration",
+          "schema",
+          "database",
+          "api design",
+          "abstract",
+          "dependency injection",
+          "singleton",
+          "factory",
+          "observer",
+          "middleware",
+          "pipeline",
+          "microservice",
+          "monolith"
+        ],
+        types: ["decision", "constraint"],
+        weight: 7
+      },
+      {
+        category: "refactoring",
+        keywords: [
+          "refactor",
+          "rename",
+          "extract",
+          "inline",
+          "move",
+          "split",
+          "merge",
+          "simplify",
+          "cleanup",
+          "clean up",
+          "dead code",
+          "consolidate",
+          "reorganize",
+          "restructure",
+          "decouple"
+        ],
+        weight: 6
+      },
+      {
+        category: "config",
+        keywords: [
+          "config",
+          "configuration",
+          "env",
+          "environment",
+          "dotenv",
+          ".env",
+          "settings",
+          "tsconfig",
+          "eslint",
+          "prettier",
+          "webpack",
+          "vite",
+          "esbuild",
+          "docker",
+          "ci/cd",
+          "github actions",
+          "deploy",
+          "build",
+          "bundle",
+          "package.json"
+        ],
+        filePatterns: [
+          /\.config\./i,
+          /\.env/i,
+          /tsconfig/i,
+          /\.ya?ml/i,
+          /Dockerfile/i,
+          /docker-compose/i
+        ],
+        weight: 5
+      },
+      {
+        category: "docs",
+        keywords: [
+          "document",
+          "readme",
+          "changelog",
+          "jsdoc",
+          "comment",
+          "explain",
+          "guide",
+          "tutorial",
+          "api doc",
+          "openapi",
+          "swagger"
+        ],
+        types: ["docs"],
+        filePatterns: [/\.md$/i, /docs?\//i, /readme/i, /changelog/i],
+        weight: 5
+      },
+      {
+        category: "feature-dev",
+        keywords: [
+          "feature",
+          "implement",
+          "add",
+          "create",
+          "new",
+          "endpoint",
+          "component",
+          "module",
+          "service",
+          "handler",
+          "route",
+          "hook",
+          "plugin",
+          "integration"
+        ],
+        types: ["feature", "file-write"],
+        weight: 3
+        // lowest — generic catch-all for development
+      }
+    ];
+  }
+});
+
 // src/services/sqlite/Observations.ts
 var Observations_exports = {};
 __export(Observations_exports, {
@@ -311,11 +553,20 @@ function createObservation(db, memorySessionId, project, type, title, subtitle, 
   const safeTitle = redactSecrets(title);
   const safeText = text ? redactSecrets(text) : text;
   const safeNarrative = narrative ? redactSecrets(narrative) : narrative;
+  const autoCategory = categorize({
+    type,
+    title: safeTitle,
+    text: safeText,
+    narrative: safeNarrative,
+    concepts,
+    filesModified,
+    filesRead
+  });
   const result = db.run(
     `INSERT INTO observations
-     (memory_session_id, project, type, title, subtitle, text, narrative, facts, concepts, files_read, files_modified, prompt_number, created_at, created_at_epoch, content_hash, discovery_tokens)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [memorySessionId, project, type, safeTitle, subtitle, safeText, safeNarrative, facts, concepts, filesRead, filesModified, promptNumber, now.toISOString(), now.getTime(), contentHash, discoveryTokens]
+     (memory_session_id, project, type, title, subtitle, text, narrative, facts, concepts, files_read, files_modified, prompt_number, created_at, created_at_epoch, content_hash, discovery_tokens, auto_category)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [memorySessionId, project, type, safeTitle, subtitle, safeText, safeNarrative, facts, concepts, filesRead, filesModified, promptNumber, now.toISOString(), now.getTime(), contentHash, discoveryTokens, autoCategory]
   );
   return Number(result.lastInsertRowid);
 }
@@ -424,6 +675,7 @@ var init_Observations = __esm({
   "src/services/sqlite/Observations.ts"() {
     "use strict";
     init_secrets();
+    init_categorizer();
   }
 });
 
@@ -705,19 +957,53 @@ function getEmbeddingService() {
   }
   return embeddingService;
 }
-var EmbeddingService, embeddingService;
+var MODEL_CONFIGS, FASTEMBED_COMPATIBLE_MODELS, EmbeddingService, embeddingService;
 var init_EmbeddingService = __esm({
   "src/services/search/EmbeddingService.ts"() {
     "use strict";
     init_logger();
+    MODEL_CONFIGS = {
+      "all-MiniLM-L6-v2": {
+        modelId: "Xenova/all-MiniLM-L6-v2",
+        dimensions: 384
+      },
+      "jina-code-v2": {
+        modelId: "jinaai/jina-embeddings-v2-base-code",
+        dimensions: 768
+      },
+      "bge-small-en": {
+        modelId: "BAAI/bge-small-en-v1.5",
+        dimensions: 384
+      }
+    };
+    FASTEMBED_COMPATIBLE_MODELS = /* @__PURE__ */ new Set(["all-MiniLM-L6-v2", "bge-small-en"]);
     EmbeddingService = class {
       provider = null;
       model = null;
       initialized = false;
       initializing = null;
+      config;
+      configName;
+      constructor() {
+        const envModel = process.env.KIRO_MEMORY_EMBEDDING_MODEL || "all-MiniLM-L6-v2";
+        this.configName = envModel;
+        if (MODEL_CONFIGS[envModel]) {
+          this.config = MODEL_CONFIGS[envModel];
+        } else if (envModel.includes("/")) {
+          const dimensions = parseInt(process.env.KIRO_MEMORY_EMBEDDING_DIMENSIONS || "384", 10);
+          this.config = {
+            modelId: envModel,
+            dimensions: isNaN(dimensions) ? 384 : dimensions
+          };
+        } else {
+          logger.warn("EMBEDDING", `Unknown model name '${envModel}', falling back to 'all-MiniLM-L6-v2'`);
+          this.configName = "all-MiniLM-L6-v2";
+          this.config = MODEL_CONFIGS["all-MiniLM-L6-v2"];
+        }
+      }
       /**
        * Initialize the embedding service.
-       * Tries fastembed, then @huggingface/transformers, then fallback to null.
+       * Tries fastembed (when compatible), then @huggingface/transformers, then falls back to null.
        */
       async initialize() {
         if (this.initialized) return this.provider !== null;
@@ -728,32 +1014,35 @@ var init_EmbeddingService = __esm({
         return result;
       }
       async _doInitialize() {
-        try {
-          const fastembed = await import("fastembed");
-          const EmbeddingModel = fastembed.EmbeddingModel || fastembed.default?.EmbeddingModel;
-          const FlagEmbedding = fastembed.FlagEmbedding || fastembed.default?.FlagEmbedding;
-          if (FlagEmbedding && EmbeddingModel) {
-            this.model = await FlagEmbedding.init({
-              model: EmbeddingModel.BGESmallENV15
-            });
-            this.provider = "fastembed";
-            this.initialized = true;
-            logger.info("EMBEDDING", "Initialized with fastembed (BGE-small-en-v1.5)");
-            return true;
+        const fastembedCompatible = FASTEMBED_COMPATIBLE_MODELS.has(this.configName);
+        if (fastembedCompatible) {
+          try {
+            const fastembed = await import("fastembed");
+            const EmbeddingModel = fastembed.EmbeddingModel || fastembed.default?.EmbeddingModel;
+            const FlagEmbedding = fastembed.FlagEmbedding || fastembed.default?.FlagEmbedding;
+            if (FlagEmbedding && EmbeddingModel) {
+              this.model = await FlagEmbedding.init({
+                model: EmbeddingModel.BGESmallENV15
+              });
+              this.provider = "fastembed";
+              this.initialized = true;
+              logger.info("EMBEDDING", `Initialized with fastembed (BGE-small-en-v1.5) for model '${this.configName}'`);
+              return true;
+            }
+          } catch (error) {
+            logger.debug("EMBEDDING", `fastembed not available: ${error}`);
           }
-        } catch (error) {
-          logger.debug("EMBEDDING", `fastembed not available: ${error}`);
         }
         try {
           const transformers = await import("@huggingface/transformers");
           const pipeline = transformers.pipeline || transformers.default?.pipeline;
           if (pipeline) {
-            this.model = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", {
+            this.model = await pipeline("feature-extraction", this.config.modelId, {
               quantized: true
             });
             this.provider = "transformers";
             this.initialized = true;
-            logger.info("EMBEDDING", "Initialized with @huggingface/transformers (all-MiniLM-L6-v2)");
+            logger.info("EMBEDDING", `Initialized with @huggingface/transformers (${this.config.modelId})`);
             return true;
           }
         } catch (error) {
@@ -766,7 +1055,7 @@ var init_EmbeddingService = __esm({
       }
       /**
        * Generate embedding for a single text.
-       * Returns Float32Array with 384 dimensions, or null if not available.
+       * Returns Float32Array with configured dimensions, or null if not available.
        */
       async embed(text) {
         if (!this.initialized) await this.initialize();
@@ -817,10 +1106,17 @@ var init_EmbeddingService = __esm({
         return this.provider;
       }
       /**
-       * Embedding vector dimensions.
+       * Embedding vector dimensions for the active model configuration.
        */
       getDimensions() {
-        return 384;
+        return this.config.dimensions;
+      }
+      /**
+       * Human-readable model name used as identifier in the observation_embeddings table.
+       * Returns the short name (e.g., 'all-MiniLM-L6-v2') or the full HF model ID for custom models.
+       */
+      getModelName() {
+        return this.configName;
       }
       // --- Batch implementations ---
       /**
@@ -1339,6 +1635,13 @@ var MigrationRunner = class {
           db.run("CREATE INDEX IF NOT EXISTS idx_jobs_type ON job_queue(type)");
           db.run("CREATE INDEX IF NOT EXISTS idx_jobs_priority ON job_queue(status, priority DESC, created_at_epoch ASC)");
         }
+      },
+      {
+        version: 11,
+        up: (db) => {
+          db.run("ALTER TABLE observations ADD COLUMN auto_category TEXT");
+          db.run("CREATE INDEX IF NOT EXISTS idx_observations_category ON observations(auto_category)");
+        }
       }
     ];
   }
@@ -1717,7 +2020,7 @@ var VectorSearch = class {
     `).all(batchSize);
     if (rows.length === 0) return 0;
     let count = 0;
-    const model = embeddingService2.getProvider() || "unknown";
+    const model = embeddingService2.getModelName();
     for (const row of rows) {
       const parts = [row.title];
       if (row.text) parts.push(row.text);

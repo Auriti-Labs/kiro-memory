@@ -220,14 +220,48 @@ ${data.stack}` : ` ${data.message}`;
 var logger = new Logger();
 
 // src/services/search/EmbeddingService.ts
+var MODEL_CONFIGS = {
+  "all-MiniLM-L6-v2": {
+    modelId: "Xenova/all-MiniLM-L6-v2",
+    dimensions: 384
+  },
+  "jina-code-v2": {
+    modelId: "jinaai/jina-embeddings-v2-base-code",
+    dimensions: 768
+  },
+  "bge-small-en": {
+    modelId: "BAAI/bge-small-en-v1.5",
+    dimensions: 384
+  }
+};
+var FASTEMBED_COMPATIBLE_MODELS = /* @__PURE__ */ new Set(["all-MiniLM-L6-v2", "bge-small-en"]);
 var EmbeddingService = class {
   provider = null;
   model = null;
   initialized = false;
   initializing = null;
+  config;
+  configName;
+  constructor() {
+    const envModel = process.env.KIRO_MEMORY_EMBEDDING_MODEL || "all-MiniLM-L6-v2";
+    this.configName = envModel;
+    if (MODEL_CONFIGS[envModel]) {
+      this.config = MODEL_CONFIGS[envModel];
+    } else if (envModel.includes("/")) {
+      const dimensions = parseInt(process.env.KIRO_MEMORY_EMBEDDING_DIMENSIONS || "384", 10);
+      this.config = {
+        modelId: envModel,
+        dimensions: isNaN(dimensions) ? 384 : dimensions
+      };
+    } else {
+      logger.warn("EMBEDDING", `Unknown model name '${envModel}', falling back to 'all-MiniLM-L6-v2'`);
+      this.configName = "all-MiniLM-L6-v2";
+      this.config = MODEL_CONFIGS["all-MiniLM-L6-v2"];
+    }
+  }
   /**
    * Initialize the embedding service.
-   * Tries fastembed, then @huggingface/transformers, then fallback to null.
+   * Tries fastembed (when compatible), then @huggingface/transformers, then falls back to null.
    */
   async initialize() {
     if (this.initialized) return this.provider !== null;
@@ -238,32 +272,35 @@ var EmbeddingService = class {
     return result;
   }
   async _doInitialize() {
-    try {
-      const fastembed = await import("fastembed");
-      const EmbeddingModel = fastembed.EmbeddingModel || fastembed.default?.EmbeddingModel;
-      const FlagEmbedding = fastembed.FlagEmbedding || fastembed.default?.FlagEmbedding;
-      if (FlagEmbedding && EmbeddingModel) {
-        this.model = await FlagEmbedding.init({
-          model: EmbeddingModel.BGESmallENV15
-        });
-        this.provider = "fastembed";
-        this.initialized = true;
-        logger.info("EMBEDDING", "Initialized with fastembed (BGE-small-en-v1.5)");
-        return true;
+    const fastembedCompatible = FASTEMBED_COMPATIBLE_MODELS.has(this.configName);
+    if (fastembedCompatible) {
+      try {
+        const fastembed = await import("fastembed");
+        const EmbeddingModel = fastembed.EmbeddingModel || fastembed.default?.EmbeddingModel;
+        const FlagEmbedding = fastembed.FlagEmbedding || fastembed.default?.FlagEmbedding;
+        if (FlagEmbedding && EmbeddingModel) {
+          this.model = await FlagEmbedding.init({
+            model: EmbeddingModel.BGESmallENV15
+          });
+          this.provider = "fastembed";
+          this.initialized = true;
+          logger.info("EMBEDDING", `Initialized with fastembed (BGE-small-en-v1.5) for model '${this.configName}'`);
+          return true;
+        }
+      } catch (error) {
+        logger.debug("EMBEDDING", `fastembed not available: ${error}`);
       }
-    } catch (error) {
-      logger.debug("EMBEDDING", `fastembed not available: ${error}`);
     }
     try {
       const transformers = await import("@huggingface/transformers");
       const pipeline = transformers.pipeline || transformers.default?.pipeline;
       if (pipeline) {
-        this.model = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", {
+        this.model = await pipeline("feature-extraction", this.config.modelId, {
           quantized: true
         });
         this.provider = "transformers";
         this.initialized = true;
-        logger.info("EMBEDDING", "Initialized with @huggingface/transformers (all-MiniLM-L6-v2)");
+        logger.info("EMBEDDING", `Initialized with @huggingface/transformers (${this.config.modelId})`);
         return true;
       }
     } catch (error) {
@@ -276,7 +313,7 @@ var EmbeddingService = class {
   }
   /**
    * Generate embedding for a single text.
-   * Returns Float32Array with 384 dimensions, or null if not available.
+   * Returns Float32Array with configured dimensions, or null if not available.
    */
   async embed(text) {
     if (!this.initialized) await this.initialize();
@@ -327,10 +364,17 @@ var EmbeddingService = class {
     return this.provider;
   }
   /**
-   * Embedding vector dimensions.
+   * Embedding vector dimensions for the active model configuration.
    */
   getDimensions() {
-    return 384;
+    return this.config.dimensions;
+  }
+  /**
+   * Human-readable model name used as identifier in the observation_embeddings table.
+   * Returns the short name (e.g., 'all-MiniLM-L6-v2') or the full HF model ID for custom models.
+   */
+  getModelName() {
+    return this.configName;
   }
   // --- Batch implementations ---
   /**

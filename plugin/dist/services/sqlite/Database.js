@@ -649,6 +649,13 @@ var MigrationRunner = class {
           db.run("CREATE INDEX IF NOT EXISTS idx_jobs_type ON job_queue(type)");
           db.run("CREATE INDEX IF NOT EXISTS idx_jobs_priority ON job_queue(status, priority DESC, created_at_epoch ASC)");
         }
+      },
+      {
+        version: 11,
+        up: (db) => {
+          db.run("ALTER TABLE observations ADD COLUMN auto_category TEXT");
+          db.run("CREATE INDEX IF NOT EXISTS idx_observations_category ON observations(auto_category)");
+        }
       }
     ];
   }
