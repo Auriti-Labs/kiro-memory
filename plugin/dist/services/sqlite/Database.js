@@ -656,6 +656,45 @@ var MigrationRunner = class {
           db.run("ALTER TABLE observations ADD COLUMN auto_category TEXT");
           db.run("CREATE INDEX IF NOT EXISTS idx_observations_category ON observations(auto_category)");
         }
+      },
+      {
+        version: 12,
+        up: (db) => {
+          db.run(`
+            CREATE TABLE IF NOT EXISTS github_links (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              observation_id INTEGER,
+              session_id TEXT,
+              repo TEXT NOT NULL,
+              issue_number INTEGER,
+              pr_number INTEGER,
+              event_type TEXT NOT NULL,
+              action TEXT,
+              title TEXT,
+              url TEXT,
+              author TEXT,
+              created_at TEXT NOT NULL,
+              created_at_epoch INTEGER NOT NULL,
+              FOREIGN KEY (observation_id) REFERENCES observations(id)
+            )
+          `);
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_repo ON github_links(repo)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_obs ON github_links(observation_id)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_event ON github_links(event_type)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_repo_issue ON github_links(repo, issue_number)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_repo_pr ON github_links(repo, pr_number)");
+        }
+      },
+      {
+        version: 13,
+        up: (db) => {
+          db.run("CREATE INDEX IF NOT EXISTS idx_observations_keyset ON observations(created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_observations_project_keyset ON observations(project, created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_summaries_keyset ON summaries(created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_summaries_project_keyset ON summaries(project, created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_prompts_keyset ON prompts(created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_prompts_project_keyset ON prompts(project, created_at_epoch DESC, id DESC)");
+        }
       }
     ];
   }

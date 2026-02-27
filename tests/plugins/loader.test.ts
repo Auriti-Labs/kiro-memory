@@ -209,25 +209,25 @@ describe('PluginLoader', () => {
     it('rifiuta un plugin con minKiroVersion superiore alla versione corrente', async () => {
       const plugin = makePlugin({
         name: 'kiro-memory-plugin-future',
-        minKiroVersion: '3.0.0'
+        minKiroVersion: '99.0.0'
       });
       loader.mockModules.set('kiro-memory-plugin-future', plugin);
 
       await expect(
         loader.loadPlugin('kiro-memory-plugin-future')
-      ).rejects.toThrow('3.0.0');
+      ).rejects.toThrow('99.0.0');
     });
 
     it('rifiuta un plugin con minKiroVersion minor incompatibile', async () => {
       const plugin = makePlugin({
         name: 'kiro-memory-plugin-minor',
-        minKiroVersion: '2.5.0'
+        minKiroVersion: '3.5.0'
       });
       loader.mockModules.set('kiro-memory-plugin-minor', plugin);
 
       await expect(
         loader.loadPlugin('kiro-memory-plugin-minor')
-      ).rejects.toThrow('2.5.0');
+      ).rejects.toThrow('3.5.0');
     });
   });
 

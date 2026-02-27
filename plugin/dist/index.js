@@ -1375,10 +1375,71 @@ var MigrationRunner = class {
           db.run("ALTER TABLE observations ADD COLUMN auto_category TEXT");
           db.run("CREATE INDEX IF NOT EXISTS idx_observations_category ON observations(auto_category)");
         }
+      },
+      {
+        version: 12,
+        up: (db) => {
+          db.run(`
+            CREATE TABLE IF NOT EXISTS github_links (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              observation_id INTEGER,
+              session_id TEXT,
+              repo TEXT NOT NULL,
+              issue_number INTEGER,
+              pr_number INTEGER,
+              event_type TEXT NOT NULL,
+              action TEXT,
+              title TEXT,
+              url TEXT,
+              author TEXT,
+              created_at TEXT NOT NULL,
+              created_at_epoch INTEGER NOT NULL,
+              FOREIGN KEY (observation_id) REFERENCES observations(id)
+            )
+          `);
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_repo ON github_links(repo)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_obs ON github_links(observation_id)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_event ON github_links(event_type)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_repo_issue ON github_links(repo, issue_number)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_repo_pr ON github_links(repo, pr_number)");
+        }
+      },
+      {
+        version: 13,
+        up: (db) => {
+          db.run("CREATE INDEX IF NOT EXISTS idx_observations_keyset ON observations(created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_observations_project_keyset ON observations(project, created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_summaries_keyset ON summaries(created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_summaries_project_keyset ON summaries(project, created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_prompts_keyset ON prompts(created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_prompts_project_keyset ON prompts(project, created_at_epoch DESC, id DESC)");
+        }
       }
     ];
   }
 };
+
+// src/services/sqlite/cursor.ts
+function encodeCursor(id, epoch) {
+  const raw = `${epoch}:${id}`;
+  return Buffer.from(raw, "utf8").toString("base64url");
+}
+function decodeCursor(cursor) {
+  try {
+    const raw = Buffer.from(cursor, "base64url").toString("utf8");
+    const colonIdx = raw.indexOf(":");
+    if (colonIdx === -1) return null;
+    const epochStr = raw.substring(0, colonIdx);
+    const idStr = raw.substring(colonIdx + 1);
+    const epoch = parseInt(epochStr, 10);
+    const id = parseInt(idStr, 10);
+    if (!Number.isInteger(epoch) || epoch <= 0) return null;
+    if (!Number.isInteger(id) || id <= 0) return null;
+    return { epoch, id };
+  } catch {
+    return null;
+  }
+}
 
 // src/services/sqlite/Sessions.ts
 function createSession(db, contentSessionId, project, userPrompt) {
@@ -1616,6 +1677,13 @@ function getReportData(db, project, startEpoch, endEpoch) {
 
 // src/services/sqlite/index.ts
 init_Search();
+
+// src/types/worker-types.ts
+var KNOWLEDGE_TYPES = ["constraint", "decision", "heuristic", "rejected"];
+
+// src/services/sqlite/Retention.ts
+var KNOWLEDGE_TYPE_LIST = KNOWLEDGE_TYPES;
+var KNOWLEDGE_PLACEHOLDERS = KNOWLEDGE_TYPE_LIST.map(() => "?").join(", ");
 
 // src/sdk/index.ts
 init_Observations();
@@ -2220,9 +2288,6 @@ function getHybridSearch() {
   return hybridSearch;
 }
 
-// src/types/worker-types.ts
-var KNOWLEDGE_TYPES = ["constraint", "decision", "heuristic", "rejected"];
-
 // src/sdk/index.ts
 var KiroMemorySDK = class {
   db;
@@ -2780,6 +2845,66 @@ var KiroMemorySDK = class {
     return getReportData(this.db.db, this.project, startEpoch, endEpoch);
   }
   /**
+   * Lista osservazioni con keyset pagination.
+   * Restituisce un oggetto { data, next_cursor, has_more }.
+   *
+   * Esempio:
+   *   const page1 = await sdk.listObservations({ limit: 50 });
+   *   const page2 = await sdk.listObservations({ cursor: page1.next_cursor });
+   */
+  async listObservations(options = {}) {
+    const limit = Math.min(Math.max(options.limit ?? 50, 1), 200);
+    const project = options.project ?? this.project;
+    let rows;
+    if (options.cursor) {
+      const decoded = decodeCursor(options.cursor);
+      if (!decoded) throw new Error("Cursor non valido");
+      const sql = project ? `SELECT * FROM observations
+           WHERE project = ? AND (created_at_epoch < ? OR (created_at_epoch = ? AND id < ?))
+           ORDER BY created_at_epoch DESC, id DESC
+           LIMIT ?` : `SELECT * FROM observations
+           WHERE (created_at_epoch < ? OR (created_at_epoch = ? AND id < ?))
+           ORDER BY created_at_epoch DESC, id DESC
+           LIMIT ?`;
+      rows = project ? this.db.db.query(sql).all(project, decoded.epoch, decoded.epoch, decoded.id, limit) : this.db.db.query(sql).all(decoded.epoch, decoded.epoch, decoded.id, limit);
+    } else {
+      const sql = project ? "SELECT * FROM observations WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT ?" : "SELECT * FROM observations ORDER BY created_at_epoch DESC, id DESC LIMIT ?";
+      rows = project ? this.db.db.query(sql).all(project, limit) : this.db.db.query(sql).all(limit);
+    }
+    const next_cursor = rows.length >= limit ? encodeCursor(rows[rows.length - 1].id, rows[rows.length - 1].created_at_epoch) : null;
+    return { data: rows, next_cursor, has_more: next_cursor !== null };
+  }
+  /**
+   * Lista sommari con keyset pagination.
+   * Restituisce un oggetto { data, next_cursor, has_more }.
+   *
+   * Esempio:
+   *   const page1 = await sdk.listSummaries({ limit: 20 });
+   *   const page2 = await sdk.listSummaries({ cursor: page1.next_cursor });
+   */
+  async listSummaries(options = {}) {
+    const limit = Math.min(Math.max(options.limit ?? 20, 1), 200);
+    const project = options.project ?? this.project;
+    let rows;
+    if (options.cursor) {
+      const decoded = decodeCursor(options.cursor);
+      if (!decoded) throw new Error("Cursor non valido");
+      const sql = project ? `SELECT * FROM summaries
+           WHERE project = ? AND (created_at_epoch < ? OR (created_at_epoch = ? AND id < ?))
+           ORDER BY created_at_epoch DESC, id DESC
+           LIMIT ?` : `SELECT * FROM summaries
+           WHERE (created_at_epoch < ? OR (created_at_epoch = ? AND id < ?))
+           ORDER BY created_at_epoch DESC, id DESC
+           LIMIT ?`;
+      rows = project ? this.db.db.query(sql).all(project, decoded.epoch, decoded.epoch, decoded.id, limit) : this.db.db.query(sql).all(decoded.epoch, decoded.epoch, decoded.id, limit);
+    } else {
+      const sql = project ? "SELECT * FROM summaries WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT ?" : "SELECT * FROM summaries ORDER BY created_at_epoch DESC, id DESC LIMIT ?";
+      rows = project ? this.db.db.query(sql).all(project, limit) : this.db.db.query(sql).all(limit);
+    }
+    const next_cursor = rows.length >= limit ? encodeCursor(rows[rows.length - 1].id, rows[rows.length - 1].created_at_epoch) : null;
+    return { data: rows, next_cursor, has_more: next_cursor !== null };
+  }
+  /**
    * Getter for direct database access (for API routes)
    */
   getDb() {
@@ -2914,7 +3039,7 @@ async function runHook(name, handler) {
 }
 
 // src/index.ts
-var VERSION = "2.1.0";
+var VERSION = "3.0.0";
 export {
   KiroMemoryDatabase,
   KiroMemorySDK,

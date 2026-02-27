@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-02-27
+
+### Added
+
+- **Plugin System** (#29, #30): Architettura plugin completa con `IPlugin` interface, `PluginRegistry` singleton, `PluginLoader` con auto-discovery da `~/.kiro-memory/plugins/`. Lifecycle a due fasi: register → enable/disable. REST API `/api/plugins` per gestione runtime
+- **Plugin Slack** (#31): Notifiche Slack con Block Kit formatting, rate limiting (1 req/sec), retry automatico su 429, filtri per tipo/progetto, configurazione via env vars
+- **Plugin GitHub** (#32): Auto-linking issue (`#123`, `org/repo#456`), commenti automatici su issue alla chiusura sessione, HTTP client con cache LRU e retry esponenziale, parser issue da testo naturale
+- **Keyset Pagination** (#25): Cursore base64 con indici compositi per performance costante O(1) invece di OFFSET O(n). Supporto per tutte le entità (observations, summaries, prompts, sessions)
+- **Import/Export JSONL** (#28): Streaming import/export in formato JSONL con deduplicazione SHA256 e batch insert. Supporto per backup portabili tra installazioni
+- **Backup Automatico** (#27): Backup SQLite con rotazione automatica (max 10), restore point-in-time, compressione gzip opzionale, scheduling configurabile
+- **Retention Policies** (#26): Politiche di retention configurabili per tipo e progetto con cleanup automatico, dry-run mode, e reporting dettagliato
+- **Timeline Interattiva** (#21): Canvas 2D con zoom, pan e navigazione temporale per visualizzare l'attività nel tempo
+- **Diff Viewer** (#22): Visualizzazione side-by-side dei cambiamenti con syntax highlighting e navigazione tra diff
+- **Heatmap Attività** (#23): Mappa di calore stile GitHub con scala quantile, tooltip dettagliati e filtro per progetto
+- **Filtri Avanzati** (#24): Sidebar con filtri per date, concetti, ricerca full-text e salvataggio preset
+- **OpenAPI 3.1** (#17): Documentazione completa per tutte le REST API con schema validation
+- **CLI Avanzata** (#19): Comandi search, export, import, doctor, stats, config con output formattato
+- **GitHub Webhooks** (#18): Integrazione webhooks con verifica HMAC e github_links tracking
+- **VS Code Extension** (#20): Scaffold estensione con sidebar e comandi integrati
+- **Documentation Site** (#56): Sito Starlight con 22 pagine di documentazione completa
+- **Auto-Categorizzazione** (#14): Classificatore keyword-based per osservazioni automatiche
+- **Embedding Configurabili** (#55): Modello embedding selezionabile via env var (default: all-MiniLM-L6-v2)
+- **Secret Filtering** (#54): Filtro automatico per API keys, password e token nelle osservazioni
+- **Summary LLM-Agnostico** (#15): Generatore di riassunti senza dipendenza da LLM specifico
+- **Anomaly Detection** (#16): Rilevamento anomalie sessioni con z-score statistico
+
+### Changed
+
+- **Express 5** (#59): Migrazione completa da Express 4 a Express 5.2.1 con async error handling migliorato e path parameter syntax aggiornata
+- **MCP Server API v2** (#58): Migrazione a `McpServer` + `registerTool()` con schema Zod, sostituisce pattern `Server` + `setRequestHandler` deprecato
+
+### Fixed
+
+- **Analytics Parameter Binding**: Rimosso prefisso `@` dai parametri named in `getAnalyticsOverview` per compatibilità better-sqlite3
+- **Defensive Array Guards**: `mergeAndDeduplicateByProject` gestisce input non-array (errori API) senza crash
+- **SQLite ORDER BY**: Aggiunto tiebreaker `id` alle query con ORDER BY epoch per risultati deterministici
+- **Worker VERSION**: Usa versione dinamica dal package invece di valore hardcoded nel health check
+- **TypeScript Types**: Aggiunte dichiarazioni per dipendenze opzionali (fastembed, transformers)
+
+### Performance
+
+- **Keyset Pagination**: Query con cursore O(1) invece di OFFSET O(n) per dataset grandi
+- **Statement Caching**: Prepared statement riutilizzati nello shim bun-sqlite
+- **CTE Analytics**: Query unificate con Common Table Expressions (N+1 → 1)
+
+## [2.1.0] - 2026-02-27
+
+### Fixed
+
+- **Security Fixes (Sprint 1)**: busy_timeout SQLite, isValidString minLen, sanitizeFTS5Query, CSP unsafe-eval rimosso, SQL interpolation parametrizzata, auth endpoint distruttivi
+- **Stop Hook**: Session matching corretto per summary generation
+- **Worker Shutdown**: Timeout su connessioni SSE aperte durante shutdown
+
+### Performance
+
+- **N+1 Queries**: getProjectStats e getSessionStats unificate in singola CTE query
+- **Statement Caching**: Prepared statement caching nello shim bun-sqlite
+
+### Changed
+
+- **i18n**: Commenti sorgente migrati a inglese (convenzione codebase)
+- **Test Coverage**: Da ~15% a ~45% con test per shim, search engine, e hook
+
 ## [1.9.0] - 2026-02-25
 
 ### Added
@@ -209,6 +272,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session Summaries**: Structured summaries generated automatically at session end
 - **Web Dashboard**: Real-time viewer at `http://localhost:3001`
 
+[3.0.0]: https://github.com/Auriti-Labs/kiro-memory/compare/v2.1.0...v3.0.0
+[2.1.0]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.9.0...v2.1.0
 [1.9.0]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.8.1...v1.9.0
 [1.8.1]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.7.1...v1.8.0

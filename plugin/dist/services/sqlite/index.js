@@ -656,10 +656,77 @@ var MigrationRunner = class {
           db.run("ALTER TABLE observations ADD COLUMN auto_category TEXT");
           db.run("CREATE INDEX IF NOT EXISTS idx_observations_category ON observations(auto_category)");
         }
+      },
+      {
+        version: 12,
+        up: (db) => {
+          db.run(`
+            CREATE TABLE IF NOT EXISTS github_links (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              observation_id INTEGER,
+              session_id TEXT,
+              repo TEXT NOT NULL,
+              issue_number INTEGER,
+              pr_number INTEGER,
+              event_type TEXT NOT NULL,
+              action TEXT,
+              title TEXT,
+              url TEXT,
+              author TEXT,
+              created_at TEXT NOT NULL,
+              created_at_epoch INTEGER NOT NULL,
+              FOREIGN KEY (observation_id) REFERENCES observations(id)
+            )
+          `);
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_repo ON github_links(repo)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_obs ON github_links(observation_id)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_event ON github_links(event_type)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_repo_issue ON github_links(repo, issue_number)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_repo_pr ON github_links(repo, pr_number)");
+        }
+      },
+      {
+        version: 13,
+        up: (db) => {
+          db.run("CREATE INDEX IF NOT EXISTS idx_observations_keyset ON observations(created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_observations_project_keyset ON observations(project, created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_summaries_keyset ON summaries(created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_summaries_project_keyset ON summaries(project, created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_prompts_keyset ON prompts(created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_prompts_project_keyset ON prompts(project, created_at_epoch DESC, id DESC)");
+        }
       }
     ];
   }
 };
+
+// src/services/sqlite/cursor.ts
+function encodeCursor(id, epoch) {
+  const raw = `${epoch}:${id}`;
+  return Buffer.from(raw, "utf8").toString("base64url");
+}
+function decodeCursor(cursor) {
+  try {
+    const raw = Buffer.from(cursor, "base64url").toString("utf8");
+    const colonIdx = raw.indexOf(":");
+    if (colonIdx === -1) return null;
+    const epochStr = raw.substring(0, colonIdx);
+    const idStr = raw.substring(colonIdx + 1);
+    const epoch = parseInt(epochStr, 10);
+    const id = parseInt(idStr, 10);
+    if (!Number.isInteger(epoch) || epoch <= 0) return null;
+    if (!Number.isInteger(id) || id <= 0) return null;
+    return { epoch, id };
+  } catch {
+    return null;
+  }
+}
+function buildNextCursor(rows, limit) {
+  if (rows.length < limit) return null;
+  const last = rows[rows.length - 1];
+  if (!last) return null;
+  return encodeCursor(last.id, last.created_at_epoch);
+}
 
 // src/services/sqlite/Sessions.ts
 function createSession(db, contentSessionId, project, userPrompt) {
@@ -1606,22 +1673,925 @@ function markObservationsStale(db, ids, stale) {
     [stale ? 1 : 0, ...validIds]
   );
 }
+
+// src/services/sqlite/GithubLinks.ts
+function createGithubLink(db, data) {
+  const now = /* @__PURE__ */ new Date();
+  const result = db.run(
+    `INSERT INTO github_links
+     (observation_id, session_id, repo, issue_number, pr_number, event_type,
+      action, title, url, author, created_at, created_at_epoch)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      data.observation_id ?? null,
+      data.session_id ?? null,
+      data.repo,
+      data.issue_number ?? null,
+      data.pr_number ?? null,
+      data.event_type,
+      data.action ?? null,
+      data.title ?? null,
+      data.url ?? null,
+      data.author ?? null,
+      now.toISOString(),
+      now.getTime()
+    ]
+  );
+  return Number(result.lastInsertRowid);
+}
+function getGithubLinksByObservation(db, observationId) {
+  return db.query(
+    `SELECT * FROM github_links
+     WHERE observation_id = ?
+     ORDER BY created_at_epoch DESC, id DESC`
+  ).all(observationId);
+}
+function getGithubLinksByRepo(db, repo, limit = 50) {
+  return db.query(
+    `SELECT * FROM github_links
+     WHERE repo = ?
+     ORDER BY created_at_epoch DESC, id DESC
+     LIMIT ?`
+  ).all(repo, limit);
+}
+function getGithubLinksByIssue(db, repo, issueNumber) {
+  return db.query(
+    `SELECT * FROM github_links
+     WHERE repo = ? AND issue_number = ?
+     ORDER BY created_at_epoch DESC, id DESC`
+  ).all(repo, issueNumber);
+}
+function getGithubLinksByPR(db, repo, prNumber) {
+  return db.query(
+    `SELECT * FROM github_links
+     WHERE repo = ? AND pr_number = ?
+     ORDER BY created_at_epoch DESC, id DESC`
+  ).all(repo, prNumber);
+}
+function searchGithubLinks(db, query, options = {}) {
+  const { repo, event_type, limit = 50 } = options;
+  const safeLimit = Math.min(Math.max(1, limit), 200);
+  const conditions = [];
+  const params = [];
+  if (query && query.trim().length > 0) {
+    const pattern = `%${query.replace(/[%_\\]/g, "\\$&")}%`;
+    conditions.push(`(title LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\')`);
+    params.push(pattern, pattern);
+  }
+  if (repo) {
+    conditions.push("repo = ?");
+    params.push(repo);
+  }
+  if (event_type) {
+    conditions.push("event_type = ?");
+    params.push(event_type);
+  }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  params.push(safeLimit);
+  return db.query(
+    `SELECT * FROM github_links
+     ${where}
+     ORDER BY created_at_epoch DESC, id DESC
+     LIMIT ?`
+  ).all(...params);
+}
+function listReposWithLinkCount(db) {
+  return db.query(
+    `SELECT repo,
+            COUNT(*) as count,
+            MAX(created_at) as last_event_at
+     FROM github_links
+     GROUP BY repo
+     ORDER BY count DESC, repo ASC`
+  ).all();
+}
+
+// src/services/sqlite/ImportExport.ts
+import { createHash } from "crypto";
+var JSONL_SCHEMA_VERSION = "2.5.0";
+var IMPORT_BATCH_SIZE = 100;
+function countExportRecords(db, filters) {
+  const { fromEpoch, toEpoch } = filtersToEpoch(filters);
+  const obsConds = buildConditions({ project: filters.project, type: filters.type, fromEpoch, toEpoch });
+  const sumConds = buildConditions({ project: filters.project, fromEpoch, toEpoch });
+  const promptConds = buildConditions({ project: filters.project, fromEpoch, toEpoch });
+  const obsCount = db.query(
+    `SELECT COUNT(*) as c FROM observations WHERE ${obsConds.where}`
+  ).get(...obsConds.params).c;
+  const sumCount = db.query(
+    `SELECT COUNT(*) as c FROM summaries WHERE ${sumConds.where}`
+  ).get(...sumConds.params).c;
+  const promptCount = db.query(
+    `SELECT COUNT(*) as c FROM prompts WHERE ${promptConds.where}`
+  ).get(...promptConds.params).c;
+  return { observations: obsCount, summaries: sumCount, prompts: promptCount };
+}
+function generateMetaRecord(db, filters) {
+  const counts = countExportRecords(db, filters);
+  const meta = {
+    _meta: {
+      version: JSONL_SCHEMA_VERSION,
+      exported_at: (/* @__PURE__ */ new Date()).toISOString(),
+      counts,
+      filters: Object.keys(filters).length > 0 ? filters : void 0
+    }
+  };
+  return JSON.stringify(meta);
+}
+function exportObservationsStreaming(db, filters, onRow, batchSize = 200) {
+  const { fromEpoch, toEpoch } = filtersToEpoch(filters);
+  const conds = buildConditions({ project: filters.project, type: filters.type, fromEpoch, toEpoch });
+  let offset = 0;
+  let total = 0;
+  while (true) {
+    const rows = db.query(
+      `SELECT id, memory_session_id, project, type, title, subtitle, text, narrative, facts, concepts,
+              files_read, files_modified, prompt_number, content_hash, discovery_tokens, auto_category,
+              created_at, created_at_epoch
+       FROM observations
+       WHERE ${conds.where}
+       ORDER BY created_at_epoch ASC, id ASC
+       LIMIT ? OFFSET ?`
+    ).all(...conds.params, batchSize, offset);
+    if (rows.length === 0) break;
+    for (const row of rows) {
+      const record = {
+        _type: "observation",
+        id: row.id,
+        memory_session_id: row.memory_session_id,
+        project: row.project,
+        type: row.type,
+        title: row.title,
+        subtitle: row.subtitle,
+        text: row.text,
+        narrative: row.narrative,
+        facts: row.facts,
+        concepts: row.concepts,
+        files_read: row.files_read,
+        files_modified: row.files_modified,
+        prompt_number: row.prompt_number,
+        content_hash: row.content_hash,
+        discovery_tokens: row.discovery_tokens ?? 0,
+        auto_category: row.auto_category,
+        created_at: row.created_at,
+        created_at_epoch: row.created_at_epoch
+      };
+      onRow(JSON.stringify(record));
+      total++;
+    }
+    offset += rows.length;
+    if (rows.length < batchSize) break;
+  }
+  return total;
+}
+function exportSummariesStreaming(db, filters, onRow, batchSize = 200) {
+  const { fromEpoch, toEpoch } = filtersToEpoch(filters);
+  const conds = buildConditions({ project: filters.project, fromEpoch, toEpoch });
+  let offset = 0;
+  let total = 0;
+  while (true) {
+    const rows = db.query(
+      `SELECT id, session_id, project, request, investigated, learned, completed, next_steps, notes,
+              discovery_tokens, created_at, created_at_epoch
+       FROM summaries
+       WHERE ${conds.where}
+       ORDER BY created_at_epoch ASC, id ASC
+       LIMIT ? OFFSET ?`
+    ).all(...conds.params, batchSize, offset);
+    if (rows.length === 0) break;
+    for (const row of rows) {
+      const record = {
+        _type: "summary",
+        id: row.id,
+        session_id: row.session_id,
+        project: row.project,
+        request: row.request,
+        investigated: row.investigated,
+        learned: row.learned,
+        completed: row.completed,
+        next_steps: row.next_steps,
+        notes: row.notes,
+        discovery_tokens: row.discovery_tokens ?? 0,
+        created_at: row.created_at,
+        created_at_epoch: row.created_at_epoch
+      };
+      onRow(JSON.stringify(record));
+      total++;
+    }
+    offset += rows.length;
+    if (rows.length < batchSize) break;
+  }
+  return total;
+}
+function exportPromptsStreaming(db, filters, onRow, batchSize = 200) {
+  const { fromEpoch, toEpoch } = filtersToEpoch(filters);
+  const conds = buildConditions({ project: filters.project, fromEpoch, toEpoch });
+  let offset = 0;
+  let total = 0;
+  while (true) {
+    const rows = db.query(
+      `SELECT id, content_session_id, project, prompt_number, prompt_text, created_at, created_at_epoch
+       FROM prompts
+       WHERE ${conds.where}
+       ORDER BY created_at_epoch ASC, id ASC
+       LIMIT ? OFFSET ?`
+    ).all(...conds.params, batchSize, offset);
+    if (rows.length === 0) break;
+    for (const row of rows) {
+      const record = {
+        _type: "prompt",
+        id: row.id,
+        content_session_id: row.content_session_id,
+        project: row.project,
+        prompt_number: row.prompt_number,
+        prompt_text: row.prompt_text,
+        created_at: row.created_at,
+        created_at_epoch: row.created_at_epoch
+      };
+      onRow(JSON.stringify(record));
+      total++;
+    }
+    offset += rows.length;
+    if (rows.length < batchSize) break;
+  }
+  return total;
+}
+function validateJsonlRow(raw) {
+  if (!raw || typeof raw !== "object") {
+    return "Il record non \xE8 un oggetto JSON valido";
+  }
+  const rec = raw;
+  if ("_meta" in rec) return null;
+  const validTypes = ["observation", "summary", "prompt"];
+  if (!rec._type || typeof rec._type !== "string" || !validTypes.includes(rec._type)) {
+    return `Campo "_type" obbligatorio, uno di: ${validTypes.join(", ")}`;
+  }
+  if (rec._type === "observation") {
+    if (!rec.project || typeof rec.project !== "string") return 'observation: campo "project" obbligatorio';
+    if (!rec.type || typeof rec.type !== "string") return 'observation: campo "type" obbligatorio';
+    if (!rec.title || typeof rec.title !== "string") return 'observation: campo "title" obbligatorio';
+    if (rec.project.length > 200) return 'observation: "project" troppo lungo (max 200)';
+    if (rec.title.length > 500) return 'observation: "title" troppo lungo (max 500)';
+  } else if (rec._type === "summary") {
+    if (!rec.project || typeof rec.project !== "string") return 'summary: campo "project" obbligatorio';
+    if (!rec.session_id || typeof rec.session_id !== "string") return 'summary: campo "session_id" obbligatorio';
+  } else if (rec._type === "prompt") {
+    if (!rec.project || typeof rec.project !== "string") return 'prompt: campo "project" obbligatorio';
+    if (!rec.content_session_id || typeof rec.content_session_id !== "string") return 'prompt: campo "content_session_id" obbligatorio';
+    if (!rec.prompt_text || typeof rec.prompt_text !== "string") return 'prompt: campo "prompt_text" obbligatorio';
+  }
+  return null;
+}
+function computeImportHash(rec) {
+  const payload = [
+    rec.project ?? "",
+    rec.type ?? "",
+    rec.title ?? "",
+    rec.narrative ?? ""
+  ].join("|");
+  return createHash("sha256").update(payload).digest("hex");
+}
+function hashExistsInObservations(db, hash) {
+  const result = db.query(
+    "SELECT id FROM observations WHERE content_hash = ? LIMIT 1"
+  ).get(hash);
+  return !!result;
+}
+function importObservationBatch(db, records, dryRun) {
+  let imported = 0;
+  let skipped = 0;
+  for (let i = 0; i < records.length; i += IMPORT_BATCH_SIZE) {
+    const batch = records.slice(i, i + IMPORT_BATCH_SIZE);
+    if (dryRun) {
+      for (const rec of batch) {
+        const hash = rec.content_hash || computeImportHash(rec);
+        if (hashExistsInObservations(db, hash)) {
+          skipped++;
+        } else {
+          imported++;
+        }
+      }
+      continue;
+    }
+    const insertBatch = db.transaction(() => {
+      for (const rec of batch) {
+        const hash = rec.content_hash || computeImportHash(rec);
+        if (hashExistsInObservations(db, hash)) {
+          skipped++;
+          continue;
+        }
+        const now = (/* @__PURE__ */ new Date()).toISOString();
+        db.run(
+          `INSERT INTO observations
+           (memory_session_id, project, type, title, subtitle, text, narrative, facts, concepts,
+            files_read, files_modified, prompt_number, content_hash, discovery_tokens, auto_category,
+            created_at, created_at_epoch)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            rec.memory_session_id || "imported",
+            rec.project,
+            rec.type,
+            rec.title,
+            rec.subtitle ?? null,
+            rec.text ?? null,
+            rec.narrative ?? null,
+            rec.facts ?? null,
+            rec.concepts ?? null,
+            rec.files_read ?? null,
+            rec.files_modified ?? null,
+            rec.prompt_number ?? 0,
+            hash,
+            rec.discovery_tokens ?? 0,
+            rec.auto_category ?? null,
+            rec.created_at || now,
+            rec.created_at_epoch || Date.now()
+          ]
+        );
+        imported++;
+      }
+    });
+    insertBatch();
+  }
+  return { imported, skipped };
+}
+function importSummaryBatch(db, records, dryRun) {
+  let imported = 0;
+  let skipped = 0;
+  for (let i = 0; i < records.length; i += IMPORT_BATCH_SIZE) {
+    const batch = records.slice(i, i + IMPORT_BATCH_SIZE);
+    if (dryRun) {
+      for (const rec of batch) {
+        const exists = db.query(
+          "SELECT id FROM summaries WHERE session_id = ? AND project = ? AND created_at_epoch = ? LIMIT 1"
+        ).get(rec.session_id, rec.project, rec.created_at_epoch ?? 0);
+        if (exists) skipped++;
+        else imported++;
+      }
+      continue;
+    }
+    const insertBatch = db.transaction(() => {
+      for (const rec of batch) {
+        const exists = db.query(
+          "SELECT id FROM summaries WHERE session_id = ? AND project = ? AND created_at_epoch = ? LIMIT 1"
+        ).get(rec.session_id, rec.project, rec.created_at_epoch ?? 0);
+        if (exists) {
+          skipped++;
+          continue;
+        }
+        const now = (/* @__PURE__ */ new Date()).toISOString();
+        db.run(
+          `INSERT INTO summaries
+           (session_id, project, request, investigated, learned, completed, next_steps, notes,
+            discovery_tokens, created_at, created_at_epoch)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            rec.session_id,
+            rec.project,
+            rec.request ?? null,
+            rec.investigated ?? null,
+            rec.learned ?? null,
+            rec.completed ?? null,
+            rec.next_steps ?? null,
+            rec.notes ?? null,
+            rec.discovery_tokens ?? 0,
+            rec.created_at || now,
+            rec.created_at_epoch || Date.now()
+          ]
+        );
+        imported++;
+      }
+    });
+    insertBatch();
+  }
+  return { imported, skipped };
+}
+function importPromptBatch(db, records, dryRun) {
+  let imported = 0;
+  let skipped = 0;
+  for (let i = 0; i < records.length; i += IMPORT_BATCH_SIZE) {
+    const batch = records.slice(i, i + IMPORT_BATCH_SIZE);
+    if (dryRun) {
+      for (const rec of batch) {
+        const exists = db.query(
+          "SELECT id FROM prompts WHERE content_session_id = ? AND prompt_number = ? LIMIT 1"
+        ).get(rec.content_session_id, rec.prompt_number ?? 0);
+        if (exists) skipped++;
+        else imported++;
+      }
+      continue;
+    }
+    const insertBatch = db.transaction(() => {
+      for (const rec of batch) {
+        const exists = db.query(
+          "SELECT id FROM prompts WHERE content_session_id = ? AND prompt_number = ? LIMIT 1"
+        ).get(rec.content_session_id, rec.prompt_number ?? 0);
+        if (exists) {
+          skipped++;
+          continue;
+        }
+        const now = (/* @__PURE__ */ new Date()).toISOString();
+        db.run(
+          `INSERT INTO prompts
+           (content_session_id, project, prompt_number, prompt_text, created_at, created_at_epoch)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            rec.content_session_id,
+            rec.project,
+            rec.prompt_number ?? 0,
+            rec.prompt_text,
+            rec.created_at || now,
+            rec.created_at_epoch || Date.now()
+          ]
+        );
+        imported++;
+      }
+    });
+    insertBatch();
+  }
+  return { imported, skipped };
+}
+function importJsonl(db, content, dryRun = false) {
+  const lines = content.split("\n");
+  const result = {
+    imported: 0,
+    skipped: 0,
+    errors: 0,
+    total: 0,
+    errorDetails: []
+  };
+  const obsBuf = [];
+  const sumBuf = [];
+  const promptBuf = [];
+  const flushBuffers = () => {
+    if (obsBuf.length > 0) {
+      const r = importObservationBatch(db, obsBuf.splice(0), dryRun);
+      result.imported += r.imported;
+      result.skipped += r.skipped;
+    }
+    if (sumBuf.length > 0) {
+      const r = importSummaryBatch(db, sumBuf.splice(0), dryRun);
+      result.imported += r.imported;
+      result.skipped += r.skipped;
+    }
+    if (promptBuf.length > 0) {
+      const r = importPromptBatch(db, promptBuf.splice(0), dryRun);
+      result.imported += r.imported;
+      result.skipped += r.skipped;
+    }
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i].trim();
+    if (!raw || raw.startsWith("#")) continue;
+    result.total++;
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      result.errors++;
+      result.errorDetails.push({ line: i + 1, error: `JSON non valido: ${raw.substring(0, 60)}` });
+      continue;
+    }
+    if (parsed && typeof parsed === "object" && "_meta" in parsed) {
+      result.total--;
+      continue;
+    }
+    const validErr = validateJsonlRow(parsed);
+    if (validErr) {
+      result.errors++;
+      result.errorDetails.push({ line: i + 1, error: validErr });
+      continue;
+    }
+    const rec = parsed;
+    if (rec._type === "observation") {
+      obsBuf.push(rec);
+    } else if (rec._type === "summary") {
+      sumBuf.push(rec);
+    } else if (rec._type === "prompt") {
+      promptBuf.push(rec);
+    }
+    const totalBuf = obsBuf.length + sumBuf.length + promptBuf.length;
+    if (totalBuf >= IMPORT_BATCH_SIZE) {
+      flushBuffers();
+    }
+  }
+  flushBuffers();
+  return result;
+}
+function filtersToEpoch(filters) {
+  return {
+    fromEpoch: filters.from ? new Date(filters.from).getTime() : void 0,
+    toEpoch: filters.to ? new Date(filters.to).getTime() : void 0
+  };
+}
+function buildConditions(params) {
+  const conditions = ["1=1"];
+  const values = [];
+  if (params.project) {
+    conditions.push("project = ?");
+    values.push(params.project);
+  }
+  if (params.type) {
+    conditions.push("type = ?");
+    values.push(params.type);
+  }
+  if (params.fromEpoch !== void 0) {
+    conditions.push("created_at_epoch >= ?");
+    values.push(params.fromEpoch);
+  }
+  if (params.toEpoch !== void 0) {
+    conditions.push("created_at_epoch <= ?");
+    values.push(params.toEpoch);
+  }
+  return { where: conditions.join(" AND "), params: values };
+}
+
+// src/types/worker-types.ts
+var KNOWLEDGE_TYPES = ["constraint", "decision", "heuristic", "rejected"];
+
+// src/services/sqlite/Retention.ts
+var KNOWLEDGE_TYPE_LIST = KNOWLEDGE_TYPES;
+var KNOWLEDGE_PLACEHOLDERS = KNOWLEDGE_TYPE_LIST.map(() => "?").join(", ");
+function toEpochThreshold(maxAgeDays) {
+  if (maxAgeDays <= 0) return null;
+  return Date.now() - maxAgeDays * 864e5;
+}
+function buildKnowledgeImportanceExemptionClause() {
+  return `AND NOT (
+    facts IS NOT NULL AND (
+      facts LIKE '%"importance":4%'
+      OR facts LIKE '%"importance": 4%'
+      OR facts LIKE '%"importance":5%'
+      OR facts LIKE '%"importance": 5%'
+    )
+  )`;
+}
+function getRetentionStats(db, config) {
+  const obsThreshold = toEpochThreshold(config.observationsMaxAgeDays);
+  const sumThreshold = toEpochThreshold(config.summariesMaxAgeDays);
+  const promptThreshold = toEpochThreshold(config.promptsMaxAgeDays);
+  const knowledgeThreshold = toEpochThreshold(config.knowledgeMaxAgeDays);
+  const importanceExemption = buildKnowledgeImportanceExemptionClause();
+  let observations = 0;
+  if (obsThreshold !== null) {
+    const row = db.query(
+      `SELECT COUNT(*) as c FROM observations
+       WHERE created_at_epoch < ?
+         AND type NOT IN (${KNOWLEDGE_PLACEHOLDERS})`
+    ).get(obsThreshold, ...KNOWLEDGE_TYPE_LIST);
+    observations = row?.c ?? 0;
+  }
+  let summaries = 0;
+  if (sumThreshold !== null) {
+    const row = db.query(
+      "SELECT COUNT(*) as c FROM summaries WHERE created_at_epoch < ?"
+    ).get(sumThreshold);
+    summaries = row?.c ?? 0;
+  }
+  let prompts = 0;
+  if (promptThreshold !== null) {
+    const row = db.query(
+      "SELECT COUNT(*) as c FROM prompts WHERE created_at_epoch < ?"
+    ).get(promptThreshold);
+    prompts = row?.c ?? 0;
+  }
+  let knowledge = 0;
+  if (knowledgeThreshold !== null) {
+    const row = db.query(
+      `SELECT COUNT(*) as c FROM observations
+       WHERE created_at_epoch < ?
+         AND type IN (${KNOWLEDGE_PLACEHOLDERS})
+         ${importanceExemption}`
+    ).get(knowledgeThreshold, ...KNOWLEDGE_TYPE_LIST);
+    knowledge = row?.c ?? 0;
+  }
+  const total = observations + summaries + prompts + knowledge;
+  return { observations, summaries, prompts, knowledge, total };
+}
+function countRows(db, sql, params) {
+  const row = db.query(sql).get(...params);
+  return row?.c ?? 0;
+}
+function applyRetention(db, config) {
+  const obsThreshold = toEpochThreshold(config.observationsMaxAgeDays);
+  const sumThreshold = toEpochThreshold(config.summariesMaxAgeDays);
+  const promptThreshold = toEpochThreshold(config.promptsMaxAgeDays);
+  const knowledgeThreshold = toEpochThreshold(config.knowledgeMaxAgeDays);
+  const importanceExemption = buildKnowledgeImportanceExemptionClause();
+  const deleteAll = db.transaction(() => {
+    let observations = 0;
+    let summaries = 0;
+    let prompts = 0;
+    let knowledge = 0;
+    if (obsThreshold !== null) {
+      const obsParams = [obsThreshold, ...KNOWLEDGE_TYPE_LIST];
+      const obsWhere = `WHERE created_at_epoch < ? AND type NOT IN (${KNOWLEDGE_PLACEHOLDERS})`;
+      observations = countRows(
+        db,
+        `SELECT COUNT(*) as c FROM observations ${obsWhere}`,
+        obsParams
+      );
+      if (observations > 0) {
+        db.run(
+          `DELETE FROM observation_embeddings
+           WHERE observation_id IN (
+             SELECT id FROM observations ${obsWhere}
+           )`,
+          obsParams
+        );
+        db.run(
+          `DELETE FROM observations ${obsWhere}`,
+          obsParams
+        );
+      }
+    }
+    if (sumThreshold !== null) {
+      summaries = countRows(
+        db,
+        "SELECT COUNT(*) as c FROM summaries WHERE created_at_epoch < ?",
+        [sumThreshold]
+      );
+      if (summaries > 0) {
+        db.run("DELETE FROM summaries WHERE created_at_epoch < ?", [sumThreshold]);
+      }
+    }
+    if (promptThreshold !== null) {
+      prompts = countRows(
+        db,
+        "SELECT COUNT(*) as c FROM prompts WHERE created_at_epoch < ?",
+        [promptThreshold]
+      );
+      if (prompts > 0) {
+        db.run("DELETE FROM prompts WHERE created_at_epoch < ?", [promptThreshold]);
+      }
+    }
+    if (knowledgeThreshold !== null) {
+      const kParams = [knowledgeThreshold, ...KNOWLEDGE_TYPE_LIST];
+      const kWhere = `WHERE created_at_epoch < ? AND type IN (${KNOWLEDGE_PLACEHOLDERS}) ${importanceExemption}`;
+      knowledge = countRows(
+        db,
+        `SELECT COUNT(*) as c FROM observations ${kWhere}`,
+        kParams
+      );
+      if (knowledge > 0) {
+        db.run(
+          `DELETE FROM observation_embeddings
+           WHERE observation_id IN (
+             SELECT id FROM observations ${kWhere}
+           )`,
+          kParams
+        );
+        db.run(
+          `DELETE FROM observations ${kWhere}`,
+          kParams
+        );
+      }
+    }
+    return { observations, summaries, prompts, knowledge };
+  });
+  const counts = deleteAll();
+  const total = counts.observations + counts.summaries + counts.prompts + counts.knowledge;
+  return {
+    ...counts,
+    total,
+    executedAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+}
+function buildRetentionConfig(config) {
+  function getNum(key, fallback) {
+    const v = config[key];
+    if (v === null || v === void 0) return fallback;
+    const n = Number(v);
+    return isNaN(n) ? fallback : n;
+  }
+  return {
+    observationsMaxAgeDays: getNum("retention.observations.maxAgeDays", 90),
+    summariesMaxAgeDays: getNum("retention.summaries.maxAgeDays", 365),
+    promptsMaxAgeDays: getNum("retention.prompts.maxAgeDays", 30),
+    knowledgeMaxAgeDays: getNum("retention.knowledge.maxAgeDays", 0)
+  };
+}
+
+// src/services/sqlite/Backup.ts
+import {
+  existsSync as existsSync4,
+  mkdirSync as mkdirSync3,
+  copyFileSync,
+  readdirSync,
+  statSync as statSync2,
+  unlinkSync,
+  readFileSync as readFileSync2,
+  writeFileSync
+} from "fs";
+import { join as join3, basename as basename2 } from "path";
+function formatTimestamp(date) {
+  const pad = (n, len = 2) => String(n).padStart(len, "0");
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const mins = pad(date.getMinutes());
+  const secs = pad(date.getSeconds());
+  const ms = pad(date.getMilliseconds(), 3);
+  return `${year}-${month}-${day}-${hours}${mins}${secs}-${ms}`;
+}
+function collectStats(db, dbPath) {
+  const countTable = (table) => {
+    try {
+      const row = db.query(`SELECT COUNT(*) as c FROM ${table}`).get();
+      return row?.c ?? 0;
+    } catch {
+      return 0;
+    }
+  };
+  const dbSizeBytes = existsSync4(dbPath) ? statSync2(dbPath).size : 0;
+  return {
+    observations: countTable("observations"),
+    sessions: countTable("sessions"),
+    summaries: countTable("summaries"),
+    prompts: countTable("prompts"),
+    dbSizeBytes
+  };
+}
+function getSchemaVersion(db) {
+  try {
+    const row = db.query("SELECT MAX(version) as v FROM schema_versions").get();
+    return row?.v ?? 0;
+  } catch {
+    return 0;
+  }
+}
+function createBackup(dbPath, backupDir, db) {
+  mkdirSync3(backupDir, { recursive: true });
+  const now = /* @__PURE__ */ new Date();
+  const ts = formatTimestamp(now);
+  const filename = `backup-${ts}.db`;
+  const destPath = join3(backupDir, filename);
+  const metaFilename = `backup-${ts}.meta.json`;
+  const metaPath = join3(backupDir, metaFilename);
+  if (!existsSync4(dbPath)) {
+    throw new Error(`Database non trovato: ${dbPath}`);
+  }
+  copyFileSync(dbPath, destPath);
+  logger.info("BACKUP", `File DB copiato: ${dbPath} \u2192 ${destPath}`);
+  const walPath = `${dbPath}-wal`;
+  const shmPath = `${dbPath}-shm`;
+  if (existsSync4(walPath)) {
+    copyFileSync(walPath, `${destPath}-wal`);
+    logger.debug("BACKUP", "File WAL copiato");
+  }
+  if (existsSync4(shmPath)) {
+    copyFileSync(shmPath, `${destPath}-shm`);
+    logger.debug("BACKUP", "File SHM copiato");
+  }
+  const stats = collectStats(db, dbPath);
+  const schemaVersion = getSchemaVersion(db);
+  const metadata = {
+    timestamp: now.toISOString(),
+    timestampEpoch: now.getTime(),
+    schemaVersion,
+    stats,
+    sourcePath: dbPath,
+    filename
+  };
+  writeFileSync(metaPath, JSON.stringify(metadata, null, 2), "utf8");
+  logger.info("BACKUP", `Metadata scritto: ${metaPath}`);
+  return {
+    filePath: destPath,
+    metaPath,
+    metadata
+  };
+}
+function listBackups(backupDir) {
+  if (!existsSync4(backupDir)) {
+    return [];
+  }
+  const entries = [];
+  let files;
+  try {
+    files = readdirSync(backupDir);
+  } catch (err) {
+    logger.warn("BACKUP", `Impossibile leggere la directory backup: ${backupDir}`, {}, err);
+    return [];
+  }
+  const metaFiles = files.filter((f) => f.startsWith("backup-") && f.endsWith(".meta.json"));
+  for (const metaFile of metaFiles) {
+    const metaPath = join3(backupDir, metaFile);
+    const dbFilename = metaFile.replace(/\.meta\.json$/, ".db");
+    const filePath = join3(backupDir, dbFilename);
+    let metadata;
+    try {
+      const raw = readFileSync2(metaPath, "utf8");
+      metadata = JSON.parse(raw);
+    } catch (err) {
+      logger.warn("BACKUP", `Metadata non leggibile: ${metaPath}`, {}, err);
+      continue;
+    }
+    if (!existsSync4(filePath)) {
+      logger.warn("BACKUP", `File backup mancante per metadata: ${filePath}`);
+      continue;
+    }
+    entries.push({ filePath, metaPath, metadata });
+  }
+  entries.sort((a, b) => b.metadata.timestampEpoch - a.metadata.timestampEpoch);
+  return entries;
+}
+function restoreBackup(backupFile, dbPath) {
+  if (!existsSync4(backupFile)) {
+    throw new Error(`File backup non trovato: ${backupFile}`);
+  }
+  copyFileSync(backupFile, dbPath);
+  logger.info("BACKUP", `Database ripristinato: ${backupFile} \u2192 ${dbPath}`);
+  const walBackup = `${backupFile}-wal`;
+  const shmBackup = `${backupFile}-shm`;
+  const walDest = `${dbPath}-wal`;
+  const shmDest = `${dbPath}-shm`;
+  if (existsSync4(walBackup)) {
+    copyFileSync(walBackup, walDest);
+    logger.debug("BACKUP", "File WAL ripristinato");
+  } else if (existsSync4(walDest)) {
+    unlinkSync(walDest);
+    logger.debug("BACKUP", "File WAL corrente rimosso (non presente nel backup)");
+  }
+  if (existsSync4(shmBackup)) {
+    copyFileSync(shmBackup, shmDest);
+    logger.debug("BACKUP", "File SHM ripristinato");
+  } else if (existsSync4(shmDest)) {
+    unlinkSync(shmDest);
+    logger.debug("BACKUP", "File SHM corrente rimosso (non presente nel backup)");
+  }
+}
+function rotateBackups(backupDir, maxKeep) {
+  if (maxKeep <= 0) {
+    throw new Error(`maxKeep deve essere > 0, ricevuto: ${maxKeep}`);
+  }
+  const entries = listBackups(backupDir);
+  if (entries.length <= maxKeep) {
+    logger.debug("BACKUP", `Rotazione non necessaria: ${entries.length}/${maxKeep} backup presenti`);
+    return 0;
+  }
+  const toDelete = entries.slice(maxKeep);
+  let deleted = 0;
+  for (const entry of toDelete) {
+    try {
+      if (existsSync4(entry.filePath)) {
+        unlinkSync(entry.filePath);
+      }
+    } catch (err) {
+      logger.warn("BACKUP", `Impossibile eliminare: ${entry.filePath}`, {}, err);
+    }
+    for (const extra of [`${entry.filePath}-wal`, `${entry.filePath}-shm`]) {
+      try {
+        if (existsSync4(extra)) unlinkSync(extra);
+      } catch {
+      }
+    }
+    try {
+      if (existsSync4(entry.metaPath)) {
+        unlinkSync(entry.metaPath);
+      }
+    } catch (err) {
+      logger.warn("BACKUP", `Impossibile eliminare metadata: ${entry.metaPath}`, {}, err);
+    }
+    logger.info("BACKUP", `Backup rimosso (rotazione): ${basename2(entry.filePath)}`);
+    deleted++;
+  }
+  logger.info("BACKUP", `Rotazione completata: ${deleted} backup eliminati, ${maxKeep} mantenuti`);
+  return deleted;
+}
 export {
+  JSONL_SCHEMA_VERSION,
   KiroMemoryDatabase,
+  applyRetention,
+  buildNextCursor,
+  buildRetentionConfig,
   completeSession,
+  computeImportHash,
   consolidateObservations,
+  countExportRecords,
+  createBackup,
   createCheckpoint,
+  createGithubLink,
   createObservation,
   createPrompt,
   createSession,
   createSummary,
+  decodeCursor,
   deleteObservation,
   deletePrompt,
   deleteSummary,
+  encodeCursor,
+  exportObservationsStreaming,
+  exportPromptsStreaming,
+  exportSummariesStreaming,
   failSession,
+  generateMetaRecord,
   getActiveSessions,
   getAllSessions,
   getCheckpointsBySession,
+  getGithubLinksByIssue,
+  getGithubLinksByObservation,
+  getGithubLinksByPR,
+  getGithubLinksByRepo,
   getLatestCheckpoint,
   getLatestCheckpointByProject,
   getLatestPrompt,
@@ -1632,6 +2602,7 @@ export {
   getPromptsByProject,
   getPromptsBySession,
   getReportData,
+  getRetentionStats,
   getSessionByContentId,
   getSessionById,
   getSessionsByProject,
@@ -1639,8 +2610,15 @@ export {
   getSummariesByProject,
   getSummaryBySession,
   getTimeline,
+  hashExistsInObservations,
+  importJsonl,
   isDuplicateObservation,
+  listBackups,
+  listReposWithLinkCount,
   markObservationsStale,
+  restoreBackup,
+  rotateBackups,
+  searchGithubLinks,
   searchObservations,
   searchObservationsFTS,
   searchObservationsFTSWithRank,
@@ -1648,5 +2626,6 @@ export {
   searchSummaries,
   searchSummariesFiltered,
   updateLastAccessed,
-  updateSessionMemoryId
+  updateSessionMemoryId,
+  validateJsonlRow
 };

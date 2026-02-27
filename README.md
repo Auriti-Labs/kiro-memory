@@ -59,6 +59,10 @@ When a new session starts, Kiro Memory automatically injects previous session co
 - **Session Tracking** -- Sessions view with stats (total, active, completed, avg duration) and expandable session details
 - **Session Summaries** -- Structured summaries with investigated/completed/learned/next_steps sections
 - **Web Dashboard** -- Real-time viewer at `http://localhost:3001` with dark/light/system theme, hybrid search, project filters, mobile drawer, and live updates via SSE
+- **Plugin System** -- Extensible architecture with auto-discovery, lifecycle management, REST API. Built-in Slack and GitHub plugins
+- **Backup & Restore** -- Automatic SQLite backup with rotation, point-in-time restore, gzip compression
+- **Import/Export JSONL** -- Streaming import/export with SHA256 deduplication for portable backups
+- **Secret Filtering** -- Automatic redaction of API keys, passwords, and tokens in observations
 - **MCP Server** -- 11 tools exposed via Model Context Protocol
 - **Full-Text Search** -- SQLite FTS5 with weighted BM25 scoring for relevance-ranked results
 - **Data Export** -- Export observations and summaries in JSON or Markdown format
@@ -112,7 +116,7 @@ For editors without hook support, Kiro Memory uses **rules files** + **MCP serve
 - **Windsurf**: `.windsurfrules` + MCP config in `~/.codeium/windsurf/mcp_config.json`
 - **Cline**: `.clinerules` + MCP config in Cline settings
 
-The MCP server exposes 10 tools that your AI assistant can use directly.
+The MCP server exposes 11 tools that your AI assistant can use directly.
 
 ## Architecture
 

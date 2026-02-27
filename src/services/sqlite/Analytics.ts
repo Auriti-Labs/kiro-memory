@@ -162,16 +162,17 @@ export function getAnalyticsOverview(
   const weekStart = now - (7 * 24 * 60 * 60 * 1000);
 
   // Single CTE query: 10 counts in a single DB roundtrip
-  const projectFilter = project ? 'WHERE project = @project' : '';
-  const obsProjectFilter = project ? 'WHERE project = @project' : '';
+  // Usa $param syntax compatibile sia con bun:sqlite che better-sqlite3
+  const projectFilter = project ? 'WHERE project = $project' : '';
+  const obsProjectFilter = project ? 'WHERE project = $project' : '';
 
   const sql = `
     WITH
       obs_stats AS (
         SELECT
           COUNT(*) as total,
-          COUNT(CASE WHEN created_at_epoch >= @todayStart THEN 1 END) as today,
-          COUNT(CASE WHEN created_at_epoch >= @weekStart THEN 1 END) as this_week,
+          COUNT(CASE WHEN created_at_epoch >= $todayStart THEN 1 END) as today,
+          COUNT(CASE WHEN created_at_epoch >= $weekStart THEN 1 END) as this_week,
           COUNT(CASE WHEN is_stale = 1 THEN 1 END) as stale,
           COUNT(CASE WHEN type IN ('constraint', 'decision', 'heuristic', 'rejected') THEN 1 END) as knowledge,
           COALESCE(SUM(discovery_tokens), 0) as discovery_tokens,
@@ -203,11 +204,11 @@ export function getAnalyticsOverview(
   `;
 
   const params: Record<string, any> = {
-    todayStart,
-    weekStart
+    $todayStart: todayStart,
+    $weekStart: weekStart
   };
   if (project) {
-    params['project'] = project;
+    params['$project'] = project;
   }
 
   const row = db.query(sql).get(params) as any;

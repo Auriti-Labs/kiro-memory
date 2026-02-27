@@ -44,4 +44,4 @@ export { logger, LogLevel } from './utils/logger.js';
 export type { Component } from './utils/logger.js';
 
 // Version
-export const VERSION = '2.1.0';
+export const VERSION = '3.0.0';

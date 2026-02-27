@@ -945,6 +945,464 @@ var init_Search = __esm({
   }
 });
 
+// src/services/sqlite/ImportExport.ts
+var ImportExport_exports = {};
+__export(ImportExport_exports, {
+  JSONL_SCHEMA_VERSION: () => JSONL_SCHEMA_VERSION,
+  computeImportHash: () => computeImportHash,
+  countExportRecords: () => countExportRecords,
+  exportObservationsStreaming: () => exportObservationsStreaming,
+  exportPromptsStreaming: () => exportPromptsStreaming,
+  exportSummariesStreaming: () => exportSummariesStreaming,
+  generateMetaRecord: () => generateMetaRecord,
+  hashExistsInObservations: () => hashExistsInObservations,
+  importJsonl: () => importJsonl,
+  validateJsonlRow: () => validateJsonlRow
+});
+import { createHash } from "crypto";
+function countExportRecords(db, filters) {
+  const { fromEpoch, toEpoch } = filtersToEpoch(filters);
+  const obsConds = buildConditions({ project: filters.project, type: filters.type, fromEpoch, toEpoch });
+  const sumConds = buildConditions({ project: filters.project, fromEpoch, toEpoch });
+  const promptConds = buildConditions({ project: filters.project, fromEpoch, toEpoch });
+  const obsCount = db.query(
+    `SELECT COUNT(*) as c FROM observations WHERE ${obsConds.where}`
+  ).get(...obsConds.params).c;
+  const sumCount = db.query(
+    `SELECT COUNT(*) as c FROM summaries WHERE ${sumConds.where}`
+  ).get(...sumConds.params).c;
+  const promptCount = db.query(
+    `SELECT COUNT(*) as c FROM prompts WHERE ${promptConds.where}`
+  ).get(...promptConds.params).c;
+  return { observations: obsCount, summaries: sumCount, prompts: promptCount };
+}
+function generateMetaRecord(db, filters) {
+  const counts = countExportRecords(db, filters);
+  const meta = {
+    _meta: {
+      version: JSONL_SCHEMA_VERSION,
+      exported_at: (/* @__PURE__ */ new Date()).toISOString(),
+      counts,
+      filters: Object.keys(filters).length > 0 ? filters : void 0
+    }
+  };
+  return JSON.stringify(meta);
+}
+function exportObservationsStreaming(db, filters, onRow, batchSize = 200) {
+  const { fromEpoch, toEpoch } = filtersToEpoch(filters);
+  const conds = buildConditions({ project: filters.project, type: filters.type, fromEpoch, toEpoch });
+  let offset = 0;
+  let total = 0;
+  while (true) {
+    const rows = db.query(
+      `SELECT id, memory_session_id, project, type, title, subtitle, text, narrative, facts, concepts,
+              files_read, files_modified, prompt_number, content_hash, discovery_tokens, auto_category,
+              created_at, created_at_epoch
+       FROM observations
+       WHERE ${conds.where}
+       ORDER BY created_at_epoch ASC, id ASC
+       LIMIT ? OFFSET ?`
+    ).all(...conds.params, batchSize, offset);
+    if (rows.length === 0) break;
+    for (const row of rows) {
+      const record = {
+        _type: "observation",
+        id: row.id,
+        memory_session_id: row.memory_session_id,
+        project: row.project,
+        type: row.type,
+        title: row.title,
+        subtitle: row.subtitle,
+        text: row.text,
+        narrative: row.narrative,
+        facts: row.facts,
+        concepts: row.concepts,
+        files_read: row.files_read,
+        files_modified: row.files_modified,
+        prompt_number: row.prompt_number,
+        content_hash: row.content_hash,
+        discovery_tokens: row.discovery_tokens ?? 0,
+        auto_category: row.auto_category,
+        created_at: row.created_at,
+        created_at_epoch: row.created_at_epoch
+      };
+      onRow(JSON.stringify(record));
+      total++;
+    }
+    offset += rows.length;
+    if (rows.length < batchSize) break;
+  }
+  return total;
+}
+function exportSummariesStreaming(db, filters, onRow, batchSize = 200) {
+  const { fromEpoch, toEpoch } = filtersToEpoch(filters);
+  const conds = buildConditions({ project: filters.project, fromEpoch, toEpoch });
+  let offset = 0;
+  let total = 0;
+  while (true) {
+    const rows = db.query(
+      `SELECT id, session_id, project, request, investigated, learned, completed, next_steps, notes,
+              discovery_tokens, created_at, created_at_epoch
+       FROM summaries
+       WHERE ${conds.where}
+       ORDER BY created_at_epoch ASC, id ASC
+       LIMIT ? OFFSET ?`
+    ).all(...conds.params, batchSize, offset);
+    if (rows.length === 0) break;
+    for (const row of rows) {
+      const record = {
+        _type: "summary",
+        id: row.id,
+        session_id: row.session_id,
+        project: row.project,
+        request: row.request,
+        investigated: row.investigated,
+        learned: row.learned,
+        completed: row.completed,
+        next_steps: row.next_steps,
+        notes: row.notes,
+        discovery_tokens: row.discovery_tokens ?? 0,
+        created_at: row.created_at,
+        created_at_epoch: row.created_at_epoch
+      };
+      onRow(JSON.stringify(record));
+      total++;
+    }
+    offset += rows.length;
+    if (rows.length < batchSize) break;
+  }
+  return total;
+}
+function exportPromptsStreaming(db, filters, onRow, batchSize = 200) {
+  const { fromEpoch, toEpoch } = filtersToEpoch(filters);
+  const conds = buildConditions({ project: filters.project, fromEpoch, toEpoch });
+  let offset = 0;
+  let total = 0;
+  while (true) {
+    const rows = db.query(
+      `SELECT id, content_session_id, project, prompt_number, prompt_text, created_at, created_at_epoch
+       FROM prompts
+       WHERE ${conds.where}
+       ORDER BY created_at_epoch ASC, id ASC
+       LIMIT ? OFFSET ?`
+    ).all(...conds.params, batchSize, offset);
+    if (rows.length === 0) break;
+    for (const row of rows) {
+      const record = {
+        _type: "prompt",
+        id: row.id,
+        content_session_id: row.content_session_id,
+        project: row.project,
+        prompt_number: row.prompt_number,
+        prompt_text: row.prompt_text,
+        created_at: row.created_at,
+        created_at_epoch: row.created_at_epoch
+      };
+      onRow(JSON.stringify(record));
+      total++;
+    }
+    offset += rows.length;
+    if (rows.length < batchSize) break;
+  }
+  return total;
+}
+function validateJsonlRow(raw) {
+  if (!raw || typeof raw !== "object") {
+    return "Il record non \xE8 un oggetto JSON valido";
+  }
+  const rec = raw;
+  if ("_meta" in rec) return null;
+  const validTypes = ["observation", "summary", "prompt"];
+  if (!rec._type || typeof rec._type !== "string" || !validTypes.includes(rec._type)) {
+    return `Campo "_type" obbligatorio, uno di: ${validTypes.join(", ")}`;
+  }
+  if (rec._type === "observation") {
+    if (!rec.project || typeof rec.project !== "string") return 'observation: campo "project" obbligatorio';
+    if (!rec.type || typeof rec.type !== "string") return 'observation: campo "type" obbligatorio';
+    if (!rec.title || typeof rec.title !== "string") return 'observation: campo "title" obbligatorio';
+    if (rec.project.length > 200) return 'observation: "project" troppo lungo (max 200)';
+    if (rec.title.length > 500) return 'observation: "title" troppo lungo (max 500)';
+  } else if (rec._type === "summary") {
+    if (!rec.project || typeof rec.project !== "string") return 'summary: campo "project" obbligatorio';
+    if (!rec.session_id || typeof rec.session_id !== "string") return 'summary: campo "session_id" obbligatorio';
+  } else if (rec._type === "prompt") {
+    if (!rec.project || typeof rec.project !== "string") return 'prompt: campo "project" obbligatorio';
+    if (!rec.content_session_id || typeof rec.content_session_id !== "string") return 'prompt: campo "content_session_id" obbligatorio';
+    if (!rec.prompt_text || typeof rec.prompt_text !== "string") return 'prompt: campo "prompt_text" obbligatorio';
+  }
+  return null;
+}
+function computeImportHash(rec) {
+  const payload = [
+    rec.project ?? "",
+    rec.type ?? "",
+    rec.title ?? "",
+    rec.narrative ?? ""
+  ].join("|");
+  return createHash("sha256").update(payload).digest("hex");
+}
+function hashExistsInObservations(db, hash) {
+  const result = db.query(
+    "SELECT id FROM observations WHERE content_hash = ? LIMIT 1"
+  ).get(hash);
+  return !!result;
+}
+function importObservationBatch(db, records, dryRun) {
+  let imported = 0;
+  let skipped = 0;
+  for (let i = 0; i < records.length; i += IMPORT_BATCH_SIZE) {
+    const batch = records.slice(i, i + IMPORT_BATCH_SIZE);
+    if (dryRun) {
+      for (const rec of batch) {
+        const hash = rec.content_hash || computeImportHash(rec);
+        if (hashExistsInObservations(db, hash)) {
+          skipped++;
+        } else {
+          imported++;
+        }
+      }
+      continue;
+    }
+    const insertBatch = db.transaction(() => {
+      for (const rec of batch) {
+        const hash = rec.content_hash || computeImportHash(rec);
+        if (hashExistsInObservations(db, hash)) {
+          skipped++;
+          continue;
+        }
+        const now = (/* @__PURE__ */ new Date()).toISOString();
+        db.run(
+          `INSERT INTO observations
+           (memory_session_id, project, type, title, subtitle, text, narrative, facts, concepts,
+            files_read, files_modified, prompt_number, content_hash, discovery_tokens, auto_category,
+            created_at, created_at_epoch)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            rec.memory_session_id || "imported",
+            rec.project,
+            rec.type,
+            rec.title,
+            rec.subtitle ?? null,
+            rec.text ?? null,
+            rec.narrative ?? null,
+            rec.facts ?? null,
+            rec.concepts ?? null,
+            rec.files_read ?? null,
+            rec.files_modified ?? null,
+            rec.prompt_number ?? 0,
+            hash,
+            rec.discovery_tokens ?? 0,
+            rec.auto_category ?? null,
+            rec.created_at || now,
+            rec.created_at_epoch || Date.now()
+          ]
+        );
+        imported++;
+      }
+    });
+    insertBatch();
+  }
+  return { imported, skipped };
+}
+function importSummaryBatch(db, records, dryRun) {
+  let imported = 0;
+  let skipped = 0;
+  for (let i = 0; i < records.length; i += IMPORT_BATCH_SIZE) {
+    const batch = records.slice(i, i + IMPORT_BATCH_SIZE);
+    if (dryRun) {
+      for (const rec of batch) {
+        const exists = db.query(
+          "SELECT id FROM summaries WHERE session_id = ? AND project = ? AND created_at_epoch = ? LIMIT 1"
+        ).get(rec.session_id, rec.project, rec.created_at_epoch ?? 0);
+        if (exists) skipped++;
+        else imported++;
+      }
+      continue;
+    }
+    const insertBatch = db.transaction(() => {
+      for (const rec of batch) {
+        const exists = db.query(
+          "SELECT id FROM summaries WHERE session_id = ? AND project = ? AND created_at_epoch = ? LIMIT 1"
+        ).get(rec.session_id, rec.project, rec.created_at_epoch ?? 0);
+        if (exists) {
+          skipped++;
+          continue;
+        }
+        const now = (/* @__PURE__ */ new Date()).toISOString();
+        db.run(
+          `INSERT INTO summaries
+           (session_id, project, request, investigated, learned, completed, next_steps, notes,
+            discovery_tokens, created_at, created_at_epoch)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            rec.session_id,
+            rec.project,
+            rec.request ?? null,
+            rec.investigated ?? null,
+            rec.learned ?? null,
+            rec.completed ?? null,
+            rec.next_steps ?? null,
+            rec.notes ?? null,
+            rec.discovery_tokens ?? 0,
+            rec.created_at || now,
+            rec.created_at_epoch || Date.now()
+          ]
+        );
+        imported++;
+      }
+    });
+    insertBatch();
+  }
+  return { imported, skipped };
+}
+function importPromptBatch(db, records, dryRun) {
+  let imported = 0;
+  let skipped = 0;
+  for (let i = 0; i < records.length; i += IMPORT_BATCH_SIZE) {
+    const batch = records.slice(i, i + IMPORT_BATCH_SIZE);
+    if (dryRun) {
+      for (const rec of batch) {
+        const exists = db.query(
+          "SELECT id FROM prompts WHERE content_session_id = ? AND prompt_number = ? LIMIT 1"
+        ).get(rec.content_session_id, rec.prompt_number ?? 0);
+        if (exists) skipped++;
+        else imported++;
+      }
+      continue;
+    }
+    const insertBatch = db.transaction(() => {
+      for (const rec of batch) {
+        const exists = db.query(
+          "SELECT id FROM prompts WHERE content_session_id = ? AND prompt_number = ? LIMIT 1"
+        ).get(rec.content_session_id, rec.prompt_number ?? 0);
+        if (exists) {
+          skipped++;
+          continue;
+        }
+        const now = (/* @__PURE__ */ new Date()).toISOString();
+        db.run(
+          `INSERT INTO prompts
+           (content_session_id, project, prompt_number, prompt_text, created_at, created_at_epoch)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            rec.content_session_id,
+            rec.project,
+            rec.prompt_number ?? 0,
+            rec.prompt_text,
+            rec.created_at || now,
+            rec.created_at_epoch || Date.now()
+          ]
+        );
+        imported++;
+      }
+    });
+    insertBatch();
+  }
+  return { imported, skipped };
+}
+function importJsonl(db, content, dryRun = false) {
+  const lines = content.split("\n");
+  const result = {
+    imported: 0,
+    skipped: 0,
+    errors: 0,
+    total: 0,
+    errorDetails: []
+  };
+  const obsBuf = [];
+  const sumBuf = [];
+  const promptBuf = [];
+  const flushBuffers = () => {
+    if (obsBuf.length > 0) {
+      const r = importObservationBatch(db, obsBuf.splice(0), dryRun);
+      result.imported += r.imported;
+      result.skipped += r.skipped;
+    }
+    if (sumBuf.length > 0) {
+      const r = importSummaryBatch(db, sumBuf.splice(0), dryRun);
+      result.imported += r.imported;
+      result.skipped += r.skipped;
+    }
+    if (promptBuf.length > 0) {
+      const r = importPromptBatch(db, promptBuf.splice(0), dryRun);
+      result.imported += r.imported;
+      result.skipped += r.skipped;
+    }
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i].trim();
+    if (!raw || raw.startsWith("#")) continue;
+    result.total++;
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      result.errors++;
+      result.errorDetails.push({ line: i + 1, error: `JSON non valido: ${raw.substring(0, 60)}` });
+      continue;
+    }
+    if (parsed && typeof parsed === "object" && "_meta" in parsed) {
+      result.total--;
+      continue;
+    }
+    const validErr = validateJsonlRow(parsed);
+    if (validErr) {
+      result.errors++;
+      result.errorDetails.push({ line: i + 1, error: validErr });
+      continue;
+    }
+    const rec = parsed;
+    if (rec._type === "observation") {
+      obsBuf.push(rec);
+    } else if (rec._type === "summary") {
+      sumBuf.push(rec);
+    } else if (rec._type === "prompt") {
+      promptBuf.push(rec);
+    }
+    const totalBuf = obsBuf.length + sumBuf.length + promptBuf.length;
+    if (totalBuf >= IMPORT_BATCH_SIZE) {
+      flushBuffers();
+    }
+  }
+  flushBuffers();
+  return result;
+}
+function filtersToEpoch(filters) {
+  return {
+    fromEpoch: filters.from ? new Date(filters.from).getTime() : void 0,
+    toEpoch: filters.to ? new Date(filters.to).getTime() : void 0
+  };
+}
+function buildConditions(params) {
+  const conditions = ["1=1"];
+  const values = [];
+  if (params.project) {
+    conditions.push("project = ?");
+    values.push(params.project);
+  }
+  if (params.type) {
+    conditions.push("type = ?");
+    values.push(params.type);
+  }
+  if (params.fromEpoch !== void 0) {
+    conditions.push("created_at_epoch >= ?");
+    values.push(params.fromEpoch);
+  }
+  if (params.toEpoch !== void 0) {
+    conditions.push("created_at_epoch <= ?");
+    values.push(params.toEpoch);
+  }
+  return { where: conditions.join(" AND "), params: values };
+}
+var JSONL_SCHEMA_VERSION, IMPORT_BATCH_SIZE;
+var init_ImportExport = __esm({
+  "src/services/sqlite/ImportExport.ts"() {
+    "use strict";
+    JSONL_SCHEMA_VERSION = "2.5.0";
+    IMPORT_BATCH_SIZE = 100;
+  }
+});
+
 // src/services/search/EmbeddingService.ts
 var EmbeddingService_exports = {};
 __export(EmbeddingService_exports, {
@@ -1202,6 +1660,321 @@ var init_EmbeddingService = __esm({
       }
     };
     embeddingService = null;
+  }
+});
+
+// src/cli/cli-utils.ts
+var cli_utils_exports = {};
+__export(cli_utils_exports, {
+  CONFIG_DEFAULTS: () => CONFIG_DEFAULTS,
+  buildProgressBar: () => buildProgressBar,
+  checkFtsIntegrity: () => checkFtsIntegrity,
+  formatBytes: () => formatBytes,
+  formatImportResult: () => formatImportResult,
+  formatStatsOutput: () => formatStatsOutput,
+  generateExportOutput: () => generateExportOutput,
+  generateJsonOutput: () => generateJsonOutput,
+  generateJsonlOutput: () => generateJsonlOutput,
+  generateMarkdownOutput: () => generateMarkdownOutput,
+  getConfigPath: () => getConfigPath,
+  getConfigValue: () => getConfigValue,
+  getDbFileSize: () => getDbFileSize,
+  listConfig: () => listConfig,
+  observationToJsonl: () => observationToJsonl,
+  observationToMarkdown: () => observationToMarkdown,
+  parseJsonlFile: () => parseJsonlFile,
+  readConfig: () => readConfig,
+  rebuildFtsIndex: () => rebuildFtsIndex,
+  removeOrphanedEmbeddings: () => removeOrphanedEmbeddings,
+  setConfigValue: () => setConfigValue,
+  vacuumDatabase: () => vacuumDatabase,
+  validateImportRecord: () => validateImportRecord,
+  writeConfig: () => writeConfig
+});
+import { existsSync as existsSync5, statSync as statSync3, readFileSync as readFileSync3, writeFileSync as writeFileSync2, mkdirSync as mkdirSync4 } from "fs";
+import { join as join4 } from "path";
+import { homedir as homedir3 } from "os";
+function observationToJsonl(obs) {
+  return JSON.stringify(obs);
+}
+function generateJsonlOutput(observations) {
+  return observations.map(observationToJsonl).join("\n");
+}
+function generateJsonOutput(observations) {
+  return JSON.stringify(observations, null, 2);
+}
+function observationToMarkdown(obs) {
+  const date = new Date(obs.created_at).toLocaleDateString("it-IT", {
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  });
+  const lines = [
+    `## ${obs.title}`,
+    "",
+    `- **Tipo:** ${obs.type}`,
+    `- **Progetto:** ${obs.project}`,
+    `- **Data:** ${date}`
+  ];
+  if (obs.subtitle) lines.push(`- **Sottotitolo:** ${obs.subtitle}`);
+  if (obs.files_modified) lines.push(`- **File modificati:** ${obs.files_modified}`);
+  if (obs.files_read) lines.push(`- **File letti:** ${obs.files_read}`);
+  if (obs.text) {
+    lines.push("", "### Contenuto", "", obs.text);
+  }
+  if (obs.narrative) {
+    lines.push("", "### Narrativa", "", obs.narrative);
+  }
+  if (obs.facts) {
+    lines.push("", "### Fatti", "", obs.facts);
+  }
+  lines.push("");
+  return lines.join("\n");
+}
+function generateMarkdownOutput(observations) {
+  if (observations.length === 0) return "# Nessuna observation trovata\n";
+  const header = [
+    "# Kiro Memory \u2014 Export Observations",
+    "",
+    `> Progetto: ${observations[0].project} | Totale: ${observations.length}`,
+    "",
+    "---",
+    ""
+  ].join("\n");
+  return header + observations.map(observationToMarkdown).join("\n---\n\n");
+}
+function generateExportOutput(observations, format) {
+  switch (format) {
+    case "jsonl":
+      return generateJsonlOutput(observations);
+    case "json":
+      return generateJsonOutput(observations);
+    case "md":
+      return generateMarkdownOutput(observations);
+  }
+}
+function validateImportRecord(raw) {
+  if (!raw || typeof raw !== "object") {
+    return "Record non \xE8 un oggetto JSON valido";
+  }
+  const rec = raw;
+  if (!rec.project || typeof rec.project !== "string" || rec.project.trim() === "") {
+    return 'Campo "project" obbligatorio (stringa non vuota)';
+  }
+  if (!rec.type || typeof rec.type !== "string" || rec.type.trim() === "") {
+    return 'Campo "type" obbligatorio (stringa non vuota)';
+  }
+  if (!rec.title || typeof rec.title !== "string" || rec.title.trim() === "") {
+    return 'Campo "title" obbligatorio (stringa non vuota)';
+  }
+  if (rec.project.length > 200) return '"project" troppo lungo (max 200 caratteri)';
+  if (rec.type.length > 100) return '"type" troppo lungo (max 100 caratteri)';
+  if (rec.title.length > 500) return '"title" troppo lungo (max 500 caratteri)';
+  for (const field of ["subtitle", "text", "narrative", "facts", "concepts", "files_read", "files_modified", "content_hash"]) {
+    const val = rec[field];
+    if (val !== void 0 && val !== null && typeof val !== "string") {
+      return `Campo "${field}" deve essere stringa o null`;
+    }
+  }
+  return null;
+}
+function parseJsonlFile(content) {
+  const lines = content.split("\n");
+  const results = [];
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i].trim();
+    if (!raw || raw.startsWith("#")) continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      results.push({ line: i + 1, error: `JSON non valido: ${raw.substring(0, 50)}` });
+      continue;
+    }
+    const validationError = validateImportRecord(parsed);
+    if (validationError) {
+      results.push({ line: i + 1, error: validationError });
+      continue;
+    }
+    results.push({ line: i + 1, record: parsed });
+  }
+  return results;
+}
+function getConfigPath() {
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join4(homedir3(), ".contextkit");
+  return join4(dataDir, "config.json");
+}
+function readConfig(configPath) {
+  const path = configPath || getConfigPath();
+  if (!existsSync5(path)) return {};
+  try {
+    const raw = readFileSync3(path, "utf8");
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === "object" && parsed !== null) return parsed;
+    return {};
+  } catch {
+    return {};
+  }
+}
+function writeConfig(config, configPath) {
+  const path = configPath || getConfigPath();
+  const dir = path.substring(0, path.lastIndexOf("/"));
+  mkdirSync4(dir, { recursive: true });
+  writeFileSync2(path, JSON.stringify(config, null, 2), "utf8");
+}
+function getConfigValue(key, configPath) {
+  const config = readConfig(configPath);
+  if (key in config) return config[key];
+  if (key in CONFIG_DEFAULTS) return CONFIG_DEFAULTS[key];
+  return null;
+}
+function setConfigValue(key, rawValue, configPath) {
+  const config = readConfig(configPath);
+  let value = rawValue;
+  if (rawValue === "true") value = true;
+  else if (rawValue === "false") value = false;
+  else {
+    const num = Number(rawValue);
+    if (!isNaN(num) && rawValue.trim() !== "") value = num;
+  }
+  config[key] = value;
+  writeConfig(config, configPath);
+  return value;
+}
+function listConfig(configPath) {
+  const config = readConfig(configPath);
+  const merged = { ...CONFIG_DEFAULTS };
+  for (const [k, v] of Object.entries(config)) {
+    merged[k] = v;
+  }
+  return merged;
+}
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+function getDbFileSize(dbPath) {
+  try {
+    if (!existsSync5(dbPath)) return 0;
+    return statSync3(dbPath).size;
+  } catch {
+    return 0;
+  }
+}
+function formatStatsOutput(stats) {
+  const lines = [
+    "",
+    "=== Kiro Memory \u2014 Statistiche Database ===",
+    "",
+    `  Observations totali:   ${stats.totalObservations}`,
+    `  Sessioni totali:       ${stats.totalSessions}`,
+    `  Progetti distinti:     ${stats.totalProjects}`,
+    `  Dimensione DB:         ${formatBytes(stats.dbSizeBytes)}`
+  ];
+  if (stats.mostActiveProject) {
+    lines.push(`  Progetto piu' attivo:  ${stats.mostActiveProject}`);
+  }
+  const coverage = stats.embeddingCoverage;
+  const coverageBar = buildProgressBar(coverage, 20);
+  lines.push(`  Copertura embeddings:  ${coverageBar} ${coverage}%`);
+  lines.push("");
+  return lines.join("\n");
+}
+function buildProgressBar(percent, width = 20) {
+  const filled = Math.round(percent / 100 * width);
+  const empty = width - filled;
+  return `[${"#".repeat(filled)}${"-".repeat(empty)}]`;
+}
+function formatImportResult(result) {
+  const prefix = result.dryRun ? "[DRY RUN] " : "";
+  const lines = [
+    "",
+    `=== ${prefix}Kiro Memory \u2014 Import JSONL ===`,
+    "",
+    `  Record totali analizzati: ${result.total}`,
+    `  Importati:                ${result.imported}`,
+    `  Saltati (duplicati):      ${result.skipped}`,
+    `  Errori di validazione:    ${result.errors}`
+  ];
+  if (result.dryRun) {
+    lines.push("");
+    lines.push("  (Dry run: nessun dato inserito. Rimuovi --dry-run per applicare.)");
+  }
+  if (result.errorDetails && result.errorDetails.length > 0) {
+    lines.push("");
+    lines.push("  Errori:");
+    for (const err of result.errorDetails.slice(0, 20)) {
+      lines.push(`    Riga ${err.line}: ${err.error}`);
+    }
+    if (result.errorDetails.length > 20) {
+      lines.push(`    ... e altri ${result.errorDetails.length - 20} errori`);
+    }
+  }
+  lines.push("");
+  return lines.join("\n");
+}
+function checkFtsIntegrity(db) {
+  try {
+    db.query("INSERT INTO observations_fts(observations_fts) VALUES('integrity-check')").run();
+    return true;
+  } catch {
+    return false;
+  }
+}
+function rebuildFtsIndex(db) {
+  try {
+    db.run("INSERT INTO observations_fts(observations_fts) VALUES('rebuild')");
+    return true;
+  } catch {
+    return false;
+  }
+}
+function removeOrphanedEmbeddings(db) {
+  try {
+    const result = db.run(
+      `DELETE FROM observation_embeddings
+       WHERE observation_id NOT IN (SELECT id FROM observations)`
+    );
+    return Number(result.changes);
+  } catch {
+    return 0;
+  }
+}
+function vacuumDatabase(db) {
+  try {
+    db.run("VACUUM");
+    return true;
+  } catch {
+    return false;
+  }
+}
+var CONFIG_DEFAULTS;
+var init_cli_utils = __esm({
+  "src/cli/cli-utils.ts"() {
+    "use strict";
+    CONFIG_DEFAULTS = {
+      "worker.port": 3001,
+      "worker.host": "127.0.0.1",
+      "log.level": "INFO",
+      "search.limit": 20,
+      "embeddings.enabled": false,
+      "decay.staleThresholdDays": 30,
+      // Politiche di retention: età massima in giorni (0 = mai eliminare)
+      "retention.observations.maxAgeDays": 90,
+      "retention.summaries.maxAgeDays": 365,
+      "retention.prompts.maxAgeDays": 30,
+      "retention.knowledge.maxAgeDays": 0,
+      // Cleanup automatico schedulato
+      "retention.autoCleanupEnabled": true,
+      "retention.autoCleanupIntervalHours": 24,
+      // Backup automatico schedulato
+      "backup.enabled": true,
+      "backup.intervalHours": 24,
+      "backup.maxKeep": 7,
+      "backup.compress": false
+    };
   }
 });
 
@@ -1642,10 +2415,71 @@ var MigrationRunner = class {
           db.run("ALTER TABLE observations ADD COLUMN auto_category TEXT");
           db.run("CREATE INDEX IF NOT EXISTS idx_observations_category ON observations(auto_category)");
         }
+      },
+      {
+        version: 12,
+        up: (db) => {
+          db.run(`
+            CREATE TABLE IF NOT EXISTS github_links (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              observation_id INTEGER,
+              session_id TEXT,
+              repo TEXT NOT NULL,
+              issue_number INTEGER,
+              pr_number INTEGER,
+              event_type TEXT NOT NULL,
+              action TEXT,
+              title TEXT,
+              url TEXT,
+              author TEXT,
+              created_at TEXT NOT NULL,
+              created_at_epoch INTEGER NOT NULL,
+              FOREIGN KEY (observation_id) REFERENCES observations(id)
+            )
+          `);
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_repo ON github_links(repo)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_obs ON github_links(observation_id)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_event ON github_links(event_type)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_repo_issue ON github_links(repo, issue_number)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_github_links_repo_pr ON github_links(repo, pr_number)");
+        }
+      },
+      {
+        version: 13,
+        up: (db) => {
+          db.run("CREATE INDEX IF NOT EXISTS idx_observations_keyset ON observations(created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_observations_project_keyset ON observations(project, created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_summaries_keyset ON summaries(created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_summaries_project_keyset ON summaries(project, created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_prompts_keyset ON prompts(created_at_epoch DESC, id DESC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_prompts_project_keyset ON prompts(project, created_at_epoch DESC, id DESC)");
+        }
       }
     ];
   }
 };
+
+// src/services/sqlite/cursor.ts
+function encodeCursor(id, epoch) {
+  const raw = `${epoch}:${id}`;
+  return Buffer.from(raw, "utf8").toString("base64url");
+}
+function decodeCursor(cursor) {
+  try {
+    const raw = Buffer.from(cursor, "base64url").toString("utf8");
+    const colonIdx = raw.indexOf(":");
+    if (colonIdx === -1) return null;
+    const epochStr = raw.substring(0, colonIdx);
+    const idStr = raw.substring(colonIdx + 1);
+    const epoch = parseInt(epochStr, 10);
+    const id = parseInt(idStr, 10);
+    if (!Number.isInteger(epoch) || epoch <= 0) return null;
+    if (!Number.isInteger(id) || id <= 0) return null;
+    return { epoch, id };
+  } catch {
+    return null;
+  }
+}
 
 // src/services/sqlite/Sessions.ts
 function createSession(db, contentSessionId, project, userPrompt) {
@@ -1678,13 +2512,13 @@ init_Observations();
 function escapeLikePattern2(input) {
   return input.replace(/[%_\\]/g, "\\$&");
 }
-function createSummary(db, sessionId, project, request, investigated, learned, completed, nextSteps, notes) {
+function createSummary(db, sessionId, project, request2, investigated, learned, completed, nextSteps, notes) {
   const now = /* @__PURE__ */ new Date();
   const result = db.run(
     `INSERT INTO summaries 
      (session_id, project, request, investigated, learned, completed, next_steps, notes, created_at, created_at_epoch)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [sessionId, project, request, investigated, learned, completed, nextSteps, notes, now.toISOString(), now.getTime()]
+    [sessionId, project, request2, investigated, learned, completed, nextSteps, notes, now.toISOString(), now.getTime()]
   );
   return Number(result.lastInsertRowid);
 }
@@ -1883,10 +2717,207 @@ function getReportData(db, project, startEpoch, endEpoch) {
 
 // src/services/sqlite/index.ts
 init_Search();
+init_ImportExport();
+
+// src/types/worker-types.ts
+var KNOWLEDGE_TYPES = ["constraint", "decision", "heuristic", "rejected"];
+
+// src/services/sqlite/Retention.ts
+var KNOWLEDGE_TYPE_LIST = KNOWLEDGE_TYPES;
+var KNOWLEDGE_PLACEHOLDERS = KNOWLEDGE_TYPE_LIST.map(() => "?").join(", ");
+
+// src/services/sqlite/Backup.ts
+init_logger();
+import {
+  existsSync as existsSync4,
+  mkdirSync as mkdirSync3,
+  copyFileSync,
+  readdirSync,
+  statSync as statSync2,
+  unlinkSync,
+  readFileSync as readFileSync2,
+  writeFileSync
+} from "fs";
+import { join as join3, basename as basename2 } from "path";
+function formatTimestamp(date) {
+  const pad = (n, len = 2) => String(n).padStart(len, "0");
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const mins = pad(date.getMinutes());
+  const secs = pad(date.getSeconds());
+  const ms = pad(date.getMilliseconds(), 3);
+  return `${year}-${month}-${day}-${hours}${mins}${secs}-${ms}`;
+}
+function collectStats(db, dbPath) {
+  const countTable = (table) => {
+    try {
+      const row = db.query(`SELECT COUNT(*) as c FROM ${table}`).get();
+      return row?.c ?? 0;
+    } catch {
+      return 0;
+    }
+  };
+  const dbSizeBytes = existsSync4(dbPath) ? statSync2(dbPath).size : 0;
+  return {
+    observations: countTable("observations"),
+    sessions: countTable("sessions"),
+    summaries: countTable("summaries"),
+    prompts: countTable("prompts"),
+    dbSizeBytes
+  };
+}
+function getSchemaVersion(db) {
+  try {
+    const row = db.query("SELECT MAX(version) as v FROM schema_versions").get();
+    return row?.v ?? 0;
+  } catch {
+    return 0;
+  }
+}
+function createBackup(dbPath, backupDir, db) {
+  mkdirSync3(backupDir, { recursive: true });
+  const now = /* @__PURE__ */ new Date();
+  const ts = formatTimestamp(now);
+  const filename = `backup-${ts}.db`;
+  const destPath = join3(backupDir, filename);
+  const metaFilename = `backup-${ts}.meta.json`;
+  const metaPath = join3(backupDir, metaFilename);
+  if (!existsSync4(dbPath)) {
+    throw new Error(`Database non trovato: ${dbPath}`);
+  }
+  copyFileSync(dbPath, destPath);
+  logger.info("BACKUP", `File DB copiato: ${dbPath} \u2192 ${destPath}`);
+  const walPath = `${dbPath}-wal`;
+  const shmPath = `${dbPath}-shm`;
+  if (existsSync4(walPath)) {
+    copyFileSync(walPath, `${destPath}-wal`);
+    logger.debug("BACKUP", "File WAL copiato");
+  }
+  if (existsSync4(shmPath)) {
+    copyFileSync(shmPath, `${destPath}-shm`);
+    logger.debug("BACKUP", "File SHM copiato");
+  }
+  const stats = collectStats(db, dbPath);
+  const schemaVersion = getSchemaVersion(db);
+  const metadata = {
+    timestamp: now.toISOString(),
+    timestampEpoch: now.getTime(),
+    schemaVersion,
+    stats,
+    sourcePath: dbPath,
+    filename
+  };
+  writeFileSync(metaPath, JSON.stringify(metadata, null, 2), "utf8");
+  logger.info("BACKUP", `Metadata scritto: ${metaPath}`);
+  return {
+    filePath: destPath,
+    metaPath,
+    metadata
+  };
+}
+function listBackups(backupDir) {
+  if (!existsSync4(backupDir)) {
+    return [];
+  }
+  const entries = [];
+  let files;
+  try {
+    files = readdirSync(backupDir);
+  } catch (err) {
+    logger.warn("BACKUP", `Impossibile leggere la directory backup: ${backupDir}`, {}, err);
+    return [];
+  }
+  const metaFiles = files.filter((f) => f.startsWith("backup-") && f.endsWith(".meta.json"));
+  for (const metaFile of metaFiles) {
+    const metaPath = join3(backupDir, metaFile);
+    const dbFilename = metaFile.replace(/\.meta\.json$/, ".db");
+    const filePath = join3(backupDir, dbFilename);
+    let metadata;
+    try {
+      const raw = readFileSync2(metaPath, "utf8");
+      metadata = JSON.parse(raw);
+    } catch (err) {
+      logger.warn("BACKUP", `Metadata non leggibile: ${metaPath}`, {}, err);
+      continue;
+    }
+    if (!existsSync4(filePath)) {
+      logger.warn("BACKUP", `File backup mancante per metadata: ${filePath}`);
+      continue;
+    }
+    entries.push({ filePath, metaPath, metadata });
+  }
+  entries.sort((a, b) => b.metadata.timestampEpoch - a.metadata.timestampEpoch);
+  return entries;
+}
+function restoreBackup(backupFile, dbPath) {
+  if (!existsSync4(backupFile)) {
+    throw new Error(`File backup non trovato: ${backupFile}`);
+  }
+  copyFileSync(backupFile, dbPath);
+  logger.info("BACKUP", `Database ripristinato: ${backupFile} \u2192 ${dbPath}`);
+  const walBackup = `${backupFile}-wal`;
+  const shmBackup = `${backupFile}-shm`;
+  const walDest = `${dbPath}-wal`;
+  const shmDest = `${dbPath}-shm`;
+  if (existsSync4(walBackup)) {
+    copyFileSync(walBackup, walDest);
+    logger.debug("BACKUP", "File WAL ripristinato");
+  } else if (existsSync4(walDest)) {
+    unlinkSync(walDest);
+    logger.debug("BACKUP", "File WAL corrente rimosso (non presente nel backup)");
+  }
+  if (existsSync4(shmBackup)) {
+    copyFileSync(shmBackup, shmDest);
+    logger.debug("BACKUP", "File SHM ripristinato");
+  } else if (existsSync4(shmDest)) {
+    unlinkSync(shmDest);
+    logger.debug("BACKUP", "File SHM corrente rimosso (non presente nel backup)");
+  }
+}
+function rotateBackups(backupDir, maxKeep) {
+  if (maxKeep <= 0) {
+    throw new Error(`maxKeep deve essere > 0, ricevuto: ${maxKeep}`);
+  }
+  const entries = listBackups(backupDir);
+  if (entries.length <= maxKeep) {
+    logger.debug("BACKUP", `Rotazione non necessaria: ${entries.length}/${maxKeep} backup presenti`);
+    return 0;
+  }
+  const toDelete = entries.slice(maxKeep);
+  let deleted = 0;
+  for (const entry of toDelete) {
+    try {
+      if (existsSync4(entry.filePath)) {
+        unlinkSync(entry.filePath);
+      }
+    } catch (err) {
+      logger.warn("BACKUP", `Impossibile eliminare: ${entry.filePath}`, {}, err);
+    }
+    for (const extra of [`${entry.filePath}-wal`, `${entry.filePath}-shm`]) {
+      try {
+        if (existsSync4(extra)) unlinkSync(extra);
+      } catch {
+      }
+    }
+    try {
+      if (existsSync4(entry.metaPath)) {
+        unlinkSync(entry.metaPath);
+      }
+    } catch (err) {
+      logger.warn("BACKUP", `Impossibile eliminare metadata: ${entry.metaPath}`, {}, err);
+    }
+    logger.info("BACKUP", `Backup rimosso (rotazione): ${basename2(entry.filePath)}`);
+    deleted++;
+  }
+  logger.info("BACKUP", `Rotazione completata: ${deleted} backup eliminati, ${maxKeep} mantenuti`);
+  return deleted;
+}
 
 // src/sdk/index.ts
 init_Observations();
-import { createHash } from "crypto";
+import { createHash as createHash2 } from "crypto";
 init_Search();
 
 // src/services/search/HybridSearch.ts
@@ -2248,11 +3279,6 @@ function getHybridSearch() {
 // src/sdk/index.ts
 init_EmbeddingService();
 init_logger();
-
-// src/types/worker-types.ts
-var KNOWLEDGE_TYPES = ["constraint", "decision", "heuristic", "rejected"];
-
-// src/sdk/index.ts
 var KiroMemorySDK = class {
   db;
   project;
@@ -2341,7 +3367,7 @@ var KiroMemorySDK = class {
    */
   generateContentHash(type, title, narrative) {
     const payload = `${this.project}|${type}|${title}|${narrative || ""}`;
-    return createHash("sha256").update(payload).digest("hex");
+    return createHash2("sha256").update(payload).digest("hex");
   }
   /**
    * Deduplication windows per type (ms).
@@ -2809,6 +3835,66 @@ var KiroMemorySDK = class {
     return getReportData(this.db.db, this.project, startEpoch, endEpoch);
   }
   /**
+   * Lista osservazioni con keyset pagination.
+   * Restituisce un oggetto { data, next_cursor, has_more }.
+   *
+   * Esempio:
+   *   const page1 = await sdk.listObservations({ limit: 50 });
+   *   const page2 = await sdk.listObservations({ cursor: page1.next_cursor });
+   */
+  async listObservations(options = {}) {
+    const limit = Math.min(Math.max(options.limit ?? 50, 1), 200);
+    const project = options.project ?? this.project;
+    let rows;
+    if (options.cursor) {
+      const decoded = decodeCursor(options.cursor);
+      if (!decoded) throw new Error("Cursor non valido");
+      const sql = project ? `SELECT * FROM observations
+           WHERE project = ? AND (created_at_epoch < ? OR (created_at_epoch = ? AND id < ?))
+           ORDER BY created_at_epoch DESC, id DESC
+           LIMIT ?` : `SELECT * FROM observations
+           WHERE (created_at_epoch < ? OR (created_at_epoch = ? AND id < ?))
+           ORDER BY created_at_epoch DESC, id DESC
+           LIMIT ?`;
+      rows = project ? this.db.db.query(sql).all(project, decoded.epoch, decoded.epoch, decoded.id, limit) : this.db.db.query(sql).all(decoded.epoch, decoded.epoch, decoded.id, limit);
+    } else {
+      const sql = project ? "SELECT * FROM observations WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT ?" : "SELECT * FROM observations ORDER BY created_at_epoch DESC, id DESC LIMIT ?";
+      rows = project ? this.db.db.query(sql).all(project, limit) : this.db.db.query(sql).all(limit);
+    }
+    const next_cursor = rows.length >= limit ? encodeCursor(rows[rows.length - 1].id, rows[rows.length - 1].created_at_epoch) : null;
+    return { data: rows, next_cursor, has_more: next_cursor !== null };
+  }
+  /**
+   * Lista sommari con keyset pagination.
+   * Restituisce un oggetto { data, next_cursor, has_more }.
+   *
+   * Esempio:
+   *   const page1 = await sdk.listSummaries({ limit: 20 });
+   *   const page2 = await sdk.listSummaries({ cursor: page1.next_cursor });
+   */
+  async listSummaries(options = {}) {
+    const limit = Math.min(Math.max(options.limit ?? 20, 1), 200);
+    const project = options.project ?? this.project;
+    let rows;
+    if (options.cursor) {
+      const decoded = decodeCursor(options.cursor);
+      if (!decoded) throw new Error("Cursor non valido");
+      const sql = project ? `SELECT * FROM summaries
+           WHERE project = ? AND (created_at_epoch < ? OR (created_at_epoch = ? AND id < ?))
+           ORDER BY created_at_epoch DESC, id DESC
+           LIMIT ?` : `SELECT * FROM summaries
+           WHERE (created_at_epoch < ? OR (created_at_epoch = ? AND id < ?))
+           ORDER BY created_at_epoch DESC, id DESC
+           LIMIT ?`;
+      rows = project ? this.db.db.query(sql).all(project, decoded.epoch, decoded.epoch, decoded.id, limit) : this.db.db.query(sql).all(decoded.epoch, decoded.epoch, decoded.id, limit);
+    } else {
+      const sql = project ? "SELECT * FROM summaries WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT ?" : "SELECT * FROM summaries ORDER BY created_at_epoch DESC, id DESC LIMIT ?";
+      rows = project ? this.db.db.query(sql).all(project, limit) : this.db.db.query(sql).all(limit);
+    }
+    const next_cursor = rows.length >= limit ? encodeCursor(rows[rows.length - 1].id, rows[rows.length - 1].created_at_epoch) : null;
+    return { data: rows, next_cursor, has_more: next_cursor !== null };
+  }
+  /**
    * Getter for direct database access (for API routes)
    */
   getDb() {
@@ -3053,248 +4139,16 @@ function printBanner(opts) {
   console.log("");
 }
 
-// src/cli/cli-utils.ts
-import { existsSync as existsSync4, statSync as statSync2, readFileSync as readFileSync2, writeFileSync, mkdirSync as mkdirSync3 } from "fs";
-import { join as join3 } from "path";
-import { homedir as homedir3 } from "os";
-function observationToJsonl(obs) {
-  return JSON.stringify(obs);
-}
-function generateJsonlOutput(observations) {
-  return observations.map(observationToJsonl).join("\n");
-}
-function generateJsonOutput(observations) {
-  return JSON.stringify(observations, null, 2);
-}
-function observationToMarkdown(obs) {
-  const date = new Date(obs.created_at).toLocaleDateString("it-IT", {
-    year: "numeric",
-    month: "long",
-    day: "numeric"
-  });
-  const lines = [
-    `## ${obs.title}`,
-    "",
-    `- **Tipo:** ${obs.type}`,
-    `- **Progetto:** ${obs.project}`,
-    `- **Data:** ${date}`
-  ];
-  if (obs.subtitle) lines.push(`- **Sottotitolo:** ${obs.subtitle}`);
-  if (obs.files_modified) lines.push(`- **File modificati:** ${obs.files_modified}`);
-  if (obs.files_read) lines.push(`- **File letti:** ${obs.files_read}`);
-  if (obs.text) {
-    lines.push("", "### Contenuto", "", obs.text);
-  }
-  if (obs.narrative) {
-    lines.push("", "### Narrativa", "", obs.narrative);
-  }
-  if (obs.facts) {
-    lines.push("", "### Fatti", "", obs.facts);
-  }
-  lines.push("");
-  return lines.join("\n");
-}
-function generateMarkdownOutput(observations) {
-  if (observations.length === 0) return "# Nessuna observation trovata\n";
-  const header = [
-    "# Kiro Memory \u2014 Export Observations",
-    "",
-    `> Progetto: ${observations[0].project} | Totale: ${observations.length}`,
-    "",
-    "---",
-    ""
-  ].join("\n");
-  return header + observations.map(observationToMarkdown).join("\n---\n\n");
-}
-function generateExportOutput(observations, format) {
-  switch (format) {
-    case "jsonl":
-      return generateJsonlOutput(observations);
-    case "json":
-      return generateJsonOutput(observations);
-    case "md":
-      return generateMarkdownOutput(observations);
-  }
-}
-function validateImportRecord(raw) {
-  if (!raw || typeof raw !== "object") {
-    return "Record non \xE8 un oggetto JSON valido";
-  }
-  const rec = raw;
-  if (!rec.project || typeof rec.project !== "string" || rec.project.trim() === "") {
-    return 'Campo "project" obbligatorio (stringa non vuota)';
-  }
-  if (!rec.type || typeof rec.type !== "string" || rec.type.trim() === "") {
-    return 'Campo "type" obbligatorio (stringa non vuota)';
-  }
-  if (!rec.title || typeof rec.title !== "string" || rec.title.trim() === "") {
-    return 'Campo "title" obbligatorio (stringa non vuota)';
-  }
-  if (rec.project.length > 200) return '"project" troppo lungo (max 200 caratteri)';
-  if (rec.type.length > 100) return '"type" troppo lungo (max 100 caratteri)';
-  if (rec.title.length > 500) return '"title" troppo lungo (max 500 caratteri)';
-  for (const field of ["subtitle", "text", "narrative", "facts", "concepts", "files_read", "files_modified", "content_hash"]) {
-    const val = rec[field];
-    if (val !== void 0 && val !== null && typeof val !== "string") {
-      return `Campo "${field}" deve essere stringa o null`;
-    }
-  }
-  return null;
-}
-function parseJsonlFile(content) {
-  const lines = content.split("\n");
-  const results = [];
-  for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i].trim();
-    if (!raw || raw.startsWith("#")) continue;
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      results.push({ line: i + 1, error: `JSON non valido: ${raw.substring(0, 50)}` });
-      continue;
-    }
-    const validationError = validateImportRecord(parsed);
-    if (validationError) {
-      results.push({ line: i + 1, error: validationError });
-      continue;
-    }
-    results.push({ line: i + 1, record: parsed });
-  }
-  return results;
-}
-function getConfigPath() {
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join3(homedir3(), ".contextkit");
-  return join3(dataDir, "config.json");
-}
-var CONFIG_DEFAULTS = {
-  "worker.port": 3001,
-  "worker.host": "127.0.0.1",
-  "log.level": "INFO",
-  "search.limit": 20,
-  "embeddings.enabled": false,
-  "decay.staleThresholdDays": 30
-};
-function readConfig(configPath) {
-  const path = configPath || getConfigPath();
-  if (!existsSync4(path)) return {};
-  try {
-    const raw = readFileSync2(path, "utf8");
-    const parsed = JSON.parse(raw);
-    if (typeof parsed === "object" && parsed !== null) return parsed;
-    return {};
-  } catch {
-    return {};
-  }
-}
-function writeConfig(config, configPath) {
-  const path = configPath || getConfigPath();
-  const dir = path.substring(0, path.lastIndexOf("/"));
-  mkdirSync3(dir, { recursive: true });
-  writeFileSync(path, JSON.stringify(config, null, 2), "utf8");
-}
-function getConfigValue(key, configPath) {
-  const config = readConfig(configPath);
-  if (key in config) return config[key];
-  if (key in CONFIG_DEFAULTS) return CONFIG_DEFAULTS[key];
-  return null;
-}
-function setConfigValue(key, rawValue, configPath) {
-  const config = readConfig(configPath);
-  let value = rawValue;
-  if (rawValue === "true") value = true;
-  else if (rawValue === "false") value = false;
-  else {
-    const num = Number(rawValue);
-    if (!isNaN(num) && rawValue.trim() !== "") value = num;
-  }
-  config[key] = value;
-  writeConfig(config, configPath);
-  return value;
-}
-function listConfig(configPath) {
-  const config = readConfig(configPath);
-  const merged = { ...CONFIG_DEFAULTS };
-  for (const [k, v] of Object.entries(config)) {
-    merged[k] = v;
-  }
-  return merged;
-}
-function formatBytes(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
-}
-function getDbFileSize(dbPath) {
-  try {
-    if (!existsSync4(dbPath)) return 0;
-    return statSync2(dbPath).size;
-  } catch {
-    return 0;
-  }
-}
-function formatStatsOutput(stats) {
-  const lines = [
-    "",
-    "=== Kiro Memory \u2014 Statistiche Database ===",
-    "",
-    `  Observations totali:   ${stats.totalObservations}`,
-    `  Sessioni totali:       ${stats.totalSessions}`,
-    `  Progetti distinti:     ${stats.totalProjects}`,
-    `  Dimensione DB:         ${formatBytes(stats.dbSizeBytes)}`
-  ];
-  if (stats.mostActiveProject) {
-    lines.push(`  Progetto piu' attivo:  ${stats.mostActiveProject}`);
-  }
-  const coverage = stats.embeddingCoverage;
-  const coverageBar = buildProgressBar(coverage, 20);
-  lines.push(`  Copertura embeddings:  ${coverageBar} ${coverage}%`);
-  lines.push("");
-  return lines.join("\n");
-}
-function buildProgressBar(percent, width = 20) {
-  const filled = Math.round(percent / 100 * width);
-  const empty = width - filled;
-  return `[${"#".repeat(filled)}${"-".repeat(empty)}]`;
-}
-function rebuildFtsIndex(db) {
-  try {
-    db.run("INSERT INTO observations_fts(observations_fts) VALUES('rebuild')");
-    return true;
-  } catch {
-    return false;
-  }
-}
-function removeOrphanedEmbeddings(db) {
-  try {
-    const result = db.run(
-      `DELETE FROM observation_embeddings
-       WHERE observation_id NOT IN (SELECT id FROM observations)`
-    );
-    return Number(result.changes);
-  } catch {
-    return 0;
-  }
-}
-function vacuumDatabase(db) {
-  try {
-    db.run("VACUUM");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 // src/cli/contextkit.ts
+init_cli_utils();
 init_Observations();
 import { execSync } from "child_process";
-import { existsSync as existsSync5, mkdirSync as mkdirSync4, readFileSync as readFileSync3, writeFileSync as writeFileSync2, appendFileSync as appendFileSync2 } from "fs";
-import { join as join4, dirname as dirname2 } from "path";
+import { existsSync as existsSync6, mkdirSync as mkdirSync5, readFileSync as readFileSync4, writeFileSync as writeFileSync3, appendFileSync as appendFileSync2 } from "fs";
+import { join as join5, dirname as dirname2 } from "path";
 import { homedir as homedir4, platform, release } from "os";
 import { fileURLToPath as fileURLToPath2 } from "url";
 import { createInterface } from "readline";
-import { createHash as createHash2 } from "crypto";
+import * as http from "http";
 var args = process.argv.slice(2);
 var command = args[0];
 var __filename = fileURLToPath2(import.meta.url);
@@ -3302,8 +4156,8 @@ var __dirname2 = dirname2(__filename);
 var DIST_DIR = dirname2(__dirname2);
 var PKG_VERSION = "unknown";
 try {
-  const pkgPath = join4(DIST_DIR, "..", "..", "package.json");
-  PKG_VERSION = JSON.parse(readFileSync3(pkgPath, "utf8")).version;
+  const pkgPath = join5(DIST_DIR, "..", "..", "package.json");
+  PKG_VERSION = JSON.parse(readFileSync4(pkgPath, "utf8")).version;
 } catch {
 }
 var AGENT_TEMPLATE = JSON.stringify({
@@ -3357,8 +4211,8 @@ function isWSL() {
   try {
     const rel = release().toLowerCase();
     if (rel.includes("microsoft") || rel.includes("wsl")) return true;
-    if (existsSync5("/proc/version")) {
-      const proc = readFileSync3("/proc/version", "utf8").toLowerCase();
+    if (existsSync6("/proc/version")) {
+      const proc = readFileSync4("/proc/version", "utf8").toLowerCase();
       return proc.includes("microsoft") || proc.includes("wsl");
     }
     return false;
@@ -3497,9 +4351,9 @@ function askUser(question) {
 }
 function detectShellRc() {
   const shell = process.env.SHELL || "/bin/bash";
-  if (shell.includes("zsh")) return { name: "zsh", rcFile: join4(homedir4(), ".zshrc") };
-  if (shell.includes("fish")) return { name: "fish", rcFile: join4(homedir4(), ".config/fish/config.fish") };
-  return { name: "bash", rcFile: join4(homedir4(), ".bashrc") };
+  if (shell.includes("zsh")) return { name: "zsh", rcFile: join5(homedir4(), ".zshrc") };
+  if (shell.includes("fish")) return { name: "fish", rcFile: join5(homedir4(), ".config/fish/config.fish") };
+  return { name: "bash", rcFile: join5(homedir4(), ".bashrc") };
 }
 var AUTOFIXABLE_CHECKS = /* @__PURE__ */ new Set([
   "WSL: npm global prefix",
@@ -3529,14 +4383,14 @@ async function tryAutoFix(failedChecks) {
   if (prefixCheck) {
     console.log("  Fixing npm global prefix...");
     try {
-      const npmGlobalDir = join4(homedir4(), ".npm-global");
-      mkdirSync4(npmGlobalDir, { recursive: true });
+      const npmGlobalDir = join5(homedir4(), ".npm-global");
+      mkdirSync5(npmGlobalDir, { recursive: true });
       const { spawnSync: spawnNpmConfig } = __require("child_process");
       spawnNpmConfig("npm", ["config", "set", "prefix", npmGlobalDir], { stdio: "ignore" });
       const exportLine = 'export PATH="$HOME/.npm-global/bin:$PATH"';
       let alreadyInRc = false;
-      if (existsSync5(rcFile)) {
-        const content = readFileSync3(rcFile, "utf8");
+      if (existsSync6(rcFile)) {
+        const content = readFileSync4(rcFile, "utf8");
         alreadyInRc = content.includes(".npm-global/bin");
       }
       if (!alreadyInRc) {
@@ -3556,9 +4410,9 @@ ${exportLine}
   const npmBinaryCheck = fixable.find((c) => c.name === "WSL: npm binary");
   if (npmBinaryCheck) {
     console.log("\n  Fixing npm binary (installing nvm + Node.js 22)...");
-    const nvmDir = join4(homedir4(), ".nvm");
+    const nvmDir = join5(homedir4(), ".nvm");
     try {
-      if (existsSync5(nvmDir)) {
+      if (existsSync6(nvmDir)) {
         console.log(`  nvm already installed at ${nvmDir}`);
       } else {
         console.log("  Downloading nvm...");
@@ -3606,8 +4460,8 @@ ${exportLine}
       const { spawnSync: spawnRebuild } = __require("child_process");
       const globalDirResult = spawnRebuild("npm", ["prefix", "-g"], { encoding: "utf8", stdio: ["pipe", "pipe", "ignore"] });
       const globalDir = (globalDirResult.stdout || "").trim();
-      const sqlitePkg = join4(globalDir, "lib", "node_modules", "kiro-memory");
-      if (existsSync5(sqlitePkg)) {
+      const sqlitePkg = join5(globalDir, "lib", "node_modules", "kiro-memory");
+      if (existsSync6(sqlitePkg)) {
         spawnRebuild("npm", ["rebuild", "better-sqlite3"], {
           cwd: sqlitePkg,
           stdio: "inherit",
@@ -3655,44 +4509,44 @@ async function installKiro() {
     }
   }
   const distDir = DIST_DIR;
-  const kiroDir = process.env.KIRO_CONFIG_DIR || join4(homedir4(), ".kiro");
-  const agentsDir = join4(kiroDir, "agents");
-  const settingsDir = join4(kiroDir, "settings");
-  const steeringDir = join4(kiroDir, "steering");
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join4(homedir4(), ".contextkit");
+  const kiroDir = process.env.KIRO_CONFIG_DIR || join5(homedir4(), ".kiro");
+  const agentsDir = join5(kiroDir, "agents");
+  const settingsDir = join5(kiroDir, "settings");
+  const steeringDir = join5(kiroDir, "steering");
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join5(homedir4(), ".contextkit");
   console.log("[2/4] Installing Kiro configuration...\n");
   for (const dir of [agentsDir, settingsDir, steeringDir, dataDir]) {
-    mkdirSync4(dir, { recursive: true });
+    mkdirSync5(dir, { recursive: true });
   }
   const agentConfig = AGENT_TEMPLATE.replace(/__DIST_DIR__/g, distDir);
-  const agentDestPath = join4(agentsDir, "kiro-memory.json");
-  writeFileSync2(agentDestPath, agentConfig, "utf8");
+  const agentDestPath = join5(agentsDir, "kiro-memory.json");
+  writeFileSync3(agentDestPath, agentConfig, "utf8");
   console.log(`  \u2192 Agent config: ${agentDestPath}`);
-  const mcpFilePath = join4(settingsDir, "mcp.json");
+  const mcpFilePath = join5(settingsDir, "mcp.json");
   let mcpConfig = { mcpServers: {} };
-  if (existsSync5(mcpFilePath)) {
+  if (existsSync6(mcpFilePath)) {
     try {
-      mcpConfig = JSON.parse(readFileSync3(mcpFilePath, "utf8"));
+      mcpConfig = JSON.parse(readFileSync4(mcpFilePath, "utf8"));
       if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
     } catch {
     }
   }
   mcpConfig.mcpServers["kiro-memory"] = {
     command: "node",
-    args: [join4(distDir, "servers", "mcp-server.js")]
+    args: [join5(distDir, "servers", "mcp-server.js")]
   };
-  writeFileSync2(mcpFilePath, JSON.stringify(mcpConfig, null, 2), "utf8");
+  writeFileSync3(mcpFilePath, JSON.stringify(mcpConfig, null, 2), "utf8");
   console.log(`  \u2192 MCP config:   ${mcpFilePath}`);
-  const steeringDestPath = join4(steeringDir, "kiro-memory.md");
-  writeFileSync2(steeringDestPath, STEERING_CONTENT, "utf8");
+  const steeringDestPath = join5(steeringDir, "kiro-memory.md");
+  writeFileSync3(steeringDestPath, STEERING_CONTENT, "utf8");
   console.log(`  \u2192 Steering:     ${steeringDestPath}`);
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/4] Shell alias setup\n");
   const { rcFile } = detectShellRc();
   const aliasLine = 'alias kiro="kiro-cli --agent kiro-memory"';
   let aliasAlreadySet = false;
-  if (existsSync5(rcFile)) {
-    const rcContent = readFileSync3(rcFile, "utf8");
+  if (existsSync6(rcFile)) {
+    const rcContent = readFileSync4(rcFile, "utf8");
     aliasAlreadySet = rcContent.includes("alias kiro=") && rcContent.includes("kiro-memory");
   }
   if (aliasAlreadySet) {
@@ -3799,16 +4653,16 @@ async function installClaudeCode() {
     }
   }
   const distDir = DIST_DIR;
-  const claudeDir = join4(homedir4(), ".claude");
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join4(homedir4(), ".kiro-memory");
+  const claudeDir = join5(homedir4(), ".claude");
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join5(homedir4(), ".kiro-memory");
   console.log("[2/3] Installing Claude Code configuration...\n");
-  mkdirSync4(claudeDir, { recursive: true });
-  mkdirSync4(dataDir, { recursive: true });
-  const settingsPath = join4(claudeDir, "settings.json");
+  mkdirSync5(claudeDir, { recursive: true });
+  mkdirSync5(dataDir, { recursive: true });
+  const settingsPath = join5(claudeDir, "settings.json");
   let settings = {};
-  if (existsSync5(settingsPath)) {
+  if (existsSync6(settingsPath)) {
     try {
-      settings = JSON.parse(readFileSync3(settingsPath, "utf8"));
+      settings = JSON.parse(readFileSync4(settingsPath, "utf8"));
     } catch {
     }
   }
@@ -3823,7 +4677,7 @@ async function installClaudeCode() {
       matcher: "",
       hooks: [{
         type: "command",
-        command: `node ${join4(distDir, config.script)}`,
+        command: `node ${join5(distDir, config.script)}`,
         timeout: config.timeout
       }]
     };
@@ -3838,31 +4692,31 @@ async function installClaudeCode() {
       settings[event].push(hookEntry);
     }
   }
-  writeFileSync2(settingsPath, JSON.stringify(settings, null, 2), "utf8");
+  writeFileSync3(settingsPath, JSON.stringify(settings, null, 2), "utf8");
   console.log(`  \u2192 Hooks config: ${settingsPath}`);
-  const mcpPath = join4(homedir4(), ".mcp.json");
+  const mcpPath = join5(homedir4(), ".mcp.json");
   let mcpConfig = {};
-  if (existsSync5(mcpPath)) {
+  if (existsSync6(mcpPath)) {
     try {
-      mcpConfig = JSON.parse(readFileSync3(mcpPath, "utf8"));
+      mcpConfig = JSON.parse(readFileSync4(mcpPath, "utf8"));
     } catch {
     }
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
   mcpConfig.mcpServers["kiro-memory"] = {
     command: "node",
-    args: [join4(distDir, "servers", "mcp-server.js")]
+    args: [join5(distDir, "servers", "mcp-server.js")]
   };
-  writeFileSync2(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
+  writeFileSync3(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
   console.log(`  \u2192 MCP config:   ${mcpPath}`);
-  const steeringPath = join4(claudeDir, "CLAUDE.md");
+  const steeringPath = join5(claudeDir, "CLAUDE.md");
   let existingSteering = "";
-  if (existsSync5(steeringPath)) {
-    existingSteering = readFileSync3(steeringPath, "utf8");
+  if (existsSync6(steeringPath)) {
+    existingSteering = readFileSync4(steeringPath, "utf8");
   }
   if (!existingSteering.includes("Kiro Memory")) {
     const separator = existingSteering.length > 0 ? "\n\n---\n\n" : "";
-    writeFileSync2(steeringPath, existingSteering + separator + CLAUDE_CODE_STEERING, "utf8");
+    writeFileSync3(steeringPath, existingSteering + separator + CLAUDE_CODE_STEERING, "utf8");
     console.log(`  \u2192 Steering:     ${steeringPath}`);
   } else {
     console.log(`  \u2192 Steering:     ${steeringPath} (already configured)`);
@@ -3906,16 +4760,16 @@ async function installCursor() {
     }
   }
   const distDir = DIST_DIR;
-  const cursorDir = join4(homedir4(), ".cursor");
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join4(homedir4(), ".kiro-memory");
+  const cursorDir = join5(homedir4(), ".cursor");
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join5(homedir4(), ".kiro-memory");
   console.log("[2/3] Installing Cursor configuration...\n");
-  mkdirSync4(cursorDir, { recursive: true });
-  mkdirSync4(dataDir, { recursive: true });
-  const hooksPath = join4(cursorDir, "hooks.json");
+  mkdirSync5(cursorDir, { recursive: true });
+  mkdirSync5(dataDir, { recursive: true });
+  const hooksPath = join5(cursorDir, "hooks.json");
   let hooksConfig = { version: 1, hooks: {} };
-  if (existsSync5(hooksPath)) {
+  if (existsSync6(hooksPath)) {
     try {
-      hooksConfig = JSON.parse(readFileSync3(hooksPath, "utf8"));
+      hooksConfig = JSON.parse(readFileSync4(hooksPath, "utf8"));
       if (!hooksConfig.hooks) hooksConfig.hooks = {};
       if (!hooksConfig.version) hooksConfig.version = 1;
     } catch {
@@ -3931,7 +4785,7 @@ async function installCursor() {
   };
   for (const [event, script] of Object.entries(cursorHookMap)) {
     const hookEntry = {
-      command: `node ${join4(distDir, script)}`
+      command: `node ${join5(distDir, script)}`
     };
     if (!hooksConfig.hooks[event]) {
       hooksConfig.hooks[event] = [hookEntry];
@@ -3942,22 +4796,22 @@ async function installCursor() {
       hooksConfig.hooks[event].push(hookEntry);
     }
   }
-  writeFileSync2(hooksPath, JSON.stringify(hooksConfig, null, 2), "utf8");
+  writeFileSync3(hooksPath, JSON.stringify(hooksConfig, null, 2), "utf8");
   console.log(`  \u2192 Hooks config: ${hooksPath}`);
-  const mcpPath = join4(cursorDir, "mcp.json");
+  const mcpPath = join5(cursorDir, "mcp.json");
   let mcpConfig = {};
-  if (existsSync5(mcpPath)) {
+  if (existsSync6(mcpPath)) {
     try {
-      mcpConfig = JSON.parse(readFileSync3(mcpPath, "utf8"));
+      mcpConfig = JSON.parse(readFileSync4(mcpPath, "utf8"));
     } catch {
     }
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
   mcpConfig.mcpServers["kiro-memory"] = {
     command: "node",
-    args: [join4(distDir, "servers", "mcp-server.js")]
+    args: [join5(distDir, "servers", "mcp-server.js")]
   };
-  writeFileSync2(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
+  writeFileSync3(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
   console.log(`  \u2192 MCP config:   ${mcpPath}`);
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/3] Done!\n");
@@ -3997,25 +4851,25 @@ async function installWindsurf() {
     }
   }
   const distDir = DIST_DIR;
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join4(homedir4(), ".kiro-memory");
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join5(homedir4(), ".kiro-memory");
   console.log("[2/3] Installing Windsurf configuration...\n");
-  mkdirSync4(dataDir, { recursive: true });
-  const windsurfDir = join4(homedir4(), ".codeium", "windsurf");
-  mkdirSync4(windsurfDir, { recursive: true });
-  const mcpPath = join4(windsurfDir, "mcp_config.json");
+  mkdirSync5(dataDir, { recursive: true });
+  const windsurfDir = join5(homedir4(), ".codeium", "windsurf");
+  mkdirSync5(windsurfDir, { recursive: true });
+  const mcpPath = join5(windsurfDir, "mcp_config.json");
   let mcpConfig = {};
-  if (existsSync5(mcpPath)) {
+  if (existsSync6(mcpPath)) {
     try {
-      mcpConfig = JSON.parse(readFileSync3(mcpPath, "utf8"));
+      mcpConfig = JSON.parse(readFileSync4(mcpPath, "utf8"));
     } catch {
     }
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
   mcpConfig.mcpServers["kiro-memory"] = {
     command: "node",
-    args: [join4(distDir, "servers", "mcp-server.js")]
+    args: [join5(distDir, "servers", "mcp-server.js")]
   };
-  writeFileSync2(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
+  writeFileSync3(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
   console.log(`  \u2192 MCP config:   ${mcpPath}`);
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/3] Done!\n");
@@ -4056,31 +4910,31 @@ async function installCline() {
     }
   }
   const distDir = DIST_DIR;
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join4(homedir4(), ".kiro-memory");
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join5(homedir4(), ".kiro-memory");
   console.log("[2/3] Installing Cline configuration...\n");
-  mkdirSync4(dataDir, { recursive: true });
+  mkdirSync5(dataDir, { recursive: true });
   const platform2 = process.platform;
   let clineSettingsDir;
   if (platform2 === "darwin") {
-    clineSettingsDir = join4(homedir4(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
+    clineSettingsDir = join5(homedir4(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
   } else {
-    clineSettingsDir = join4(homedir4(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
+    clineSettingsDir = join5(homedir4(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
   }
-  mkdirSync4(clineSettingsDir, { recursive: true });
-  const mcpPath = join4(clineSettingsDir, "cline_mcp_settings.json");
+  mkdirSync5(clineSettingsDir, { recursive: true });
+  const mcpPath = join5(clineSettingsDir, "cline_mcp_settings.json");
   let mcpConfig = {};
-  if (existsSync5(mcpPath)) {
+  if (existsSync6(mcpPath)) {
     try {
-      mcpConfig = JSON.parse(readFileSync3(mcpPath, "utf8"));
+      mcpConfig = JSON.parse(readFileSync4(mcpPath, "utf8"));
     } catch {
     }
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
   mcpConfig.mcpServers["kiro-memory"] = {
     command: "node",
-    args: [join4(distDir, "servers", "mcp-server.js")]
+    args: [join5(distDir, "servers", "mcp-server.js")]
   };
-  writeFileSync2(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
+  writeFileSync3(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
   console.log(`  \u2192 MCP config:   ${mcpPath}`);
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/3] Done!\n");
@@ -4099,20 +4953,20 @@ async function installCline() {
 async function runDoctor() {
   console.log("\n=== Kiro Memory - Diagnostics ===");
   const checks = runEnvironmentChecks();
-  const kiroDir = process.env.KIRO_CONFIG_DIR || join4(homedir4(), ".kiro");
-  const agentPath = join4(kiroDir, "agents", "kiro-memory.json");
-  const mcpPath = join4(kiroDir, "settings", "mcp.json");
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join4(homedir4(), ".contextkit");
+  const kiroDir = process.env.KIRO_CONFIG_DIR || join5(homedir4(), ".kiro");
+  const agentPath = join5(kiroDir, "agents", "kiro-memory.json");
+  const mcpPath = join5(kiroDir, "settings", "mcp.json");
+  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join5(homedir4(), ".contextkit");
   checks.push({
     name: "Kiro agent config",
-    ok: existsSync5(agentPath),
-    message: existsSync5(agentPath) ? agentPath : "Not found",
-    fix: !existsSync5(agentPath) ? "Run: kiro-memory install" : void 0
+    ok: existsSync6(agentPath),
+    message: existsSync6(agentPath) ? agentPath : "Not found",
+    fix: !existsSync6(agentPath) ? "Run: kiro-memory install" : void 0
   });
   let mcpOk = false;
-  if (existsSync5(mcpPath)) {
+  if (existsSync6(mcpPath)) {
     try {
-      const mcp = JSON.parse(readFileSync3(mcpPath, "utf8"));
+      const mcp = JSON.parse(readFileSync4(mcpPath, "utf8"));
       mcpOk = !!mcp.mcpServers?.["kiro-memory"] || !!mcp.mcpServers?.contextkit;
     } catch {
     }
@@ -4125,15 +4979,15 @@ async function runDoctor() {
   });
   checks.push({
     name: "Data directory",
-    ok: existsSync5(dataDir),
-    message: existsSync5(dataDir) ? dataDir : "Not created (will be created on first use)"
+    ok: existsSync6(dataDir),
+    message: existsSync6(dataDir) ? dataDir : "Not created (will be created on first use)"
   });
-  const claudeDir = join4(homedir4(), ".claude");
-  const claudeSettingsPath = join4(claudeDir, "settings.json");
+  const claudeDir = join5(homedir4(), ".claude");
+  const claudeSettingsPath = join5(claudeDir, "settings.json");
   let claudeHooksOk = false;
-  if (existsSync5(claudeSettingsPath)) {
+  if (existsSync6(claudeSettingsPath)) {
     try {
-      const claudeSettings = JSON.parse(readFileSync3(claudeSettingsPath, "utf8"));
+      const claudeSettings = JSON.parse(readFileSync4(claudeSettingsPath, "utf8"));
       claudeHooksOk = !!(claudeSettings?.SessionStart || claudeSettings?.PostToolUse);
       if (claudeHooksOk) {
         const allSettings = JSON.stringify(claudeSettings);
@@ -4142,11 +4996,11 @@ async function runDoctor() {
     } catch {
     }
   }
-  const claudeMcpPath = join4(homedir4(), ".mcp.json");
+  const claudeMcpPath = join5(homedir4(), ".mcp.json");
   let claudeMcpOk = false;
-  if (existsSync5(claudeMcpPath)) {
+  if (existsSync6(claudeMcpPath)) {
     try {
-      const claudeMcp = JSON.parse(readFileSync3(claudeMcpPath, "utf8"));
+      const claudeMcp = JSON.parse(readFileSync4(claudeMcpPath, "utf8"));
       claudeMcpOk = !!claudeMcp.mcpServers?.["kiro-memory"];
     } catch {
     }
@@ -4163,12 +5017,12 @@ async function runDoctor() {
     // Non-blocking: optional installation
     message: claudeMcpOk ? "kiro-memory registered in ~/.mcp.json" : "Not configured (optional: run kiro-memory install --claude-code)"
   });
-  const cursorDir = join4(homedir4(), ".cursor");
-  const cursorHooksPath = join4(cursorDir, "hooks.json");
+  const cursorDir = join5(homedir4(), ".cursor");
+  const cursorHooksPath = join5(cursorDir, "hooks.json");
   let cursorHooksOk = false;
-  if (existsSync5(cursorHooksPath)) {
+  if (existsSync6(cursorHooksPath)) {
     try {
-      const cursorHooks = JSON.parse(readFileSync3(cursorHooksPath, "utf8"));
+      const cursorHooks = JSON.parse(readFileSync4(cursorHooksPath, "utf8"));
       cursorHooksOk = !!(cursorHooks.hooks?.sessionStart || cursorHooks.hooks?.afterFileEdit);
       if (cursorHooksOk) {
         const allHooks = JSON.stringify(cursorHooks.hooks);
@@ -4177,11 +5031,11 @@ async function runDoctor() {
     } catch {
     }
   }
-  const cursorMcpPath = join4(cursorDir, "mcp.json");
+  const cursorMcpPath = join5(cursorDir, "mcp.json");
   let cursorMcpOk = false;
-  if (existsSync5(cursorMcpPath)) {
+  if (existsSync6(cursorMcpPath)) {
     try {
-      const cursorMcp = JSON.parse(readFileSync3(cursorMcpPath, "utf8"));
+      const cursorMcp = JSON.parse(readFileSync4(cursorMcpPath, "utf8"));
       cursorMcpOk = !!cursorMcp.mcpServers?.["kiro-memory"];
     } catch {
     }
@@ -4198,11 +5052,11 @@ async function runDoctor() {
     // Non-blocking: optional installation
     message: cursorMcpOk ? "kiro-memory registered in ~/.cursor/mcp.json" : "Not configured (optional: run kiro-memory install --cursor)"
   });
-  const windsurfMcpPath = join4(homedir4(), ".codeium", "windsurf", "mcp_config.json");
+  const windsurfMcpPath = join5(homedir4(), ".codeium", "windsurf", "mcp_config.json");
   let windsurfMcpOk = false;
-  if (existsSync5(windsurfMcpPath)) {
+  if (existsSync6(windsurfMcpPath)) {
     try {
-      const windsurfMcp = JSON.parse(readFileSync3(windsurfMcpPath, "utf8"));
+      const windsurfMcp = JSON.parse(readFileSync4(windsurfMcpPath, "utf8"));
       windsurfMcpOk = !!windsurfMcp.mcpServers?.["kiro-memory"];
     } catch {
     }
@@ -4216,15 +5070,15 @@ async function runDoctor() {
   const clinePlatform = process.platform;
   let clineSettingsBase;
   if (clinePlatform === "darwin") {
-    clineSettingsBase = join4(homedir4(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
+    clineSettingsBase = join5(homedir4(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
   } else {
-    clineSettingsBase = join4(homedir4(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
+    clineSettingsBase = join5(homedir4(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
   }
-  const clineMcpPath = join4(clineSettingsBase, "cline_mcp_settings.json");
+  const clineMcpPath = join5(clineSettingsBase, "cline_mcp_settings.json");
   let clineMcpOk = false;
-  if (existsSync5(clineMcpPath)) {
+  if (existsSync6(clineMcpPath)) {
     try {
-      const clineMcp = JSON.parse(readFileSync3(clineMcpPath, "utf8"));
+      const clineMcp = JSON.parse(readFileSync4(clineMcpPath, "utf8"));
       clineMcpOk = !!clineMcp.mcpServers?.["kiro-memory"];
     } catch {
     }
@@ -4301,6 +5155,14 @@ async function main() {
   }
   if (command === "config") {
     await handleConfig(args.slice(1));
+    return;
+  }
+  if (command === "backup") {
+    await handleBackup(args.slice(1));
+    return;
+  }
+  if (command === "plugins") {
+    await handlePlugins(args.slice(1));
     return;
   }
   const sdk = createKiroMemory();
@@ -4668,7 +5530,7 @@ async function generateReportCli(sdk, cliArgs) {
       output = formatReportText(data);
   }
   if (outputArg) {
-    writeFileSync2(outputArg, output, "utf8");
+    writeFileSync3(outputArg, output, "utf8");
     console.log(`
   Report saved to: ${outputArg}
 `);
@@ -4796,115 +5658,131 @@ ${cyan("=== Kiro Memory \u2014 Ricerca Interattiva ===")}`);
 async function exportObservations(sdk, cliArgs) {
   const formatArg = cliArgs.find((a) => a.startsWith("--format="))?.split("=").slice(1).join("=") || cliArgs.find((a, i) => cliArgs[i - 1] === "--format");
   const projectArg = cliArgs.find((a) => a.startsWith("--project="))?.split("=").slice(1).join("=") || cliArgs.find((a, i) => cliArgs[i - 1] === "--project");
-  const outputArg = cliArgs.find((a) => a.startsWith("--output="))?.split("=").slice(1).join("=") || cliArgs.find((a, i) => cliArgs[i - 1] === "--output");
-  if (!projectArg) {
-    console.error("Errore: --project <nome> \xE8 obbligatorio per il comando export");
-    process.exit(1);
-  }
+  const outputArg = cliArgs.find((a) => a.startsWith("-o="))?.split("=").slice(1).join("=") || cliArgs.find((a) => a.startsWith("--output="))?.split("=").slice(1).join("=") || cliArgs.find((a, i) => (cliArgs[i - 1] === "--output" || cliArgs[i - 1] === "-o") && !a.startsWith("-"));
+  const fromArg = cliArgs.find((a) => a.startsWith("--from="))?.split("=").slice(1).join("=") || cliArgs.find((a, i) => cliArgs[i - 1] === "--from" && !a.startsWith("-"));
+  const toArg = cliArgs.find((a) => a.startsWith("--to="))?.split("=").slice(1).join("=") || cliArgs.find((a, i) => cliArgs[i - 1] === "--to" && !a.startsWith("-"));
+  const typeArg = cliArgs.find((a) => a.startsWith("--type="))?.split("=").slice(1).join("=") || cliArgs.find((a, i) => cliArgs[i - 1] === "--type" && !a.startsWith("-"));
   const validFormats = ["jsonl", "json", "md"];
   const format = validFormats.includes(formatArg) ? formatArg : "jsonl";
-  const kmDb = new KiroMemoryDatabase();
-  let observations;
-  try {
-    observations = getObservationsByProject(kmDb.db, projectArg, 1e4);
-  } finally {
-    kmDb.close();
-  }
-  if (observations.length === 0) {
-    console.error(`Nessuna observation trovata per il progetto "${projectArg}"`);
-    process.exit(1);
-  }
-  const output = generateExportOutput(observations, format);
-  if (outputArg) {
-    writeFileSync2(outputArg, output, "utf8");
-    console.error(`
+  if (format === "json" || format === "md") {
+    if (!projectArg) {
+      console.error("Errore: --project <nome> \xE8 obbligatorio per il formato json/md");
+      process.exit(1);
+    }
+    const kmDb2 = new KiroMemoryDatabase();
+    let observations;
+    try {
+      observations = getObservationsByProject(kmDb2.db, projectArg, 1e4);
+    } finally {
+      kmDb2.close();
+    }
+    if (observations.length === 0) {
+      console.error(`Nessuna observation trovata per il progetto "${projectArg}"`);
+      process.exit(1);
+    }
+    const output = generateExportOutput(observations, format);
+    if (outputArg) {
+      writeFileSync3(outputArg, output, "utf8");
+      console.error(`
   Esportate ${observations.length} observations in: ${outputArg}
 `);
-  } else {
-    process.stdout.write(output + "\n");
+    } else {
+      process.stdout.write(output + "\n");
+    }
+    return;
+  }
+  const { generateMetaRecord: generateMetaRecord2, exportObservationsStreaming: exportObservationsStreaming2, exportSummariesStreaming: exportSummariesStreaming2, exportPromptsStreaming: exportPromptsStreaming2 } = await Promise.resolve().then(() => (init_ImportExport(), ImportExport_exports));
+  const filters = {};
+  if (projectArg) filters.project = projectArg;
+  if (typeArg) filters.type = typeArg;
+  if (fromArg) filters.from = fromArg;
+  if (toArg) filters.to = toArg;
+  const kmDb = new KiroMemoryDatabase();
+  try {
+    if (outputArg) {
+      const { createWriteStream } = await import("fs");
+      const stream = createWriteStream(outputArg, { encoding: "utf8" });
+      let obsCount = 0;
+      let sumCount = 0;
+      let promptCount = 0;
+      stream.write(generateMetaRecord2(kmDb.db, filters) + "\n");
+      obsCount = exportObservationsStreaming2(kmDb.db, filters, (line) => {
+        stream.write(line + "\n");
+      });
+      sumCount = exportSummariesStreaming2(kmDb.db, filters, (line) => {
+        stream.write(line + "\n");
+      });
+      promptCount = exportPromptsStreaming2(kmDb.db, filters, (line) => {
+        stream.write(line + "\n");
+      });
+      await new Promise((resolve, reject) => {
+        stream.end((err) => err ? reject(err) : resolve());
+      });
+      console.error(`
+  Export JSONL completato:`);
+      console.error(`    Observations: ${obsCount}`);
+      console.error(`    Summaries:    ${sumCount}`);
+      console.error(`    Prompts:      ${promptCount}`);
+      console.error(`    File:         ${outputArg}
+`);
+    } else {
+      process.stdout.write(generateMetaRecord2(kmDb.db, filters) + "\n");
+      exportObservationsStreaming2(kmDb.db, filters, (line) => process.stdout.write(line + "\n"));
+      exportSummariesStreaming2(kmDb.db, filters, (line) => process.stdout.write(line + "\n"));
+      exportPromptsStreaming2(kmDb.db, filters, (line) => process.stdout.write(line + "\n"));
+    }
+  } finally {
+    kmDb.close();
   }
 }
 async function importObservations(cliArgs) {
   const filePath = cliArgs.find((a) => !a.startsWith("-"));
+  const dryRun = cliArgs.includes("--dry-run");
   if (!filePath) {
-    console.error("Errore: specifica il percorso del file JSONL\n  kiro-memory import <file.jsonl>");
+    console.error("Errore: specifica il percorso del file JSONL\n  kiro-memory import <file.jsonl> [--dry-run]");
     process.exit(1);
   }
-  if (!existsSync5(filePath)) {
+  if (!existsSync6(filePath)) {
     console.error(`Errore: file non trovato: ${filePath}`);
     process.exit(1);
   }
   let content;
   try {
-    content = readFileSync3(filePath, "utf8");
+    content = readFileSync4(filePath, "utf8");
   } catch (err) {
     console.error(`Errore lettura file: ${err.message}`);
     process.exit(1);
   }
-  const parsed = parseJsonlFile(content);
-  const validRecords = parsed.filter((r) => r.record);
-  const invalidRecords = parsed.filter((r) => r.error);
-  if (invalidRecords.length > 0) {
-    console.warn(`
-  Avviso: ${invalidRecords.length} righe non valide (saltate):`);
-    for (const inv of invalidRecords.slice(0, 5)) {
-      console.warn(`    Riga ${inv.line}: ${inv.error}`);
-    }
-    if (invalidRecords.length > 5) {
-      console.warn(`    ... e altri ${invalidRecords.length - 5} errori`);
-    }
-  }
-  const total = validRecords.length;
-  if (total === 0) {
-    console.error("\nNessun record valido da importare.");
-    process.exit(1);
-  }
-  console.log(`
-  Trovati ${total} record validi. Importazione in corso...
+  if (dryRun) {
+    console.log(`
+  [DRY RUN] Analisi di "${filePath}"...
 `);
+  } else {
+    console.log(`
+  Importazione di "${filePath}"...
+`);
+  }
+  const { importJsonl: importJsonl2 } = await Promise.resolve().then(() => (init_ImportExport(), ImportExport_exports));
+  const { formatImportResult: formatImportResult2 } = await Promise.resolve().then(() => (init_cli_utils(), cli_utils_exports));
   const kmDb = new KiroMemoryDatabase();
-  let imported = 0;
-  let duplicates = 0;
+  let result;
   try {
-    for (const { record: rec } of validRecords) {
-      if (!rec) continue;
-      const hashPayload = `${rec.project}|${rec.type}|${rec.title}|${rec.narrative || ""}`;
-      const contentHash = createHash2("sha256").update(hashPayload).digest("hex");
-      const exists = kmDb.db.query(
-        "SELECT id FROM observations WHERE content_hash = ? LIMIT 1"
-      ).get(contentHash);
-      if (exists) {
-        duplicates++;
-        continue;
-      }
-      createObservation(
-        kmDb.db,
-        rec.memory_session_id || `import-${Date.now()}`,
-        rec.project,
-        rec.type,
-        rec.title,
-        rec.subtitle || null,
-        rec.text || null,
-        rec.narrative || null,
-        rec.facts || null,
-        rec.concepts || null,
-        rec.files_read || null,
-        rec.files_modified || null,
-        rec.prompt_number || 0,
-        contentHash,
-        rec.discovery_tokens || 0
-      );
-      imported++;
-      if ((imported + duplicates) % 100 === 0) {
-        process.stdout.write(`  Processati: ${imported + duplicates}/${total}\r`);
-      }
-    }
+    result = importJsonl2(kmDb.db, content, dryRun);
   } finally {
     kmDb.close();
   }
-  console.log(`
-  Importate ${imported}/${total} observations (${duplicates} duplicati saltati)
-`);
+  const output = formatImportResult2({
+    imported: result.imported,
+    skipped: result.skipped,
+    errors: result.errors,
+    total: result.total,
+    dryRun,
+    errorDetails: result.errorDetails
+  });
+  console.log(output);
+  if (result.imported === 0 && result.errors > 0 && result.skipped === 0) {
+    process.exit(1);
+  }
 }
 async function runDoctorFix() {
   console.log("\n=== Kiro Memory \u2014 Riparazione Database ===\n");
@@ -5054,6 +5932,254 @@ async function handleConfig(subArgs) {
       console.log("  kiro-memory config set log.level DEBUG\n");
   }
 }
+async function handleBackup(subArgs) {
+  const subCommand = subArgs[0];
+  if (!subCommand || subCommand === "help") {
+    console.log(`
+Uso: kiro-memory backup <sottocomando>
+
+Sottocomandi:
+  create              Crea un backup manuale del database
+  list                Elenca i backup disponibili con metadata
+  restore <file>      Ripristina il database da un file backup
+`);
+    return;
+  }
+  if (subCommand === "create") {
+    const maxKeep = Number(getConfigValue("backup.maxKeep")) || 7;
+    const db = new KiroMemoryDatabase(DB_PATH, true);
+    try {
+      const entry = createBackup(DB_PATH, BACKUPS_DIR, db.db);
+      const deleted = rotateBackups(BACKUPS_DIR, maxKeep);
+      console.log(`
+=== Kiro Memory \u2014 Backup Creato ===
+`);
+      console.log(`  File:        ${entry.metadata.filename}`);
+      console.log(`  Timestamp:   ${entry.metadata.timestamp}`);
+      console.log(`  Schema v.:   ${entry.metadata.schemaVersion}`);
+      console.log(`  Obs.:        ${entry.metadata.stats.observations}`);
+      console.log(`  Sessioni:    ${entry.metadata.stats.sessions}`);
+      console.log(`  Dimensione:  ${(entry.metadata.stats.dbSizeBytes / 1024).toFixed(1)} KB`);
+      if (deleted > 0) {
+        console.log(`  Rotazione:   ${deleted} backup rimossi (max ${maxKeep} mantenuti)`);
+      }
+      console.log(`
+  Directory:  ${BACKUPS_DIR}
+`);
+    } finally {
+      db.close();
+    }
+    return;
+  }
+  if (subCommand === "list") {
+    const entries = listBackups(BACKUPS_DIR);
+    if (entries.length === 0) {
+      console.log("\n  Nessun backup trovato in: " + BACKUPS_DIR + "\n");
+      return;
+    }
+    console.log(`
+=== Kiro Memory \u2014 Backup Disponibili ===
+`);
+    console.log(`  Directory: ${BACKUPS_DIR}
+`);
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      const size = (e.metadata.stats.dbSizeBytes / 1024).toFixed(1);
+      const date = new Date(e.metadata.timestampEpoch).toLocaleString("it-IT");
+      console.log(`  ${i + 1}. ${e.metadata.filename}`);
+      console.log(`     Data:      ${date}`);
+      console.log(`     Schema:    v${e.metadata.schemaVersion}`);
+      console.log(`     Obs.:      ${e.metadata.stats.observations} | Sessioni: ${e.metadata.stats.sessions}`);
+      console.log(`     Dimensione: ${size} KB`);
+      console.log("");
+    }
+    return;
+  }
+  if (subCommand === "restore") {
+    const file = subArgs[1];
+    if (!file) {
+      console.error("\n  Errore: specifica il nome del file backup da ripristinare.");
+      console.error("  Esempio: kiro-memory backup restore backup-2026-02-27-150000.db\n");
+      process.exit(1);
+    }
+    const backupPattern = /^backup-\d{4}-\d{2}-\d{2}-\d{6}(-\d{3})?\.db$/;
+    if (file.includes("/") || file.includes("..") || !backupPattern.test(file)) {
+      console.error(`
+  Errore: nome file non valido: ${file}`);
+      console.error('  Il file deve essere nel formato "backup-YYYY-MM-DD-HHmmss[-mmm].db"\n');
+      process.exit(1);
+    }
+    const entries = listBackups(BACKUPS_DIR);
+    const found = entries.find((e) => e.metadata.filename === file);
+    if (!found) {
+      console.error(`
+  Errore: backup non trovato: ${file}`);
+      console.error(`  Usa "kiro-memory backup list" per vedere i backup disponibili.
+`);
+      process.exit(1);
+    }
+    const date = new Date(found.metadata.timestampEpoch).toLocaleString("it-IT");
+    console.log(`
+  ATTENZIONE: questa operazione sovrascrive il database corrente!`);
+    console.log(`  Backup da ripristinare: ${file}`);
+    console.log(`  Data backup:            ${date}`);
+    console.log(`  Obs. nel backup:        ${found.metadata.stats.observations}`);
+    console.log("");
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const confirmed = await new Promise((resolve) => {
+      rl.question('  Confermi il ripristino? (digita "si" per confermare): ', (answer) => {
+        rl.close();
+        resolve(answer.trim().toLowerCase() === "si");
+      });
+    });
+    if (!confirmed) {
+      console.log("\n  Ripristino annullato.\n");
+      return;
+    }
+    restoreBackup(found.filePath, DB_PATH);
+    console.log(`
+  Database ripristinato da: ${file}`);
+    console.log("  Riavvia il worker per applicare le modifiche.\n");
+    return;
+  }
+  console.error(`
+  Sottocomando backup non riconosciuto: ${subCommand}`);
+  console.error("  Usa: create | list | restore\n");
+  process.exit(1);
+}
+async function handlePlugins(subArgs) {
+  const subCommand = subArgs[0];
+  const port = process.env.KIRO_MEMORY_WORKER_PORT || process.env.CONTEXTKIT_WORKER_PORT || "3001";
+  const baseUrl = `http://127.0.0.1:${port}`;
+  async function apiGet(path) {
+    return new Promise((resolve, reject) => {
+      const req = http.get(`${baseUrl}${path}`, (res) => {
+        let body = "";
+        res.on("data", (chunk) => {
+          body += chunk;
+        });
+        res.on("end", () => {
+          try {
+            resolve({ status: res.statusCode, data: JSON.parse(body) });
+          } catch {
+            reject(new Error(`Risposta non JSON: ${body}`));
+          }
+        });
+      });
+      req.on("error", reject);
+      req.setTimeout(5e3, () => {
+        req.destroy(new Error("Timeout"));
+      });
+    });
+  }
+  async function apiPost(path) {
+    return new Promise((resolve, reject) => {
+      const options = {
+        hostname: "127.0.0.1",
+        port: parseInt(port, 10),
+        path,
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Content-Length": 0 }
+      };
+      const req = http.request(options, (res) => {
+        let body = "";
+        res.on("data", (chunk) => {
+          body += chunk;
+        });
+        res.on("end", () => {
+          try {
+            resolve({ status: res.statusCode, data: JSON.parse(body) });
+          } catch {
+            reject(new Error(`Risposta non JSON: ${body}`));
+          }
+        });
+      });
+      req.on("error", reject);
+      req.setTimeout(1e4, () => {
+        req.destroy(new Error("Timeout"));
+      });
+      req.end();
+    });
+  }
+  if (!subCommand || subCommand === "list") {
+    try {
+      const result = await apiGet("/api/plugins");
+      const { plugins } = result.data;
+      console.log("\n=== Kiro Memory \u2014 Plugin ===\n");
+      if (!plugins || plugins.length === 0) {
+        console.log("  Nessun plugin registrato.\n");
+        return;
+      }
+      for (const p of plugins) {
+        const stateColor = p.state === "active" ? "\x1B[32m" : p.state === "error" ? "\x1B[31m" : "\x1B[33m";
+        console.log(`  ${p.name}@${p.version}`);
+        console.log(`    Stato:    ${stateColor}${p.state}\x1B[0m`);
+        if (p.description) console.log(`    Desc.:    ${p.description}`);
+        if (p.error) console.log(`    Errore:   \x1B[31m${p.error}\x1B[0m`);
+        console.log("");
+      }
+    } catch {
+      console.error("\n  Errore: impossibile contattare il worker. Avvialo con: kiro-memory worker start\n");
+      process.exit(1);
+    }
+    return;
+  }
+  if (subCommand === "enable") {
+    const name = subArgs[1];
+    if (!name) {
+      console.error("\n  Errore: specifica il nome del plugin.\n  Esempio: kiro-memory plugins enable mio-plugin\n");
+      process.exit(1);
+    }
+    try {
+      const result = await apiPost(`/api/plugins/${encodeURIComponent(name)}/enable`);
+      if (result.status === 200) {
+        console.log(`
+  Plugin "${name}" abilitato con successo.`);
+        if (result.data.plugin?.state === "error") {
+          console.log(`  Attenzione: stato corrente = error: ${result.data.plugin.error}`);
+        }
+        console.log("");
+      } else {
+        console.error(`
+  Errore: ${result.data.error}
+`);
+        process.exit(1);
+      }
+    } catch {
+      console.error("\n  Errore: impossibile contattare il worker.\n");
+      process.exit(1);
+    }
+    return;
+  }
+  if (subCommand === "disable") {
+    const name = subArgs[1];
+    if (!name) {
+      console.error("\n  Errore: specifica il nome del plugin.\n  Esempio: kiro-memory plugins disable mio-plugin\n");
+      process.exit(1);
+    }
+    try {
+      const result = await apiPost(`/api/plugins/${encodeURIComponent(name)}/disable`);
+      if (result.status === 200) {
+        console.log(`
+  Plugin "${name}" disabilitato.
+`);
+      } else {
+        console.error(`
+  Errore: ${result.data.error}
+`);
+        process.exit(1);
+      }
+    } catch {
+      console.error("\n  Errore: impossibile contattare il worker.\n");
+      process.exit(1);
+    }
+    return;
+  }
+  console.error(`
+  Sottocomando plugins non riconosciuto: ${subCommand}`);
+  console.error("  Usa: list | enable <nome> | disable <nome>\n");
+  process.exit(1);
+}
 function showHelp() {
   console.log(`Usage: kiro-memory <command> [options]
 
@@ -5099,6 +6225,12 @@ Commands:
   decay stats               Show decay statistics (stale, never accessed, etc.)
   decay detect-stale        Detect and mark stale observations
   decay consolidate [--dry-run]  Consolidate duplicate observations
+  backup create             Crea un backup manuale del database
+  backup list               Elenca tutti i backup disponibili con metadata
+  backup restore <file>     Ripristina il database da un backup (con conferma)
+  plugins list              Elenca tutti i plugin registrati con stato
+  plugins enable <nome>     Abilita un plugin registrato
+  plugins disable <nome>    Disabilita un plugin attivo
   help                      Show this help message
 
 Examples:
@@ -5117,6 +6249,9 @@ Examples:
   kiro-memory export --project myapp --format jsonl --output backup.jsonl
   kiro-memory export --project myapp --format md > notes.md
   kiro-memory import backup.jsonl
+  kiro-memory backup create
+  kiro-memory backup list
+  kiro-memory backup restore backup-2026-02-27-150000.db
   kiro-memory config list
   kiro-memory config get worker.port
   kiro-memory config set log.level DEBUG
