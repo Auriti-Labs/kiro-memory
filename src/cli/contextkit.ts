@@ -6,12 +6,31 @@
 import { createKiroMemory } from '../sdk/index.js';
 import { formatReportText, formatReportMarkdown, formatReportJson } from '../services/report-formatter.js';
 import { printBanner } from './banner.js';
+import {
+  generateExportOutput,
+  parseJsonlFile,
+  getConfigPath,
+  getConfigValue,
+  setConfigValue,
+  listConfig,
+  formatStatsOutput,
+  getDbFileSize,
+  buildProgressBar,
+  rebuildFtsIndex,
+  removeOrphanedEmbeddings,
+  vacuumDatabase,
+} from './cli-utils.js';
+import { KiroMemoryDatabase } from '../services/sqlite/Database.js';
+import { getObservationsByProject, createObservation } from '../services/sqlite/Observations.js';
+import { DB_PATH } from '../shared/paths.js';
 import { execSync } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, createReadStream } from 'fs';
 import { join, dirname } from 'path';
 import { homedir, platform, release } from 'os';
 import { fileURLToPath } from 'url';
 import { createInterface } from 'readline';
+import * as http from 'http';
+import { createHash } from 'crypto';
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -1269,7 +1288,38 @@ async function main() {
     return;
   }
   if (command === 'doctor') {
+    // --fix gestito prima, poi fallthrough al doctor standard
+    if (args.includes('--fix')) {
+      await runDoctorFix();
+      return;
+    }
     await runDoctor();
+    return;
+  }
+
+  // Comandi che non necessitano del SDK completo (accesso diretto al DB)
+  if (command === 'export') {
+    const sdk = createKiroMemory();
+    try {
+      await exportObservations(sdk, args.slice(1));
+    } finally {
+      sdk.close();
+    }
+    return;
+  }
+
+  if (command === 'import') {
+    await importObservations(args.slice(1));
+    return;
+  }
+
+  if (command === 'stats') {
+    await showStats();
+    return;
+  }
+
+  if (command === 'config') {
+    await handleConfig(args.slice(1));
     return;
   }
 
@@ -1283,7 +1333,12 @@ async function main() {
         break;
 
       case 'search':
-        await searchContext(sdk, args[1]);
+        // --interactive attiva la modalità REPL
+        if (args.includes('--interactive') || args.includes('-i')) {
+          await searchInteractive(sdk, args.slice(1));
+        } else {
+          await searchContext(sdk, args[1]);
+        }
         break;
 
       case 'observations':
@@ -1748,6 +1803,448 @@ async function resumeSession(sdk: ReturnType<typeof createKiroMemory>, sessionId
   console.log('');
 }
 
+// ─── Comando: search --interactive ───
+
+/**
+ * Ricerca interattiva REPL con selezione del risultato.
+ * Fallback non-interattivo se stdin non è un TTY.
+ */
+async function searchInteractive(sdk: ReturnType<typeof createKiroMemory>, cliArgs: string[]) {
+  const projectArg = cliArgs.find((a, i) => cliArgs[i - 1] === '--project') ||
+    cliArgs.find(a => a.startsWith('--project='))?.split('=').slice(1).join('=');
+  const isInteractive = cliArgs.includes('--interactive') || cliArgs.includes('-i');
+
+  // Fallback non-interattivo se stdin non è un TTY o se il flag non è presente
+  if (!isInteractive || !process.stdin.isTTY) {
+    const queryArg = cliArgs.find(a => !a.startsWith('-') && a !== 'search');
+    if (!queryArg) {
+      console.error('Errore: fornisci un termine di ricerca o usa --interactive con un TTY');
+      process.exit(1);
+    }
+    const results = projectArg
+      ? await sdk.searchAdvanced(queryArg, { project: projectArg })
+      : await sdk.search(queryArg);
+    const obs = results.observations.slice(0, 20);
+    if (obs.length === 0) {
+      console.log('\nNessun risultato trovato.\n');
+      return;
+    }
+    console.log(`\nRisultati per: "${queryArg}"\n`);
+    obs.forEach((o, i) => {
+      const date = new Date(o.created_at).toLocaleDateString('it-IT');
+      console.log(`  ${i + 1}. [${o.type}] ${o.title} — ${o.project} (${date})`);
+    });
+    console.log('');
+    return;
+  }
+
+  // Modalità REPL interattiva
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+
+  const prompt = (question: string): Promise<string> =>
+    new Promise(resolve => rl.question(question, answer => resolve(answer.trim())));
+
+  const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
+  const cyan = (s: string) => useColor ? `\x1b[36m${s}\x1b[0m` : s;
+  const bold = (s: string) => useColor ? `\x1b[1m${s}\x1b[0m` : s;
+  const dim = (s: string) => useColor ? `\x1b[2m${s}\x1b[0m` : s;
+
+  console.log(`\n${cyan('=== Kiro Memory — Ricerca Interattiva ===')}`);
+  if (projectArg) console.log(dim(`  Filtro progetto: ${projectArg}`));
+  console.log(dim('  Premi Ctrl+C o digita "exit" per uscire.\n'));
+
+  // Loop REPL
+  while (true) {
+    let query: string;
+    try {
+      query = await prompt(cyan('> '));
+    } catch {
+      break;
+    }
+
+    if (!query || query.toLowerCase() === 'exit' || query.toLowerCase() === 'quit') break;
+
+    const results = projectArg
+      ? await sdk.searchAdvanced(query, { project: projectArg })
+      : await sdk.search(query);
+    const obs = results.observations.slice(0, 20);
+
+    if (obs.length === 0) {
+      console.log(dim('\n  Nessun risultato trovato.\n'));
+      continue;
+    }
+
+    console.log(`\n  ${bold(`${obs.length} risultato/i:`)}\n`);
+    obs.forEach((o, i) => {
+      const date = new Date(o.created_at).toLocaleDateString('it-IT');
+      console.log(`    ${bold(`${i + 1}.`)} [${o.type}] ${o.title}`);
+      console.log(dim(`       ${o.project} — ${date}`));
+    });
+    console.log('');
+
+    // Seleziona un risultato per i dettagli
+    const selRaw = await prompt(`  Numero per dettagli (Invio per saltare): `);
+    const selIdx = parseInt(selRaw) - 1;
+
+    if (!isNaN(selIdx) && selIdx >= 0 && selIdx < obs.length) {
+      const o = obs[selIdx];
+      console.log('');
+      console.log(`  ${bold('Titolo:')}     ${o.title}`);
+      console.log(`  ${bold('Tipo:')}       ${o.type}`);
+      console.log(`  ${bold('Progetto:')}   ${o.project}`);
+      console.log(`  ${bold('Data:')}       ${new Date(o.created_at).toLocaleString('it-IT')}`);
+      if (o.text) {
+        console.log(`  ${bold('Contenuto:')}`);
+        console.log(`    ${o.text.substring(0, 500)}${o.text.length > 500 ? '...' : ''}`);
+      }
+      if (o.narrative) {
+        console.log(`  ${bold('Narrativa:')}`);
+        console.log(`    ${o.narrative.substring(0, 300)}${o.narrative.length > 300 ? '...' : ''}`);
+      }
+      console.log('');
+    }
+  }
+
+  rl.close();
+  console.log('\n  Uscita dalla modalità interattiva.\n');
+}
+
+// ─── Comando: export ───
+
+/**
+ * Esporta le observations di un progetto nel formato specificato.
+ * Supporta JSONL, JSON e Markdown. Output su stdout o su file.
+ */
+async function exportObservations(sdk: ReturnType<typeof createKiroMemory>, cliArgs: string[]) {
+  // Parsing degli argomenti
+  const formatArg = (cliArgs.find(a => a.startsWith('--format='))?.split('=').slice(1).join('=')
+    || cliArgs.find((a, i) => cliArgs[i - 1] === '--format')) as string | undefined;
+  const projectArg = cliArgs.find(a => a.startsWith('--project='))?.split('=').slice(1).join('=')
+    || cliArgs.find((a, i) => cliArgs[i - 1] === '--project');
+  const outputArg = cliArgs.find(a => a.startsWith('--output='))?.split('=').slice(1).join('=')
+    || cliArgs.find((a, i) => cliArgs[i - 1] === '--output');
+
+  if (!projectArg) {
+    console.error('Errore: --project <nome> è obbligatorio per il comando export');
+    process.exit(1);
+  }
+
+  const validFormats = ['jsonl', 'json', 'md'] as const;
+  const format = (validFormats.includes(formatArg as any) ? formatArg : 'jsonl') as 'jsonl' | 'json' | 'md';
+
+  // Recupera le observations via SDK (accesso al db tramite getObservationsByProject)
+  const kmDb = new KiroMemoryDatabase();
+  let observations;
+  try {
+    observations = getObservationsByProject(kmDb.db, projectArg, 10_000);
+  } finally {
+    kmDb.close();
+  }
+
+  if (observations.length === 0) {
+    console.error(`Nessuna observation trovata per il progetto "${projectArg}"`);
+    process.exit(1);
+  }
+
+  const output = generateExportOutput(observations, format);
+
+  if (outputArg) {
+    writeFileSync(outputArg, output, 'utf8');
+    console.error(`\n  Esportate ${observations.length} observations in: ${outputArg}\n`);
+  } else {
+    process.stdout.write(output + '\n');
+  }
+}
+
+// ─── Comando: import ───
+
+/**
+ * Importa observations da un file JSONL con deduplication tramite content_hash.
+ */
+async function importObservations(cliArgs: string[]) {
+  const filePath = cliArgs.find(a => !a.startsWith('-'));
+
+  if (!filePath) {
+    console.error('Errore: specifica il percorso del file JSONL\n  kiro-memory import <file.jsonl>');
+    process.exit(1);
+  }
+
+  if (!existsSync(filePath)) {
+    console.error(`Errore: file non trovato: ${filePath}`);
+    process.exit(1);
+  }
+
+  let content: string;
+  try {
+    content = readFileSync(filePath, 'utf8');
+  } catch (err: any) {
+    console.error(`Errore lettura file: ${err.message}`);
+    process.exit(1);
+  }
+
+  const parsed = parseJsonlFile(content);
+  const validRecords = parsed.filter(r => r.record);
+  const invalidRecords = parsed.filter(r => r.error);
+
+  if (invalidRecords.length > 0) {
+    console.warn(`\n  Avviso: ${invalidRecords.length} righe non valide (saltate):`);
+    for (const inv of invalidRecords.slice(0, 5)) {
+      console.warn(`    Riga ${inv.line}: ${inv.error}`);
+    }
+    if (invalidRecords.length > 5) {
+      console.warn(`    ... e altri ${invalidRecords.length - 5} errori`);
+    }
+  }
+
+  const total = validRecords.length;
+  if (total === 0) {
+    console.error('\nNessun record valido da importare.');
+    process.exit(1);
+  }
+
+  console.log(`\n  Trovati ${total} record validi. Importazione in corso...\n`);
+
+  const kmDb = new KiroMemoryDatabase();
+  let imported = 0;
+  let duplicates = 0;
+
+  try {
+    for (const { record: rec } of validRecords) {
+      if (!rec) continue;
+
+      // Calcola hash per deduplication: SHA256(project|type|title|narrative)
+      const hashPayload = `${rec.project}|${rec.type}|${rec.title}|${rec.narrative || ''}`;
+      const contentHash = createHash('sha256').update(hashPayload).digest('hex');
+
+      // Controlla se esiste già un record con questo content_hash (finestra 0 = controlla tutto)
+      const exists = kmDb.db.query(
+        'SELECT id FROM observations WHERE content_hash = ? LIMIT 1'
+      ).get(contentHash);
+
+      if (exists) {
+        duplicates++;
+        continue;
+      }
+
+      // Inserisce il record
+      createObservation(
+        kmDb.db,
+        rec.memory_session_id || `import-${Date.now()}`,
+        rec.project,
+        rec.type,
+        rec.title,
+        rec.subtitle || null,
+        rec.text || null,
+        rec.narrative || null,
+        rec.facts || null,
+        rec.concepts || null,
+        rec.files_read || null,
+        rec.files_modified || null,
+        rec.prompt_number || 0,
+        contentHash,
+        rec.discovery_tokens || 0
+      );
+      imported++;
+
+      // Mostra progresso ogni 100 record
+      if ((imported + duplicates) % 100 === 0) {
+        process.stdout.write(`  Processati: ${imported + duplicates}/${total}\r`);
+      }
+    }
+  } finally {
+    kmDb.close();
+  }
+
+  console.log(`\n  Importate ${imported}/${total} observations (${duplicates} duplicati saltati)\n`);
+}
+
+// ─── Comando: doctor --fix ───
+
+/**
+ * Estende la diagnostica doctor con la riparazione automatica (--fix).
+ */
+async function runDoctorFix() {
+  console.log('\n=== Kiro Memory — Riparazione Database ===\n');
+
+  const kmDb = new KiroMemoryDatabase();
+  const db = kmDb.db;
+  const messages: string[] = [];
+
+  try {
+    // 1. Ricostruzione indice FTS5
+    process.stdout.write('  [1/3] Ricostruzione indice FTS5... ');
+    const ftsOk = rebuildFtsIndex(db);
+    if (ftsOk) {
+      console.log('\x1b[32m✓\x1b[0m');
+      messages.push('Indice FTS5 ricostruito');
+    } else {
+      console.log('\x1b[33m~\x1b[0m (FTS non disponibile o gia\' integro)');
+    }
+
+    // 2. Rimozione embeddings orfani
+    process.stdout.write('  [2/3] Rimozione embeddings orfani... ');
+    const removed = removeOrphanedEmbeddings(db);
+    console.log(`\x1b[32m✓\x1b[0m (${removed} rimossi)`);
+    if (removed > 0) messages.push(`${removed} embedding/s orfani rimossi`);
+
+    // 3. VACUUM database
+    process.stdout.write('  [3/3] VACUUM database...             ');
+    const vacuumOk = vacuumDatabase(db);
+    if (vacuumOk) {
+      console.log('\x1b[32m✓\x1b[0m');
+      messages.push('VACUUM completato');
+    } else {
+      console.log('\x1b[31m✗\x1b[0m');
+    }
+  } finally {
+    kmDb.close();
+  }
+
+  if (messages.length > 0) {
+    console.log('\n  Operazioni completate:');
+    for (const msg of messages) {
+      console.log(`    \x1b[32m✓\x1b[0m ${msg}`);
+    }
+  }
+  console.log('');
+}
+
+// ─── Comando: stats ───
+
+/**
+ * Mostra statistiche aggregate del database.
+ */
+async function showStats() {
+  const kmDb = new KiroMemoryDatabase();
+  const db = kmDb.db;
+
+  try {
+    // Query aggregate semplici compatibili con bun:sqlite e better-sqlite3
+    const obsRow = db.query(
+      'SELECT COUNT(*) as total FROM observations'
+    ).get() as { total: number } | null;
+
+    const sessRow = db.query(
+      'SELECT COUNT(*) as total FROM sessions'
+    ).get() as { total: number } | null;
+
+    const projRow = db.query(
+      'SELECT COUNT(DISTINCT project) as cnt FROM observations'
+    ).get() as { cnt: number } | null;
+
+    // Progetto piu' attivo
+    const topProject = db.query(
+      `SELECT project, COUNT(*) as cnt
+       FROM observations
+       GROUP BY project
+       ORDER BY cnt DESC
+       LIMIT 1`
+    ).get() as { project: string; cnt: number } | null;
+
+    // Copertura embeddings (LEFT JOIN su tabella opzionale)
+    let embCoverage = 0;
+    try {
+      const embStats = db.query(
+        `SELECT
+           (SELECT COUNT(*) FROM observations) as total,
+           COUNT(DISTINCT observation_id) as embedded
+         FROM observation_embeddings`
+      ).get() as { total: number; embedded: number } | null;
+
+      if (embStats && embStats.total > 0) {
+        embCoverage = Math.round((embStats.embedded / embStats.total) * 100);
+      }
+    } catch {
+      // La tabella potrebbe non esistere — coverage resta 0
+    }
+
+    // Dimensione file DB
+    const dbSize = getDbFileSize(DB_PATH);
+
+    const stats = {
+      totalObservations: obsRow?.total || 0,
+      totalSessions: sessRow?.total || 0,
+      totalProjects: projRow?.cnt || 0,
+      dbSizeBytes: dbSize,
+      mostActiveProject: topProject?.project || null,
+      embeddingCoverage: embCoverage,
+    };
+
+    console.log(formatStatsOutput(stats));
+  } finally {
+    kmDb.close();
+  }
+}
+
+// ─── Comando: config ───
+
+/**
+ * Gestisce la configurazione del sistema (list|get|set).
+ */
+async function handleConfig(subArgs: string[]) {
+  const subcommand = subArgs[0];
+  const configPath = getConfigPath();
+
+  switch (subcommand) {
+    case 'list': {
+      const config = listConfig(configPath);
+      console.log('\n=== Configurazione Kiro Memory ===\n');
+      console.log(`  File: ${configPath}\n`);
+
+      for (const [key, value] of Object.entries(config)) {
+        const displayValue = value === null ? '(non impostato)' : String(value);
+        console.log(`  ${key.padEnd(35)} ${displayValue}`);
+      }
+      console.log('');
+      break;
+    }
+
+    case 'get': {
+      const key = subArgs[1];
+      if (!key) {
+        console.error('Errore: specifica una chiave\n  kiro-memory config get <chiave>');
+        process.exit(1);
+      }
+      const val = getConfigValue(key, configPath);
+      if (val === null) {
+        console.log(`\n  "${key}" non impostato (nessun valore di default)\n`);
+      } else {
+        console.log(`\n  ${key} = ${val}\n`);
+      }
+      break;
+    }
+
+    case 'set': {
+      const key = subArgs[1];
+      const rawValue = subArgs[2];
+
+      if (!key) {
+        console.error('Errore: specifica chiave e valore\n  kiro-memory config set <chiave> <valore>');
+        process.exit(1);
+      }
+      if (rawValue === undefined) {
+        console.error(`Errore: valore mancante per "${key}"\n  kiro-memory config set ${key} <valore>`);
+        process.exit(1);
+      }
+
+      const saved = setConfigValue(key, rawValue, configPath);
+      console.log(`\n  Impostato: ${key} = ${saved}\n`);
+      break;
+    }
+
+    default:
+      console.log('\nUtilizzo: kiro-memory config <subcommand>\n');
+      console.log('Subcommands:');
+      console.log('  list                         Mostra tutte le impostazioni');
+      console.log('  get <chiave>                 Legge un valore');
+      console.log('  set <chiave> <valore>        Imposta un valore\n');
+      console.log('Esempio:');
+      console.log('  kiro-memory config list');
+      console.log('  kiro-memory config get worker.port');
+      console.log('  kiro-memory config set log.level DEBUG\n');
+  }
+}
+
 function showHelp() {
   console.log(`Usage: kiro-memory <command> [options]
 
@@ -1758,6 +2255,7 @@ Setup:
   install --windsurf        Install MCP server for Windsurf IDE
   install --cline           Install MCP server for Cline (VS Code)
   doctor                    Run environment diagnostics (checks Node, build tools, WSL, etc.)
+  doctor --fix              Auto-repair: rebuild FTS5, remove orphaned embeddings, VACUUM
 
 Commands:
   context, ctx              Show current project context
@@ -1766,8 +2264,18 @@ Commands:
     --period=weekly|monthly   Time period (default: weekly)
     --format=text|md|json     Output format (default: text)
     --output=<file>           Write to file instead of stdout
+  stats                     Quick database overview (totals, size, active project, embeddings)
   search <query>            Search across all context (keyword FTS5)
+  search --interactive      Interactive REPL search with result selection
+    --project <name>          Filter results by project
   semantic-search <query>   Hybrid search: vector + keyword (semantic)
+  export --project <name>   Export observations to JSONL/JSON/Markdown
+    --format=jsonl|json|md    Output format (default: jsonl)
+    --output=<file>           Write to file instead of stdout
+  import <file>             Import observations from JSONL file (deduplication by content_hash)
+  config list               Show all configuration settings
+  config get <key>          Show a single configuration value
+  config set <key> <value>  Set a configuration value
   observations [limit]      Show recent observations (default: 10)
   summaries [limit]         Show recent summaries (default: 5)
   add-observation <title> <content>   Add a new observation
@@ -1787,13 +2295,22 @@ Commands:
 Examples:
   kiro-memory install
   kiro-memory doctor
+  kiro-memory doctor --fix
+  kiro-memory stats
   kiro-memory context
   kiro-memory resume
   kiro-memory resume 42
   kiro-memory report
   kiro-memory report --period=monthly --format=md --output=report.md
   kiro-memory search "authentication"
+  kiro-memory search --interactive --project myapp
   kiro-memory semantic-search "how did I fix the auth bug"
+  kiro-memory export --project myapp --format jsonl --output backup.jsonl
+  kiro-memory export --project myapp --format md > notes.md
+  kiro-memory import backup.jsonl
+  kiro-memory config list
+  kiro-memory config get worker.port
+  kiro-memory config set log.level DEBUG
   kiro-memory add-knowledge constraint "No any in TypeScript" "Never use any type" --severity=hard
   kiro-memory add-knowledge decision "PostgreSQL over MongoDB" "Chosen for ACID" --alternatives=MongoDB,DynamoDB
   kiro-memory embeddings stats
