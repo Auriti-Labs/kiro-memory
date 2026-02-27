@@ -25,7 +25,15 @@ export interface Migration {
  *   const db = new KiroMemoryDatabase(':memory:');  // for tests
  */
 export class KiroMemoryDatabase {
-  public db: Database;
+  private _db: Database;
+
+  /**
+   * Readonly accessor for the underlying Database instance.
+   * Prefer using query() and run() proxy methods directly.
+   */
+  get db(): Database {
+    return this._db;
+  }
 
   /**
    * @param dbPath - Path to the SQLite file (default: DB_PATH)
@@ -38,22 +46,38 @@ export class KiroMemoryDatabase {
     }
 
     // Create database connection
-    this.db = new Database(dbPath, { create: true, readwrite: true });
+    this._db = new Database(dbPath, { create: true, readwrite: true });
 
     // Apply optimized SQLite settings
-    this.db.run('PRAGMA journal_mode = WAL');
-    this.db.run('PRAGMA busy_timeout = 5000'); // Wait up to 5s on concurrent lock (hook + worker)
-    this.db.run('PRAGMA synchronous = NORMAL');
-    this.db.run('PRAGMA foreign_keys = ON');
-    this.db.run('PRAGMA temp_store = memory');
-    this.db.run(`PRAGMA mmap_size = ${SQLITE_MMAP_SIZE_BYTES}`);
-    this.db.run(`PRAGMA cache_size = ${SQLITE_CACHE_SIZE_PAGES}`);
+    this._db.run('PRAGMA journal_mode = WAL');
+    this._db.run('PRAGMA busy_timeout = 5000'); // Wait up to 5s on concurrent lock (hook + worker)
+    this._db.run('PRAGMA synchronous = NORMAL');
+    this._db.run('PRAGMA foreign_keys = ON');
+    this._db.run('PRAGMA temp_store = memory');
+    this._db.run(`PRAGMA mmap_size = ${SQLITE_MMAP_SIZE_BYTES}`);
+    this._db.run(`PRAGMA cache_size = ${SQLITE_CACHE_SIZE_PAGES}`);
 
     // Run migrations only if needed (hooks skip them for performance)
     if (!skipMigrations) {
-      const migrationRunner = new MigrationRunner(this.db);
+      const migrationRunner = new MigrationRunner(this._db);
       migrationRunner.runAllMigrations();
     }
+  }
+
+  /**
+   * Prepare a query (delegates to underlying Database).
+   * Proxy method to avoid ctx.db.db.query() double access.
+   */
+  query(sql: string) {
+    return this._db.query(sql);
+  }
+
+  /**
+   * Execute a SQL statement without results (delegates to underlying Database).
+   * Proxy method to avoid ctx.db.db.run() double access.
+   */
+  run(sql: string, params?: any[]) {
+    return this._db.run(sql, params);
   }
 
   /**
@@ -61,15 +85,15 @@ export class KiroMemoryDatabase {
    * If fn() throws an error, the transaction is automatically rolled back.
    */
   withTransaction<T>(fn: (db: Database) => T): T {
-    const transaction = this.db.transaction(fn);
-    return transaction(this.db);
+    const transaction = this._db.transaction(fn);
+    return transaction(this._db);
   }
 
   /**
    * Close the database connection
    */
   close(): void {
-    this.db.close();
+    this._db.close();
   }
 }
 

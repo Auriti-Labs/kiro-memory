@@ -108,42 +108,35 @@ export function getTypeDistribution(
 
 /**
  * Session statistics: total, completed, average duration.
+ * Single query with conditional aggregation replacing 3 separate queries.
  */
 export function getSessionStats(
   db: Database,
   project?: string
 ): SessionStatsResult {
-  const totalSql = project
-    ? 'SELECT COUNT(*) as count FROM sessions WHERE project = ?'
-    : 'SELECT COUNT(*) as count FROM sessions';
-  const totalStmt = db.query(totalSql);
-  const total = project
-    ? (totalStmt.get(project) as any)?.count || 0
-    : (totalStmt.get() as any)?.count || 0;
+  const projectFilter = project ? 'WHERE project = ?' : '';
 
-  const completedSql = project
-    ? `SELECT COUNT(*) as count FROM sessions WHERE project = ? AND status = 'completed'`
-    : `SELECT COUNT(*) as count FROM sessions WHERE status = 'completed'`;
-  const completedStmt = db.query(completedSql);
-  const completed = project
-    ? (completedStmt.get(project) as any)?.count || 0
-    : (completedStmt.get() as any)?.count || 0;
+  const sql = `
+    SELECT
+      COUNT(*) as total,
+      COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
+      AVG(CASE
+        WHEN status = 'completed' AND completed_at_epoch IS NOT NULL AND completed_at_epoch > started_at_epoch
+        THEN (completed_at_epoch - started_at_epoch) / 1000.0 / 60.0
+      END) as avg_min
+    FROM sessions
+    ${projectFilter}
+  `;
 
-  // Average duration only for completed sessions (epoch in milliseconds)
-  const avgSql = project
-    ? `SELECT AVG((completed_at_epoch - started_at_epoch) / 1000.0 / 60.0) as avg_min
-       FROM sessions
-       WHERE project = ? AND status = 'completed' AND completed_at_epoch IS NOT NULL AND completed_at_epoch > started_at_epoch`
-    : `SELECT AVG((completed_at_epoch - started_at_epoch) / 1000.0 / 60.0) as avg_min
-       FROM sessions
-       WHERE status = 'completed' AND completed_at_epoch IS NOT NULL AND completed_at_epoch > started_at_epoch`;
-  const avgStmt = db.query(avgSql);
-  const avgRow = project
-    ? avgStmt.get(project) as any
-    : avgStmt.get() as any;
-  const avgDurationMinutes = Math.round((avgRow?.avg_min || 0) * 10) / 10;
+  const row = project
+    ? db.query(sql).get(project) as any
+    : db.query(sql).get() as any;
 
-  return { total, completed, avgDurationMinutes };
+  return {
+    total: row?.total || 0,
+    completed: row?.completed || 0,
+    avgDurationMinutes: Math.round((row?.avg_min || 0) * 10) / 10,
+  };
 }
 
 /**
