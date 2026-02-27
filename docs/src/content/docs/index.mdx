@@ -1,0 +1,128 @@
+---
+title: Kiro Memory
+description: Persistent cross-session memory for AI coding assistants. Works with Claude Code, Cursor, Windsurf, Cline, and any MCP-compatible editor.
+template: splash
+hero:
+  tagline: Persistent cross-session memory for AI coding assistants
+  image:
+    file: ../../assets/logo-dark.svg
+  actions:
+    - text: Get Started
+      link: /kiro-memory/getting-started/installation
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/Auriti-Labs/kiro-memory
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## What is Kiro Memory?
+
+Kiro Memory is an **npm package** that gives AI coding assistants persistent memory across sessions. Every file you open, every command you run, every decision you make gets captured automatically and injected back as context the next time your assistant starts up.
+
+Stop re-explaining your architecture. Stop repeating your conventions. Let your AI assistant remember.
+
+```bash
+npm install -g kiro-memory
+kiro-memory setup
+```
+
+---
+
+## Core Features
+
+<CardGrid stagger>
+  <Card title="Automatic Hooks" icon="puzzle">
+    Four lifecycle hooks capture context silently in the background: session start, prompt submission, tool usage, and session end.
+  </Card>
+  <Card title="MCP Server" icon="setting">
+    Native Model Context Protocol server with 4 tools — search, timeline, get_observations, and get_context — works with any MCP-compatible editor.
+  </Card>
+  <Card title="TypeScript SDK" icon="open-book">
+    Programmatic access via `createKiroMemory()`. Store observations, search context, run hybrid search, and manage sessions from your own code.
+  </Card>
+  <Card title="Web Dashboard" icon="laptop">
+    Real-time web UI on `http://localhost:3001`. Browse observations, sessions, summaries, and search history with live SSE updates.
+  </Card>
+  <Card title="Hybrid Search" icon="magnifier">
+    SQLite FTS5 keyword search combined with local vector embeddings (fastembed / @huggingface/transformers) for semantic retrieval.
+  </Card>
+  <Card title="CLI Tools" icon="terminal">
+    `kiro-memory` CLI with commands for setup, search, export, import, diagnostics, statistics, and configuration management.
+  </Card>
+</CardGrid>
+
+---
+
+## Supported Editors
+
+Kiro Memory works with any AI coding assistant that supports hooks or MCP:
+
+| Editor | Integration |
+|--------|-------------|
+| **Kiro CLI** | Native hooks (primary target) |
+| **Claude Code** | MCP server |
+| **Cursor** | Hooks + MCP server |
+| **Windsurf** | MCP server |
+| **Cline** | MCP server |
+| **Any MCP editor** | MCP stdio transport |
+
+---
+
+## Quick Install
+
+```bash
+# Install globally
+npm install -g kiro-memory
+
+# Run the interactive setup wizard
+kiro-memory setup
+
+# Check everything is working
+kiro-memory doctor
+```
+
+The setup wizard configures your editor's hooks automatically and starts the background worker on port 3001.
+
+---
+
+## How It Works
+
+1. **agentSpawn hook** fires when your AI assistant starts — it injects your previous session context automatically
+2. **userPromptSubmit hook** records every prompt you send (with secret redaction)
+3. **postToolUse hook** captures every file read, file write, shell command, and web search
+4. **stop hook** generates a structured session summary and checkpoint when the session ends
+
+On the next session, all that context is scored by recency, project relevance, and semantic similarity, then injected into the agent's context window within a configurable token budget.
+
+---
+
+## Architecture at a Glance
+
+```
+┌──────────────┐    SQLite WAL    ┌─────────────────┐
+│  Kiro Hooks  │ ──────────────► │  SQLite + FTS5  │
+│ (4 hooks)    │                  │  + embeddings   │
+└──────────────┘                  └────────┬────────┘
+                                           │
+┌──────────────┐    HTTP/REST     ┌────────┴────────┐
+│  MCP Server  │ ◄─────────────► │  Worker Service │
+│ (4 tools)    │                  │  (port 3001)    │
+└──────────────┘                  └────────┬────────┘
+                                           │
+┌──────────────┐    SDK API       ┌────────┴────────┐
+│   Your Code  │ ◄─────────────► │  KiroMemorySDK  │
+│              │                  │                 │
+└──────────────┘                  └─────────────────┘
+```
+
+---
+
+## License
+
+Kiro Memory is open source under the [AGPL-3.0 license](https://github.com/Auriti-Labs/kiro-memory/blob/main/LICENSE).
+
+Maintained by [Auriti Labs](https://github.com/Auriti-Labs).
