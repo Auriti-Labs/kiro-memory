@@ -44,6 +44,16 @@ export interface AnalyticsOverviewResult {
   tokenEconomics: TokenEconomicsResult;
 }
 
+/** Singola voce giornaliera per la heatmap */
+export interface HeatmapDayEntry {
+  /** Data in formato ISO YYYY-MM-DD */
+  date: string;
+  /** Numero di osservazioni quel giorno */
+  count: number;
+  /** Lista progetto che hanno avuto attività quel giorno */
+  projects: string[];
+}
+
 // ============================================================================
 // Query functions
 // ============================================================================
@@ -218,4 +228,53 @@ export function getAnalyticsOverview(
     knowledgeCount: row?.knowledge_count || 0,
     tokenEconomics: { discoveryTokens, readTokens, savings, reductionPct }
   };
+}
+
+/**
+ * Dati giornalieri per la heatmap interattiva della timeline.
+ * Restituisce un giorno per riga con conteggio osservazioni e lista progetti distinti.
+ * Ordinamento cronologico crescente (dal più vecchio al più recente).
+ *
+ * @param db       Istanza del database SQLite
+ * @param project  Filtro opzionale per progetto
+ * @param months   Numero di mesi da coprire (default 6, max 24)
+ */
+export function getHeatmapData(
+  db: Database,
+  project?: string,
+  months: number = 6
+): HeatmapDayEntry[] {
+  // Calcola la finestra temporale in millisecondi
+  const cutoffEpoch = Date.now() - (months * 30 * 24 * 60 * 60 * 1000);
+
+  // Query che raggruppa per giorno e aggrega i progetti con GROUP_CONCAT
+  const sql = project
+    ? `SELECT
+         DATE(datetime(created_at_epoch / 1000, 'unixepoch')) as date,
+         COUNT(*) as count,
+         GROUP_CONCAT(DISTINCT project) as projects_csv
+       FROM observations
+       WHERE project = ? AND created_at_epoch >= ?
+       GROUP BY date
+       ORDER BY date ASC`
+    : `SELECT
+         DATE(datetime(created_at_epoch / 1000, 'unixepoch')) as date,
+         COUNT(*) as count,
+         GROUP_CONCAT(DISTINCT project) as projects_csv
+       FROM observations
+       WHERE created_at_epoch >= ?
+       GROUP BY date
+       ORDER BY date ASC`;
+
+  const stmt = db.query(sql);
+  const rawRows = project
+    ? stmt.all(project, cutoffEpoch) as Array<{ date: string; count: number; projects_csv: string | null }>
+    : stmt.all(cutoffEpoch) as Array<{ date: string; count: number; projects_csv: string | null }>;
+
+  // Trasforma i risultati: split CSV → array di progetti
+  return rawRows.map(row => ({
+    date: row.date,
+    count: row.count,
+    projects: row.projects_csv ? row.projects_csv.split(',').filter(Boolean) : [],
+  }));
 }

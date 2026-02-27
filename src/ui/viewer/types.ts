@@ -89,7 +89,75 @@ export interface SessionStatsData {
   avgDurationMinutes: number;
 }
 
-export type ViewMode = 'feed' | 'analytics' | 'sessions';
+export type ViewMode = 'feed' | 'analytics' | 'sessions' | 'timeline';
+
+// ── Timeline / Heatmap Types (issue #21) ──
+
+/** Singola voce giornaliera restituita dall'endpoint /api/analytics/heatmap */
+export interface HeatmapDayEntry {
+  /** Data ISO YYYY-MM-DD */
+  date: string;
+  /** Numero totale di osservazioni quel giorno */
+  count: number;
+  /** Progetti attivi quel giorno */
+  projects: string[];
+}
+
+/** Risposta completa dell'endpoint heatmap */
+export interface HeatmapResponse {
+  days: HeatmapDayEntry[];
+}
+
+/** Livelli di zoom disponibili per la timeline canvas */
+export type TimelineZoomLevel = 'day' | 'week' | 'month';
+
+// ── Filter Types (issue #24) ──
+
+/** Intervallo di date per il filtro temporale */
+export interface DateRange {
+  from: string; // formato YYYY-MM-DD, stringa vuota = nessun limite
+  to: string;   // formato YYYY-MM-DD, stringa vuota = nessun limite
+}
+
+/** Preset rapidi per il filtro data */
+export type DatePreset = 'today' | 'week' | 'month' | 'all';
+
+/** Stato completo dei filtri della sidebar */
+export interface FilterState {
+  project: string;
+  activeTypes: Set<string>;
+  dateRange: DateRange;
+  activeConcepts: Set<string>;
+  searchText: string;
+}
+
+/** Azioni disponibili per il reducer dei filtri */
+export type FilterAction =
+  | { type: 'SET_PROJECT'; payload: string }
+  | { type: 'TOGGLE_TYPE'; payload: string }
+  | { type: 'SET_DATE_RANGE'; payload: DateRange }
+  | { type: 'SET_DATE_PRESET'; payload: DatePreset }
+  | { type: 'TOGGLE_CONCEPT'; payload: string }
+  | { type: 'SET_SEARCH_TEXT'; payload: string }
+  | { type: 'CLEAR_ALL' }
+  | { type: 'LOAD_SAVED'; payload: SavedFilter };
+
+/** Filtro salvato in localStorage */
+export interface SavedFilter {
+  id: string;       // UUID generato al salvataggio
+  name: string;     // Nome auto-generato leggibile
+  project: string;
+  dateRange: DateRange;
+  activeTypes: string[];
+  activeConcepts: string[];
+  savedAt: number;  // timestamp ms
+}
+
+/** Concept estratto dalle osservazioni */
+export interface ConceptEntry {
+  concept: string;
+  count: number;
+}
 
 // ── Session Types (per la UI) ──
 

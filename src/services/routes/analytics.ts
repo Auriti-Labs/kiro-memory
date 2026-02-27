@@ -5,7 +5,7 @@
 import { Router } from 'express';
 import type { WorkerContext } from '../worker-context.js';
 import { isValidProject, parseIntSafe } from '../worker-context.js';
-import { getObservationsTimeline, getTypeDistribution, getSessionStats, getAnalyticsOverview } from '../sqlite/Analytics.js';
+import { getObservationsTimeline, getTypeDistribution, getSessionStats, getAnalyticsOverview, getHeatmapData } from '../sqlite/Analytics.js';
 import { AnomalyDetector } from '../analytics/AnomalyDetector.js';
 import { logger } from '../../utils/logger.js';
 
@@ -81,6 +81,72 @@ export function createAnalyticsRouter(ctx: WorkerContext): Router {
     } catch (error) {
       logger.error('WORKER', 'Analytics sessions failed', { project }, error as Error);
       res.status(500).json({ error: 'Analytics sessions failed' });
+    }
+  });
+
+  // Dati giornalieri per la heatmap della timeline interattiva
+  router.get('/api/analytics/heatmap', (req, res) => {
+    const { project, months } = req.query as { project?: string; months?: string };
+
+    if (project && !isValidProject(project)) {
+      res.status(400).json({ error: 'Invalid project name' });
+      return;
+    }
+
+    try {
+      const days = getHeatmapData(
+        ctx.db.db,
+        project || undefined,
+        parseIntSafe(months, 6, 1, 24)
+      );
+      res.json({ days });
+    } catch (error) {
+      logger.error('WORKER', 'Heatmap data failed', { project }, error as Error);
+      res.status(500).json({ error: 'Heatmap data fetch failed' });
+    }
+  });
+
+  // Concepts più frequenti estratti dal campo observations.concepts (issue #24)
+  router.get('/api/concepts', (req, res) => {
+    const { project, limit } = req.query as { project?: string; limit?: string };
+
+    if (project && !isValidProject(project)) {
+      res.status(400).json({ error: 'Invalid project name' });
+      return;
+    }
+
+    const _limit = parseIntSafe(limit, 50, 1, 200);
+
+    try {
+      // Il campo concepts è una stringa CSV — estrae token, conta occorrenze, ritorna top N
+      const sql = project
+        ? `SELECT concepts FROM observations WHERE project = ? AND concepts IS NOT NULL AND concepts != ''`
+        : `SELECT concepts FROM observations WHERE concepts IS NOT NULL AND concepts != ''`;
+
+      const stmt = ctx.db.db.query(sql);
+      const rows = project
+        ? stmt.all(project) as Array<{ concepts: string }>
+        : stmt.all() as Array<{ concepts: string }>;
+
+      // Conta le occorrenze di ogni singolo concept
+      const counts = new Map<string, number>();
+      for (const row of rows) {
+        const tokens = row.concepts.split(',').map((t: string) => t.trim()).filter(Boolean);
+        for (const token of tokens) {
+          counts.set(token, (counts.get(token) ?? 0) + 1);
+        }
+      }
+
+      // Ordina per frequenza decrescente, ritorna i top N
+      const result = Array.from(counts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, _limit)
+        .map(([concept, count]) => ({ concept, count }));
+
+      res.json(result);
+    } catch (error) {
+      logger.error('WORKER', 'Concepts fetch failed', { project }, error as Error);
+      res.status(500).json({ error: 'Concepts fetch failed' });
     }
   });
 

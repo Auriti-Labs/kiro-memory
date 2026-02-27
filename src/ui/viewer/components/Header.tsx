@@ -130,6 +130,24 @@ export function Header({ isConnected, lastEventTime, resolvedTheme, themePrefere
           </svg>
           Sessions
         </button>
+        {/* Tab Timeline interattiva (issue #21) */}
+        <button
+          onClick={() => onViewChange('timeline')}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+            currentView === 'timeline'
+              ? 'bg-surface-3 text-zinc-100 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+          role="tab"
+          aria-selected={currentView === 'timeline'}
+          aria-label="Timeline interattiva"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <circle cx="7" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="17" cy="12" r="2" />
+          </svg>
+          Timeline
+        </button>
       </div>
 
       {/* Theme toggle */}
