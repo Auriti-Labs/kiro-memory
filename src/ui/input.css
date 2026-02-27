@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Tema Light (default) ── */
+:root {
+  --surface-0: #F5F6FA;
+  --surface-1: #FFFFFF;
+  --surface-2: #ECEDF3;
+  --surface-3: #E0E2EB;
+  --surface-4: #D3D6E0;
+  --border: #D3D6E0;
+  --border-subtle: #E6E8EF;
+  --border-hover: #B5B9C8;
+  /* Zinc invertita per light: 100=scuro, 700=chiaro */
+  --zinc-50: #f8f9fa;
+  --zinc-100: #131520;
+  --zinc-200: #1f2233;
+  --zinc-300: #343750;
+  --zinc-400: #4b5068;
+  --zinc-500: #6b7085;
+  --zinc-600: #9499aa;
+  --zinc-700: #bfc3ce;
+  --zinc-800: #e4e6ec;
+  --zinc-900: #f3f4f6;
+  /* Ombre leggere */
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-panel: 0 0 0 1px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.06);
+  /* Scrollbar */
+  --scrollbar-thumb: #B5B9C8;
+  --scrollbar-hover: #8B7FD4;
+  --scrollbar-track: #ECEDF3;
+}
+
+/* ── Tema Dark ── */
+.dark {
+  --surface-0: #0E1015;
+  --surface-1: #161820;
+  --surface-2: #1E202A;
+  --surface-3: #272935;
+  --surface-4: #313342;
+  --border: #313342;
+  --border-subtle: #222430;
+  --border-hover: #434558;
+  /* Zinc standard dark */
+  --zinc-50: #18181b;
+  --zinc-100: #f0f1f4;
+  --zinc-200: #e0e2e8;
+  --zinc-300: #c8ccd6;
+  --zinc-400: #9ea3b2;
+  --zinc-500: #757a8c;
+  --zinc-600: #555968;
+  --zinc-700: #3d4050;
+  --zinc-800: #272935;
+  --zinc-900: #1a1c24;
+  /* Ombre profonde */
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.3);
+  --shadow-panel: 0 0 0 1px rgba(255,255,255,0.03), 0 2px 8px rgba(0,0,0,0.4);
+  /* Scrollbar */
+  --scrollbar-thumb: #434558;
+  --scrollbar-hover: #7C5AFF;
+  --scrollbar-track: #1E202A;
+}
+
+/* ── Scrollbar personalizzata ── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); border-radius: 4px; margin: 2px; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; border: 2px solid var(--scrollbar-track); transition: background 0.2s; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+::-webkit-scrollbar-corner { background: transparent; }
+/* Firefox */
+* { scrollbar-width: auto; scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); }
+
+/* ── Stagger animations ── */
+.stagger-1 { animation-delay: 30ms; }
+.stagger-2 { animation-delay: 60ms; }
+.stagger-3 { animation-delay: 90ms; }
+.stagger-4 { animation-delay: 120ms; }
+.stagger-5 { animation-delay: 150ms; }
+.stagger-6 { animation-delay: 180ms; }
+.stagger-7 { animation-delay: 210ms; }
+.stagger-8 { animation-delay: 240ms; }
+
+/* ── Command palette ── */
+.cmd-input::placeholder { color: rgba(255,255,255,0.3); }

@@ -54,6 +54,7 @@
   "scripts": {
     "dev": "npm run build-and-sync",
     "build": "node scripts/build-plugin.js",
+    "typecheck": "tsc --noEmit",
     "build-and-sync": "npm run build && npm run sync-kiro && npm run worker:restart",
     "sync-kiro": "node scripts/sync-kiro.cjs",
     "sync-kiro:force": "node scripts/sync-kiro.cjs --force",
@@ -125,6 +126,7 @@
     "bun-types": "^1.0.0",
     "esbuild": "^0.27.2",
     "np": "^11.0.2",
+    "tailwindcss": "^3.4.19",
     "tsx": "^4.20.6",
     "typescript": "^5.3.0"
   }
