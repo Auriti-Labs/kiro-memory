@@ -1,5 +1,6 @@
 import { Database } from 'bun:sqlite';
 import type { Observation } from '../../types/worker-types.js';
+import { redactSecrets } from '../../utils/secrets.js';
 
 /**
  * Observation operations for Kiro Memory database
@@ -41,11 +42,17 @@ export function createObservation(
   discoveryTokens: number = 0
 ): number {
   const now = new Date();
+
+  // Safety net: redact any secrets that may have slipped through upstream layers
+  const safeTitle = redactSecrets(title);
+  const safeText = text ? redactSecrets(text) : text;
+  const safeNarrative = narrative ? redactSecrets(narrative) : narrative;
+
   const result = db.run(
     `INSERT INTO observations
      (memory_session_id, project, type, title, subtitle, text, narrative, facts, concepts, files_read, files_modified, prompt_number, created_at, created_at_epoch, content_hash, discovery_tokens)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [memorySessionId, project, type, title, subtitle, text, narrative, facts, concepts, filesRead, filesModified, promptNumber, now.toISOString(), now.getTime(), contentHash, discoveryTokens]
+    [memorySessionId, project, type, safeTitle, subtitle, safeText, safeNarrative, facts, concepts, filesRead, filesModified, promptNumber, now.toISOString(), now.getTime(), contentHash, discoveryTokens]
   );
   return Number(result.lastInsertRowid);
 }

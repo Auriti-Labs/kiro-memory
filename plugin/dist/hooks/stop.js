@@ -16,6 +16,48 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
+// src/utils/secrets.ts
+function redactSecrets(text) {
+  if (!text) return text;
+  let redacted = text;
+  for (const { pattern } of SECRET_PATTERNS) {
+    pattern.lastIndex = 0;
+    redacted = redacted.replace(pattern, (match) => {
+      const prefix = match.substring(0, Math.min(4, match.length));
+      return `${prefix}***REDACTED***`;
+    });
+  }
+  return redacted;
+}
+var SECRET_PATTERNS;
+var init_secrets = __esm({
+  "src/utils/secrets.ts"() {
+    "use strict";
+    SECRET_PATTERNS = [
+      // AWS Access Keys (AKIA, ABIA, ACCA, ASIA prefixes + 16 alphanumeric chars)
+      { name: "aws-key", pattern: /(?:AKIA|ABIA|ACCA|ASIA)[A-Z0-9]{16}/g },
+      // JWT tokens (three base64url segments separated by dots)
+      { name: "jwt", pattern: /eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/g },
+      // Generic API keys in key=value or key: value assignments
+      { name: "api-key", pattern: /(?:api[_-]?key|apikey|api[_-]?secret)\s*[:=]\s*['"]?([a-zA-Z0-9_\-]{20,})['"]?/gi },
+      // Password/secret/token in variable assignments
+      { name: "credential", pattern: /(?:password|passwd|pwd|secret|token|auth[_-]?token|access[_-]?token|bearer)\s*[:=]\s*['"]?([^\s'"]{8,})['"]?/gi },
+      // Credentials embedded in URLs (user:pass@host)
+      { name: "url-credential", pattern: /(?:https?:\/\/)([^:]+):([^@]+)@/g },
+      // PEM-encoded private keys (RSA, EC, DSA, OpenSSH)
+      { name: "private-key", pattern: /-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g },
+      // GitHub personal access tokens (ghp_, gho_, ghu_, ghs_, ghr_ prefixes)
+      { name: "github-token", pattern: /gh[pousr]_[a-zA-Z0-9]{36,}/g },
+      // Slack bot/user/app tokens
+      { name: "slack-token", pattern: /xox[bpoas]-[a-zA-Z0-9-]{10,}/g },
+      // HTTP Authorization Bearer header values
+      { name: "bearer-header", pattern: /\bBearer\s+([a-zA-Z0-9_\-\.]{20,})/g },
+      // Generic hex secrets (32+ hex chars after a key/secret/token/password label)
+      { name: "hex-secret", pattern: /(?:key|secret|token|password)\s*[:=]\s*['"]?([0-9a-f]{32,})['"]?/gi }
+    ];
+  }
+});
+
 // src/services/sqlite/Observations.ts
 var Observations_exports = {};
 __export(Observations_exports, {
@@ -41,11 +83,14 @@ function isDuplicateObservation(db, contentHash, windowMs = 3e4) {
 }
 function createObservation(db, memorySessionId, project, type, title, subtitle, text, narrative, facts, concepts, filesRead, filesModified, promptNumber, contentHash = null, discoveryTokens = 0) {
   const now = /* @__PURE__ */ new Date();
+  const safeTitle = redactSecrets(title);
+  const safeText = text ? redactSecrets(text) : text;
+  const safeNarrative = narrative ? redactSecrets(narrative) : narrative;
   const result = db.run(
     `INSERT INTO observations
      (memory_session_id, project, type, title, subtitle, text, narrative, facts, concepts, files_read, files_modified, prompt_number, created_at, created_at_epoch, content_hash, discovery_tokens)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [memorySessionId, project, type, title, subtitle, text, narrative, facts, concepts, filesRead, filesModified, promptNumber, now.toISOString(), now.getTime(), contentHash, discoveryTokens]
+    [memorySessionId, project, type, safeTitle, subtitle, safeText, safeNarrative, facts, concepts, filesRead, filesModified, promptNumber, now.toISOString(), now.getTime(), contentHash, discoveryTokens]
   );
   return Number(result.lastInsertRowid);
 }
@@ -153,6 +198,7 @@ function consolidateObservations(db, project, options = {}) {
 var init_Observations = __esm({
   "src/services/sqlite/Observations.ts"() {
     "use strict";
+    init_secrets();
   }
 });
 
@@ -1207,6 +1253,31 @@ var MigrationRunner = class {
           db.run("CREATE INDEX IF NOT EXISTS idx_observations_project_type ON observations(project, type)");
           db.run("CREATE INDEX IF NOT EXISTS idx_summaries_project_epoch ON summaries(project, created_at_epoch DESC)");
           db.run("CREATE INDEX IF NOT EXISTS idx_prompts_project_epoch ON prompts(project, created_at_epoch DESC)");
+        }
+      },
+      {
+        version: 10,
+        up: (db) => {
+          db.run(`
+            CREATE TABLE IF NOT EXISTS job_queue (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              type TEXT NOT NULL,
+              status TEXT NOT NULL DEFAULT 'pending',
+              payload TEXT,
+              result TEXT,
+              error TEXT,
+              retry_count INTEGER DEFAULT 0,
+              max_retries INTEGER DEFAULT 3,
+              priority INTEGER DEFAULT 0,
+              created_at TEXT NOT NULL,
+              created_at_epoch INTEGER NOT NULL,
+              started_at_epoch INTEGER,
+              completed_at_epoch INTEGER
+            )
+          `);
+          db.run("CREATE INDEX IF NOT EXISTS idx_jobs_status ON job_queue(status)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_jobs_type ON job_queue(type)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_jobs_priority ON job_queue(status, priority DESC, created_at_epoch ASC)");
         }
       }
     ];

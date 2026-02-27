@@ -624,6 +624,31 @@ var MigrationRunner = class {
           db.run("CREATE INDEX IF NOT EXISTS idx_summaries_project_epoch ON summaries(project, created_at_epoch DESC)");
           db.run("CREATE INDEX IF NOT EXISTS idx_prompts_project_epoch ON prompts(project, created_at_epoch DESC)");
         }
+      },
+      {
+        version: 10,
+        up: (db) => {
+          db.run(`
+            CREATE TABLE IF NOT EXISTS job_queue (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              type TEXT NOT NULL,
+              status TEXT NOT NULL DEFAULT 'pending',
+              payload TEXT,
+              result TEXT,
+              error TEXT,
+              retry_count INTEGER DEFAULT 0,
+              max_retries INTEGER DEFAULT 3,
+              priority INTEGER DEFAULT 0,
+              created_at TEXT NOT NULL,
+              created_at_epoch INTEGER NOT NULL,
+              started_at_epoch INTEGER,
+              completed_at_epoch INTEGER
+            )
+          `);
+          db.run("CREATE INDEX IF NOT EXISTS idx_jobs_status ON job_queue(status)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_jobs_type ON job_queue(type)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_jobs_priority ON job_queue(status, priority DESC, created_at_epoch ASC)");
+        }
       }
     ];
   }

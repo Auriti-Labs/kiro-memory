@@ -8,6 +8,7 @@
 
 import { runHook, detectProject, notifyWorker } from './utils.js';
 import { createKiroMemory } from '../sdk/index.js';
+import { redactSecrets } from '../utils/secrets.js';
 
 runHook('postToolUse', async (input) => {
   // Cursor event normalization
@@ -38,12 +39,13 @@ runHook('postToolUse', async (input) => {
       const subtitle = generateSubtitle('file-read', input.tool_name, input.tool_input, files);
       const concepts = extractConcepts(input.tool_name, input.tool_input, files);
 
+      // Redact secrets from observation fields before storing
       await sdk.storeObservation({
         type: 'file-read',
-        title,
+        title: redactSecrets(title),
         subtitle,
-        content: files.length > 0 ? `Files: ${files.join(', ')}` : `Tool ${input.tool_name} executed`,
-        narrative,
+        content: redactSecrets(files.length > 0 ? `Files: ${files.join(', ')}` : `Tool ${input.tool_name} executed`),
+        narrative: redactSecrets(narrative),
         concepts: concepts.length > 0 ? concepts : undefined,
         filesRead: files,
       });
@@ -69,13 +71,15 @@ runHook('postToolUse', async (input) => {
 
     // Separate filesRead and filesModified based on type
     const isWrite = type === 'file-write';
+
+    // Redact secrets from all text fields before storing
     await sdk.storeObservation({
       type,
-      title,
+      title: redactSecrets(title),
       subtitle,
-      content,
-      narrative,
-      facts: facts || undefined,
+      content: redactSecrets(content),
+      narrative: redactSecrets(narrative),
+      facts: facts ? redactSecrets(facts) : undefined,
       concepts: concepts.length > 0 ? concepts : undefined,
       filesRead: isWrite ? undefined : files,
       filesModified: isWrite ? files : undefined,

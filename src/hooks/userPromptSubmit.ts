@@ -8,6 +8,7 @@
 
 import { runHook, detectProject, notifyWorker } from './utils.js';
 import { createKiroMemory } from '../sdk/index.js';
+import { redactSecrets } from '../utils/secrets.js';
 
 runHook('userPromptSubmit', async (input) => {
   // The prompt is a top-level field, NOT inside tool_input
@@ -26,7 +27,9 @@ runHook('userPromptSubmit', async (input) => {
     const sessionId = input.session_id
       || `kiro-${new Date().toISOString().split('T')[0]}-${project}`;
 
-    await sdk.storePrompt(sessionId, Date.now(), promptText.trim());
+    // Redact secrets before persisting the prompt text
+    const safePromptText = redactSecrets(promptText.trim());
+    await sdk.storePrompt(sessionId, Date.now(), safePromptText);
 
     // Notify the dashboard in real-time
     await notifyWorker('prompt-created', { project });
