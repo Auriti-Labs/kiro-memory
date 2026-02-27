@@ -324,7 +324,6 @@ function ensureDir(dirPath) {
 // src/services/sqlite/Database.ts
 var SQLITE_MMAP_SIZE_BYTES = 256 * 1024 * 1024;
 var SQLITE_CACHE_SIZE_PAGES = 1e4;
-var dbInstance = null;
 var KiroMemoryDatabase = class {
   db;
   /**
@@ -337,6 +336,7 @@ var KiroMemoryDatabase = class {
     }
     this.db = new Database(dbPath, { create: true, readwrite: true });
     this.db.run("PRAGMA journal_mode = WAL");
+    this.db.run("PRAGMA busy_timeout = 5000");
     this.db.run("PRAGMA synchronous = NORMAL");
     this.db.run("PRAGMA foreign_keys = ON");
     this.db.run("PRAGMA temp_store = memory");
@@ -360,114 +360,6 @@ var KiroMemoryDatabase = class {
    */
   close() {
     this.db.close();
-  }
-};
-var DatabaseManager = class _DatabaseManager {
-  static instance;
-  db = null;
-  migrations = [];
-  static getInstance() {
-    if (!_DatabaseManager.instance) {
-      _DatabaseManager.instance = new _DatabaseManager();
-    }
-    return _DatabaseManager.instance;
-  }
-  /**
-   * Register a migration to be run during initialization
-   */
-  registerMigration(migration) {
-    this.migrations.push(migration);
-    this.migrations.sort((a, b) => a.version - b.version);
-  }
-  /**
-   * Initialize database connection with optimized settings
-   */
-  async initialize() {
-    if (this.db) {
-      return this.db;
-    }
-    ensureDir(DATA_DIR);
-    this.db = new Database(DB_PATH, { create: true, readwrite: true });
-    this.db.run("PRAGMA journal_mode = WAL");
-    this.db.run("PRAGMA synchronous = NORMAL");
-    this.db.run("PRAGMA foreign_keys = ON");
-    this.db.run("PRAGMA temp_store = memory");
-    this.db.run(`PRAGMA mmap_size = ${SQLITE_MMAP_SIZE_BYTES}`);
-    this.db.run(`PRAGMA cache_size = ${SQLITE_CACHE_SIZE_PAGES}`);
-    this.initializeSchemaVersions();
-    await this.runMigrations();
-    dbInstance = this.db;
-    return this.db;
-  }
-  /**
-   * Get the current database connection
-   */
-  getConnection() {
-    if (!this.db) {
-      throw new Error("Database not initialized. Call initialize() first.");
-    }
-    return this.db;
-  }
-  /**
-   * Execute a function within a transaction
-   */
-  withTransaction(fn) {
-    const db = this.getConnection();
-    const transaction = db.transaction(fn);
-    return transaction(db);
-  }
-  /**
-   * Close the database connection
-   */
-  close() {
-    if (this.db) {
-      this.db.close();
-      this.db = null;
-      dbInstance = null;
-    }
-  }
-  /**
-   * Initialize the schema_versions table
-   */
-  initializeSchemaVersions() {
-    if (!this.db) return;
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS schema_versions (
-        id INTEGER PRIMARY KEY,
-        version INTEGER UNIQUE NOT NULL,
-        applied_at TEXT NOT NULL
-      )
-    `);
-  }
-  /**
-   * Run all pending migrations
-   */
-  async runMigrations() {
-    if (!this.db) return;
-    const query = this.db.query("SELECT version FROM schema_versions ORDER BY version");
-    const appliedVersions = query.all().map((row) => row.version);
-    const maxApplied = appliedVersions.length > 0 ? Math.max(...appliedVersions) : 0;
-    for (const migration of this.migrations) {
-      if (migration.version > maxApplied) {
-        logger.info("DB", `Applying migration ${migration.version}`);
-        const transaction = this.db.transaction(() => {
-          migration.up(this.db);
-          const insertQuery = this.db.query("INSERT INTO schema_versions (version, applied_at) VALUES (?, ?)");
-          insertQuery.run(migration.version, (/* @__PURE__ */ new Date()).toISOString());
-        });
-        transaction();
-        logger.info("DB", `Migration ${migration.version} applied successfully`);
-      }
-    }
-  }
-  /**
-   * Get current schema version
-   */
-  getCurrentVersion() {
-    if (!this.db) return 0;
-    const query = this.db.query("SELECT MAX(version) as version FROM schema_versions");
-    const result = query.get();
-    return result?.version || 0;
   }
 };
 var MigrationRunner = class {
@@ -712,21 +604,7 @@ var MigrationRunner = class {
     ];
   }
 };
-function getDatabase() {
-  if (!dbInstance) {
-    throw new Error("Database not initialized. Call DatabaseManager.getInstance().initialize() first.");
-  }
-  return dbInstance;
-}
-async function initializeDatabase() {
-  const manager = DatabaseManager.getInstance();
-  return await manager.initialize();
-}
 export {
-  KiroMemoryDatabase as ContextKitDatabase,
   Database,
-  DatabaseManager,
-  KiroMemoryDatabase,
-  getDatabase,
-  initializeDatabase
+  KiroMemoryDatabase
 };

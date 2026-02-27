@@ -324,7 +324,6 @@ function ensureDir(dirPath) {
 // src/services/sqlite/Database.ts
 var SQLITE_MMAP_SIZE_BYTES = 256 * 1024 * 1024;
 var SQLITE_CACHE_SIZE_PAGES = 1e4;
-var dbInstance = null;
 var KiroMemoryDatabase = class {
   db;
   /**
@@ -337,6 +336,7 @@ var KiroMemoryDatabase = class {
     }
     this.db = new Database(dbPath, { create: true, readwrite: true });
     this.db.run("PRAGMA journal_mode = WAL");
+    this.db.run("PRAGMA busy_timeout = 5000");
     this.db.run("PRAGMA synchronous = NORMAL");
     this.db.run("PRAGMA foreign_keys = ON");
     this.db.run("PRAGMA temp_store = memory");
@@ -360,114 +360,6 @@ var KiroMemoryDatabase = class {
    */
   close() {
     this.db.close();
-  }
-};
-var DatabaseManager = class _DatabaseManager {
-  static instance;
-  db = null;
-  migrations = [];
-  static getInstance() {
-    if (!_DatabaseManager.instance) {
-      _DatabaseManager.instance = new _DatabaseManager();
-    }
-    return _DatabaseManager.instance;
-  }
-  /**
-   * Register a migration to be run during initialization
-   */
-  registerMigration(migration) {
-    this.migrations.push(migration);
-    this.migrations.sort((a, b) => a.version - b.version);
-  }
-  /**
-   * Initialize database connection with optimized settings
-   */
-  async initialize() {
-    if (this.db) {
-      return this.db;
-    }
-    ensureDir(DATA_DIR);
-    this.db = new Database(DB_PATH, { create: true, readwrite: true });
-    this.db.run("PRAGMA journal_mode = WAL");
-    this.db.run("PRAGMA synchronous = NORMAL");
-    this.db.run("PRAGMA foreign_keys = ON");
-    this.db.run("PRAGMA temp_store = memory");
-    this.db.run(`PRAGMA mmap_size = ${SQLITE_MMAP_SIZE_BYTES}`);
-    this.db.run(`PRAGMA cache_size = ${SQLITE_CACHE_SIZE_PAGES}`);
-    this.initializeSchemaVersions();
-    await this.runMigrations();
-    dbInstance = this.db;
-    return this.db;
-  }
-  /**
-   * Get the current database connection
-   */
-  getConnection() {
-    if (!this.db) {
-      throw new Error("Database not initialized. Call initialize() first.");
-    }
-    return this.db;
-  }
-  /**
-   * Execute a function within a transaction
-   */
-  withTransaction(fn) {
-    const db = this.getConnection();
-    const transaction = db.transaction(fn);
-    return transaction(db);
-  }
-  /**
-   * Close the database connection
-   */
-  close() {
-    if (this.db) {
-      this.db.close();
-      this.db = null;
-      dbInstance = null;
-    }
-  }
-  /**
-   * Initialize the schema_versions table
-   */
-  initializeSchemaVersions() {
-    if (!this.db) return;
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS schema_versions (
-        id INTEGER PRIMARY KEY,
-        version INTEGER UNIQUE NOT NULL,
-        applied_at TEXT NOT NULL
-      )
-    `);
-  }
-  /**
-   * Run all pending migrations
-   */
-  async runMigrations() {
-    if (!this.db) return;
-    const query = this.db.query("SELECT version FROM schema_versions ORDER BY version");
-    const appliedVersions = query.all().map((row) => row.version);
-    const maxApplied = appliedVersions.length > 0 ? Math.max(...appliedVersions) : 0;
-    for (const migration of this.migrations) {
-      if (migration.version > maxApplied) {
-        logger.info("DB", `Applying migration ${migration.version}`);
-        const transaction = this.db.transaction(() => {
-          migration.up(this.db);
-          const insertQuery = this.db.query("INSERT INTO schema_versions (version, applied_at) VALUES (?, ?)");
-          insertQuery.run(migration.version, (/* @__PURE__ */ new Date()).toISOString());
-        });
-        transaction();
-        logger.info("DB", `Migration ${migration.version} applied successfully`);
-      }
-    }
-  }
-  /**
-   * Get current schema version
-   */
-  getCurrentVersion() {
-    if (!this.db) return 0;
-    const query = this.db.query("SELECT MAX(version) as version FROM schema_versions");
-    const result = query.get();
-    return result?.version || 0;
   }
 };
 var MigrationRunner = class {
@@ -712,16 +604,6 @@ var MigrationRunner = class {
     ];
   }
 };
-function getDatabase() {
-  if (!dbInstance) {
-    throw new Error("Database not initialized. Call DatabaseManager.getInstance().initialize() first.");
-  }
-  return dbInstance;
-}
-async function initializeDatabase() {
-  const manager = DatabaseManager.getInstance();
-  return await manager.initialize();
-}
 
 // src/services/sqlite/Sessions.ts
 function createSession(db, contentSessionId, project, userPrompt) {
@@ -850,9 +732,25 @@ function consolidateObservations(db, project, options = {}) {
     ORDER BY cnt DESC
   `).all(project, minGroupSize);
   if (groups.length === 0) return { merged: 0, removed: 0 };
-  let totalMerged = 0;
-  let totalRemoved = 0;
+  if (options.dryRun) {
+    let totalMerged = 0;
+    let totalRemoved = 0;
+    for (const group of groups) {
+      const obsIds = group.ids.split(",").map(Number);
+      const placeholders = obsIds.map(() => "?").join(",");
+      const count = db.query(
+        `SELECT COUNT(*) as cnt FROM observations WHERE id IN (${placeholders})`
+      ).get(...obsIds)?.cnt || 0;
+      if (count >= minGroupSize) {
+        totalMerged += 1;
+        totalRemoved += count - 1;
+      }
+    }
+    return { merged: totalMerged, removed: totalRemoved };
+  }
   const runConsolidation = db.transaction(() => {
+    let merged = 0;
+    let removed = 0;
     for (const group of groups) {
       const obsIds = group.ids.split(",").map(Number);
       const placeholders = obsIds.map(() => "?").join(",");
@@ -860,11 +758,6 @@ function consolidateObservations(db, project, options = {}) {
         `SELECT * FROM observations WHERE id IN (${placeholders}) ORDER BY created_at_epoch DESC`
       ).all(...obsIds);
       if (observations.length < minGroupSize) continue;
-      if (options.dryRun) {
-        totalMerged += 1;
-        totalRemoved += observations.length - 1;
-        continue;
-      }
       const keeper = observations[0];
       const others = observations.slice(1);
       const uniqueTexts = /* @__PURE__ */ new Set();
@@ -883,12 +776,12 @@ function consolidateObservations(db, project, options = {}) {
       const removePlaceholders = removeIds.map(() => "?").join(",");
       db.run(`DELETE FROM observations WHERE id IN (${removePlaceholders})`, removeIds);
       db.run(`DELETE FROM observation_embeddings WHERE observation_id IN (${removePlaceholders})`, removeIds);
-      totalMerged += 1;
-      totalRemoved += removeIds.length;
+      merged += 1;
+      removed += removeIds.length;
     }
+    return { merged, removed };
   });
-  runConsolidation();
-  return { merged: totalMerged, removed: totalRemoved };
+  return runConsolidation();
 }
 
 // src/services/sqlite/Summaries.ts
@@ -1134,7 +1027,7 @@ function escapeLikePattern3(input) {
 }
 function sanitizeFTS5Query(query) {
   const trimmed = query.length > 1e4 ? query.substring(0, 1e4) : query;
-  const terms = trimmed.replace(/[""]/g, "").split(/\s+/).filter((t) => t.length > 0).slice(0, 100).map((t) => `"${t}"`);
+  const terms = trimmed.replace(/[""\u0022]/g, "").split(/\s+/).filter((t) => t.length > 0).slice(0, 100).map((t) => `"${t}"`);
   return terms.join(" ");
 }
 function searchObservationsFTS(db, query, filters = {}) {
@@ -1362,8 +1255,6 @@ function markObservationsStale(db, ids, stale) {
   );
 }
 export {
-  KiroMemoryDatabase as ContextKitDatabase,
-  DatabaseManager,
   KiroMemoryDatabase,
   completeSession,
   consolidateObservations,
@@ -1379,7 +1270,6 @@ export {
   getActiveSessions,
   getAllSessions,
   getCheckpointsBySession,
-  getDatabase,
   getLatestCheckpoint,
   getLatestCheckpointByProject,
   getLatestPrompt,
@@ -1397,7 +1287,6 @@ export {
   getSummariesByProject,
   getSummaryBySession,
   getTimeline,
-  initializeDatabase,
   isDuplicateObservation,
   markObservationsStale,
   searchObservations,

@@ -359,17 +359,21 @@ function getEmbeddingService() {
 }
 
 // src/services/search/VectorSearch.ts
+var DEFAULT_MAX_CANDIDATES = 2e3;
 function cosineSimilarity(a, b) {
-  if (a.length !== b.length) return 0;
+  const len = a.length;
+  if (len !== b.length) return 0;
   let dotProduct = 0;
   let normA = 0;
   let normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
+  for (let i = 0; i < len; i++) {
+    const ai = a[i];
+    const bi = b[i];
+    dotProduct += ai * bi;
+    normA += ai * ai;
+    normB += bi * bi;
   }
-  const denominator = Math.sqrt(normA) * Math.sqrt(normB);
+  const denominator = Math.sqrt(normA * normB);
   if (denominator === 0) return 0;
   return dotProduct / denominator;
 }
@@ -382,23 +386,36 @@ function bufferToFloat32(buf) {
 }
 var VectorSearch = class {
   /**
-   * Ricerca semantica: calcola cosine similarity tra query e tutti gli embeddings.
+   * Ricerca semantica con pre-filtraggio SQL per scalabilità.
+   *
+   * Strategia a 2 fasi:
+   * 1. SQL pre-filtra per progetto + ordina per recency (carica max N candidati)
+   * 2. JS calcola cosine similarity solo sui candidati filtrati
+   *
+   * Con 50k osservazioni e maxCandidates=2000, carica solo ~4% dei dati.
    */
   async search(db, queryEmbedding, options = {}) {
     const limit = options.limit || 10;
     const threshold = options.threshold || 0.3;
+    const maxCandidates = options.maxCandidates || DEFAULT_MAX_CANDIDATES;
     try {
-      let sql = `
+      const conditions = [];
+      const params = [];
+      if (options.project) {
+        conditions.push("o.project = ?");
+        params.push(options.project);
+      }
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      const sql = `
         SELECT e.observation_id, e.embedding,
                o.title, o.text, o.type, o.project, o.created_at, o.created_at_epoch
         FROM observation_embeddings e
         JOIN observations o ON o.id = e.observation_id
+        ${whereClause}
+        ORDER BY o.created_at_epoch DESC
+        LIMIT ?
       `;
-      const params = [];
-      if (options.project) {
-        sql += " WHERE o.project = ?";
-        params.push(options.project);
-      }
+      params.push(maxCandidates);
       const rows = db.query(sql).all(...params);
       const scored = [];
       for (const row of rows) {
@@ -419,6 +436,7 @@ var VectorSearch = class {
         }
       }
       scored.sort((a, b) => b.similarity - a.similarity);
+      logger.debug("VECTOR", `Ricerca: ${rows.length} candidati \u2192 ${scored.length} sopra soglia \u2192 ${Math.min(scored.length, limit)} risultati`);
       return scored.slice(0, limit);
     } catch (error) {
       logger.error("VECTOR", `Errore ricerca vettoriale: ${error}`);

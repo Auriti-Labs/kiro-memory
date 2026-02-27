@@ -8,7 +8,7 @@ function escapeLikePattern(input) {
 }
 function sanitizeFTS5Query(query) {
   const trimmed = query.length > 1e4 ? query.substring(0, 1e4) : query;
-  const terms = trimmed.replace(/[""]/g, "").split(/\s+/).filter((t) => t.length > 0).slice(0, 100).map((t) => `"${t}"`);
+  const terms = trimmed.replace(/[""\u0022]/g, "").split(/\s+/).filter((t) => t.length > 0).slice(0, 100).map((t) => `"${t}"`);
   return terms.join(" ");
 }
 function searchObservationsFTS(db, query, filters = {}) {

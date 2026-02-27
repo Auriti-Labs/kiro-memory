@@ -72,9 +72,25 @@ function consolidateObservations(db, project, options = {}) {
     ORDER BY cnt DESC
   `).all(project, minGroupSize);
   if (groups.length === 0) return { merged: 0, removed: 0 };
-  let totalMerged = 0;
-  let totalRemoved = 0;
+  if (options.dryRun) {
+    let totalMerged = 0;
+    let totalRemoved = 0;
+    for (const group of groups) {
+      const obsIds = group.ids.split(",").map(Number);
+      const placeholders = obsIds.map(() => "?").join(",");
+      const count = db.query(
+        `SELECT COUNT(*) as cnt FROM observations WHERE id IN (${placeholders})`
+      ).get(...obsIds)?.cnt || 0;
+      if (count >= minGroupSize) {
+        totalMerged += 1;
+        totalRemoved += count - 1;
+      }
+    }
+    return { merged: totalMerged, removed: totalRemoved };
+  }
   const runConsolidation = db.transaction(() => {
+    let merged = 0;
+    let removed = 0;
     for (const group of groups) {
       const obsIds = group.ids.split(",").map(Number);
       const placeholders = obsIds.map(() => "?").join(",");
@@ -82,11 +98,6 @@ function consolidateObservations(db, project, options = {}) {
         `SELECT * FROM observations WHERE id IN (${placeholders}) ORDER BY created_at_epoch DESC`
       ).all(...obsIds);
       if (observations.length < minGroupSize) continue;
-      if (options.dryRun) {
-        totalMerged += 1;
-        totalRemoved += observations.length - 1;
-        continue;
-      }
       const keeper = observations[0];
       const others = observations.slice(1);
       const uniqueTexts = /* @__PURE__ */ new Set();
@@ -105,12 +116,12 @@ function consolidateObservations(db, project, options = {}) {
       const removePlaceholders = removeIds.map(() => "?").join(",");
       db.run(`DELETE FROM observations WHERE id IN (${removePlaceholders})`, removeIds);
       db.run(`DELETE FROM observation_embeddings WHERE observation_id IN (${removePlaceholders})`, removeIds);
-      totalMerged += 1;
-      totalRemoved += removeIds.length;
+      merged += 1;
+      removed += removeIds.length;
     }
+    return { merged, removed };
   });
-  runConsolidation();
-  return { merged: totalMerged, removed: totalRemoved };
+  return runConsolidation();
 }
 export {
   consolidateObservations,
