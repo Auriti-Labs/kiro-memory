@@ -28,7 +28,7 @@ function sanitizeFTS5Query(query: string): string {
   const trimmed = query.length > 10_000 ? query.substring(0, 10_000) : query;
 
   const terms = trimmed
-    .replace(/[""]/g, '')
+    .replace(/[""\u0022]/g, '')
     .split(/\s+/)
     .filter(t => t.length > 0)
     .slice(0, 100)

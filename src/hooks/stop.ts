@@ -14,15 +14,15 @@ runHook('stop', async (input) => {
   const sdk = createKiroMemory({ project, skipMigrations: true });
 
   try {
-    // Recupera le osservazioni recenti della sessione corrente
-    const recentObs = await sdk.getRecentObservations(50);
+    // Recupera o crea la sessione DB per questo content_session_id
+    const contentSessionId = input.session_id || `stop-${Date.now()}`;
+    const session = await sdk.getOrCreateSession(contentSessionId);
 
-    // Filtra per session_id se disponibile da Kiro, altrimenti finestra temporale di 4 ore
-    const sessionId = input.session_id;
-    const fourHoursAgo = Date.now() - (4 * 60 * 60 * 1000);
-    const sessionObs = sessionId
-      ? recentObs.filter(o => o.memory_session_id === sessionId)
-      : recentObs.filter(o => o.created_at_epoch > fourHoursAgo);
+    // Filtra osservazioni: usa started_at_epoch della sessione se disponibile,
+    // altrimenti fallback a finestra 4h. Fix: content_session_id ≠ memory_session_id
+    const recentObs = await sdk.getRecentObservations(50);
+    const sessionStart = session.started_at_epoch || (Date.now() - (4 * 60 * 60 * 1000));
+    const sessionObs = recentObs.filter(o => o.created_at_epoch >= sessionStart);
 
     if (sessionObs.length === 0) return;
 
@@ -96,9 +96,7 @@ runHook('stop', async (input) => {
     // Notifica la dashboard in tempo reale
     await notifyWorker('summary-created', { project });
 
-    // Crea checkpoint strutturato per resume futuro
-    const session = await sdk.getOrCreateSession(input.session_id || `stop-${Date.now()}`);
-
+    // Crea checkpoint strutturato per resume futuro (sessione già recuperata sopra)
     const task = sessionObs[0]?.title || `${project} session`;
     const progress = completed || 'No progress recorded';
     const nextStepsCheckpoint = filesModified.length > 0
