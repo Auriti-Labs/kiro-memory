@@ -1,5 +1,5 @@
 /**
- * Router Analytics: overview, timeline, distribuzione tipi, sessioni.
+ * Router Analytics: overview, timeline, type distribution, sessions.
  */
 
 import { Router } from 'express';
@@ -23,7 +23,7 @@ export function createAnalyticsRouter(ctx: WorkerContext): Router {
       const overview = getAnalyticsOverview(ctx.db.db, project || undefined);
       res.json(overview);
     } catch (error) {
-      logger.error('WORKER', 'Analytics overview fallita', { project }, error as Error);
+      logger.error('WORKER', 'Analytics overview failed', { project }, error as Error);
       res.status(500).json({ error: 'Analytics overview failed' });
     }
   });
@@ -44,7 +44,7 @@ export function createAnalyticsRouter(ctx: WorkerContext): Router {
       );
       res.json(timeline);
     } catch (error) {
-      logger.error('WORKER', 'Analytics timeline fallita', { project }, error as Error);
+      logger.error('WORKER', 'Analytics timeline failed', { project }, error as Error);
       res.status(500).json({ error: 'Analytics timeline failed' });
     }
   });
@@ -61,7 +61,7 @@ export function createAnalyticsRouter(ctx: WorkerContext): Router {
       const distribution = getTypeDistribution(ctx.db.db, project || undefined);
       res.json(distribution);
     } catch (error) {
-      logger.error('WORKER', 'Analytics types fallita', { project }, error as Error);
+      logger.error('WORKER', 'Analytics types failed', { project }, error as Error);
       res.status(500).json({ error: 'Analytics types failed' });
     }
   });
@@ -78,7 +78,7 @@ export function createAnalyticsRouter(ctx: WorkerContext): Router {
       const stats = getSessionStats(ctx.db.db, project || undefined);
       res.json(stats);
     } catch (error) {
-      logger.error('WORKER', 'Analytics sessions fallita', { project }, error as Error);
+      logger.error('WORKER', 'Analytics sessions failed', { project }, error as Error);
       res.status(500).json({ error: 'Analytics sessions failed' });
     }
   });

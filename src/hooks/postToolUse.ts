@@ -67,7 +67,7 @@ runHook('postToolUse', async (input) => {
     // Content: compact technical reference (per indicizzazione ricerca)
     const content = buildContent(input.tool_name, input.tool_input, input.tool_response);
 
-    // Separa filesRead e filesModified in base al tipo
+    // Separate filesRead and filesModified based on type
     const isWrite = type === 'file-write';
     await sdk.storeObservation({
       type,
@@ -136,7 +136,7 @@ function buildObservation(
       // Titolo breve
       const title = `${verb} ${fileName}`;
 
-      // Narrativa ricca: verb + file + path + dettagli modifica
+      // Rich narrative: verb + file + path + change details
       const parts: string[] = [];
       parts.push(`${verb} ${fileName}`);
       if (filePath !== fileName) parts.push(`at ${filePath}`);
@@ -181,10 +181,10 @@ function buildObservation(
       if (desc) parts.push(`${desc}.`);
       parts.push(`Ran \`${shortCmd}\``);
 
-      // Aggiungi riassunto output (prime righe significative)
+      // Add output summary (last significant lines)
       if (stdout) {
         const lines = stdout.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0);
-        const outputLines = lines.slice(-3).join('; '); // Ultime 3 righe (spesso le più significative)
+        const outputLines = lines.slice(-3).join('; '); // Last 3 lines (often the most significant)
         if (outputLines) parts.push(`— output: ${outputLines.substring(0, 150)}`);
       }
 
@@ -283,11 +283,11 @@ function basename(filePath: string): string {
   return filePath.split('/').pop() || filePath;
 }
 
-/* ── Estrazione automatica di concept tags dal contesto ── */
+/* ── Automatic concept tag extraction from context ── */
 function extractConcepts(toolName: string, toolInput: any, files: string[]): string[] {
   const concepts = new Set<string>();
 
-  // Analizza i percorsi dei file per estrarre concept
+  // Analyze file paths to extract concepts
   for (const file of files) {
     const lower = file.toLowerCase();
     if (lower.includes('test') || lower.includes('spec')) concepts.add('testing');
@@ -306,7 +306,7 @@ function extractConcepts(toolName: string, toolInput: any, files: string[]): str
     if (lower.includes('server') || lower.includes('worker') || lower.includes('service')) concepts.add('backend');
   }
 
-  // Analizza il comando per concept aggiuntivi
+  // Analyze command for additional concepts
   const cmd = toolInput?.command || '';
   if (cmd) {
     const lowerCmd = cmd.toLowerCase();
@@ -320,7 +320,7 @@ function extractConcepts(toolName: string, toolInput: any, files: string[]): str
     if (lowerCmd.includes('curl') || lowerCmd.includes('fetch') || lowerCmd.includes('wget')) concepts.add('networking');
   }
 
-  // Analizza pattern di ricerca (grep/glob)
+  // Analyze search patterns (grep/glob)
   const pattern = toolInput?.pattern || toolInput?.regex || toolInput?.query || '';
   if (pattern) {
     const lowerPattern = pattern.toLowerCase();
@@ -329,16 +329,16 @@ function extractConcepts(toolName: string, toolInput: any, files: string[]): str
     if (lowerPattern.includes('todo') || lowerPattern.includes('fixme') || lowerPattern.includes('hack')) concepts.add('tech-debt');
   }
 
-  // Analizza contenuto codice (new_string di Edit, content di Write)
+  // Analyze code content (new_string from Edit, content from Write)
   const codeContent = (toolInput?.new_string || toolInput?.content || '').substring(0, 2000).toLowerCase();
   if (codeContent.length > 20) {
     extractConceptsFromCode(codeContent, concepts);
   }
 
-  return [...concepts].slice(0, 5); // Massimo 5 concept per osservazione
+  return [...concepts].slice(0, 5); // Max 5 concepts per observation
 }
 
-/** Estrae concept dal contenuto effettivo del codice */
+/** Extract concepts from actual code content */
 function extractConceptsFromCode(code: string, concepts: Set<string>): void {
   // React patterns
   if (/\b(usestate|useeffect|usememo|usecallback|useref|usecontext)\b/.test(code)) concepts.add('hooks');
@@ -367,10 +367,10 @@ function extractConceptsFromCode(code: string, concepts: Set<string>): void {
   if (/\btry\s*\{|catch\s*\(|throw\s+new|\.catch\s*\(|onerror/.test(code)) concepts.add('error-handling');
 }
 
-/* ── Generazione subtitle distinto dal titolo ── */
+/* ── Generate subtitle distinct from title ── */
 function generateSubtitle(type: string, toolName: string, toolInput: any, files: string[]): string {
   const filePath = files[0] || toolInput?.path || toolInput?.file_path || '';
-  // Percorso relativo: rimuovi la home e il nome del progetto
+  // Relative path: remove home and project name
   const relativePath = filePath.replace(/^\/home\/[^/]+\/[^/]+\//, '');
 
   switch (type) {
@@ -389,7 +389,7 @@ function generateSubtitle(type: string, toolName: string, toolInput: any, files:
     }
     case 'command': {
       const cmd = (toolInput?.command || '').trim();
-      // Estrai il primo "programma" dal comando
+      // Extract the first "program" from the command
       const program = cmd.split(/\s+/)[0]?.replace(/^[./]+/, '') || 'shell';
       return program;
     }

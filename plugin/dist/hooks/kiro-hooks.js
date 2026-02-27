@@ -136,7 +136,7 @@ function consolidateObservations(db, project, options = {}) {
       const consolidatedText = Array.from(uniqueTexts).join("\n---\n").substring(0, 1e5);
       db.run(
         "UPDATE observations SET text = ?, title = ? WHERE id = ?",
-        [consolidatedText, `[consolidato x${observations.length}] ${keeper.title}`, keeper.id]
+        [consolidatedText, `[consolidated x${observations.length}] ${keeper.title}`, keeper.id]
       );
       const removeIds = others.map((o) => o.id);
       const removePlaceholders = removeIds.map(() => "?").join(",");
@@ -415,12 +415,12 @@ var Database = class {
   _db;
   constructor(path, options) {
     this._db = new BetterSqlite3(path, {
-      // better-sqlite3 crea il file di default (non serve 'create')
+      // better-sqlite3 creates the file by default ('create' not needed)
       readonly: options?.readwrite === false ? true : false
     });
   }
   /**
-   * Esegui una query SQL senza risultati
+   * Execute a SQL query without results
    */
   run(sql, params) {
     const stmt = this._db.prepare(sql);
@@ -428,19 +428,19 @@ var Database = class {
     return result;
   }
   /**
-   * Prepara una query con interfaccia compatibile bun:sqlite
+   * Prepare a query with bun:sqlite-compatible interface
    */
   query(sql) {
     return new BunQueryCompat(this._db, sql);
   }
   /**
-   * Crea una transazione
+   * Create a transaction
    */
   transaction(fn) {
     return this._db.transaction(fn);
   }
   /**
-   * Chiudi la connessione
+   * Close the connection
    */
   close() {
     this._db.close();
@@ -454,21 +454,21 @@ var BunQueryCompat = class {
     this._sql = sql;
   }
   /**
-   * Restituisce tutte le righe
+   * Returns all rows
    */
   all(...params) {
     const stmt = this._db.prepare(this._sql);
     return params.length > 0 ? stmt.all(...params) : stmt.all();
   }
   /**
-   * Restituisce la prima riga o null
+   * Returns the first row or null
    */
   get(...params) {
     const stmt = this._db.prepare(this._sql);
     return params.length > 0 ? stmt.get(...params) : stmt.get();
   }
   /**
-   * Esegui senza risultati
+   * Execute without results
    */
   run(...params) {
     const stmt = this._db.prepare(this._sql);
@@ -736,8 +736,8 @@ var SQLITE_CACHE_SIZE_PAGES = 1e4;
 var KiroMemoryDatabase = class {
   db;
   /**
-   * @param dbPath - Percorso al file SQLite (default: DB_PATH)
-   * @param skipMigrations - Se true, salta il migration runner (per hook ad alta frequenza)
+   * @param dbPath - Path to the SQLite file (default: DB_PATH)
+   * @param skipMigrations - If true, skip the migration runner (for high-frequency hooks)
    */
   constructor(dbPath = DB_PATH, skipMigrations = false) {
     if (dbPath !== ":memory:") {
@@ -757,8 +757,8 @@ var KiroMemoryDatabase = class {
     }
   }
   /**
-   * Esegue una funzione all'interno di una transazione atomica.
-   * Se fn() lancia un errore, la transazione viene annullata automaticamente.
+   * Executes a function within an atomic transaction.
+   * If fn() throws an error, the transaction is automatically rolled back.
    */
   withTransaction(fn) {
     const transaction = this.db.transaction(fn);
@@ -1263,8 +1263,8 @@ var EmbeddingService = class {
   initialized = false;
   initializing = null;
   /**
-   * Inizializza il servizio di embedding.
-   * Tenta fastembed, poi @huggingface/transformers, poi fallback a null.
+   * Initialize the embedding service.
+   * Tries fastembed, then @huggingface/transformers, then fallback to null.
    */
   async initialize() {
     if (this.initialized) return this.provider !== null;
@@ -1285,11 +1285,11 @@ var EmbeddingService = class {
         });
         this.provider = "fastembed";
         this.initialized = true;
-        logger.info("EMBEDDING", "Inizializzato con fastembed (BGE-small-en-v1.5)");
+        logger.info("EMBEDDING", "Initialized with fastembed (BGE-small-en-v1.5)");
         return true;
       }
     } catch (error) {
-      logger.debug("EMBEDDING", `fastembed non disponibile: ${error}`);
+      logger.debug("EMBEDDING", `fastembed not available: ${error}`);
     }
     try {
       const transformers = await import("@huggingface/transformers");
@@ -1300,20 +1300,20 @@ var EmbeddingService = class {
         });
         this.provider = "transformers";
         this.initialized = true;
-        logger.info("EMBEDDING", "Inizializzato con @huggingface/transformers (all-MiniLM-L6-v2)");
+        logger.info("EMBEDDING", "Initialized with @huggingface/transformers (all-MiniLM-L6-v2)");
         return true;
       }
     } catch (error) {
-      logger.debug("EMBEDDING", `@huggingface/transformers non disponibile: ${error}`);
+      logger.debug("EMBEDDING", `@huggingface/transformers not available: ${error}`);
     }
     this.provider = null;
     this.initialized = true;
-    logger.warn("EMBEDDING", "Nessun provider embedding disponibile, ricerca semantica disabilitata");
+    logger.warn("EMBEDDING", "No embedding provider available, semantic search disabled");
     return false;
   }
   /**
-   * Genera embedding per un singolo testo.
-   * Ritorna Float32Array con 384 dimensioni, o null se non disponibile.
+   * Generate embedding for a single text.
+   * Returns Float32Array with 384 dimensions, or null if not available.
    */
   async embed(text) {
     if (!this.initialized) await this.initialize();
@@ -1326,12 +1326,12 @@ var EmbeddingService = class {
         return await this._embedTransformers(truncated);
       }
     } catch (error) {
-      logger.error("EMBEDDING", `Errore generazione embedding: ${error}`);
+      logger.error("EMBEDDING", `Error generating embedding: ${error}`);
     }
     return null;
   }
   /**
-   * Genera embeddings in batch.
+   * Generate embeddings in batch.
    */
   async embedBatch(texts) {
     if (!this.initialized) await this.initialize();
@@ -1348,24 +1348,24 @@ var EmbeddingService = class {
     return results;
   }
   /**
-   * Verifica se il servizio è disponibile.
+   * Check if the service is available.
    */
   isAvailable() {
     return this.initialized && this.provider !== null;
   }
   /**
-   * Nome del provider attivo.
+   * Name of the active provider.
    */
   getProvider() {
     return this.provider;
   }
   /**
-   * Dimensioni del vettore embedding.
+   * Embedding vector dimensions.
    */
   getDimensions() {
     return 384;
   }
-  // --- Provider specifici ---
+  // --- Provider-specific implementations ---
   async _embedFastembed(text) {
     const embeddings = this.model.embed([text], 1);
     for await (const batch of embeddings) {
@@ -1423,13 +1423,13 @@ function bufferToFloat32(buf) {
 }
 var VectorSearch = class {
   /**
-   * Ricerca semantica con pre-filtraggio SQL per scalabilità.
+   * Semantic search with SQL pre-filtering for scalability.
    *
-   * Strategia a 2 fasi:
-   * 1. SQL pre-filtra per progetto + ordina per recency (carica max N candidati)
-   * 2. JS calcola cosine similarity solo sui candidati filtrati
+   * 2-phase strategy:
+   * 1. SQL pre-filters by project + sorts by recency (loads max N candidates)
+   * 2. JS computes cosine similarity only on filtered candidates
    *
-   * Con 50k osservazioni e maxCandidates=2000, carica solo ~4% dei dati.
+   * With 50k observations and maxCandidates=2000, loads only ~4% of data.
    */
   async search(db, queryEmbedding, options = {}) {
     const limit = options.limit || 10;
@@ -1473,15 +1473,15 @@ var VectorSearch = class {
         }
       }
       scored.sort((a, b) => b.similarity - a.similarity);
-      logger.debug("VECTOR", `Ricerca: ${rows.length} candidati \u2192 ${scored.length} sopra soglia \u2192 ${Math.min(scored.length, limit)} risultati`);
+      logger.debug("VECTOR", `Search: ${rows.length} candidates \u2192 ${scored.length} above threshold \u2192 ${Math.min(scored.length, limit)} results`);
       return scored.slice(0, limit);
     } catch (error) {
-      logger.error("VECTOR", `Errore ricerca vettoriale: ${error}`);
+      logger.error("VECTOR", `Vector search error: ${error}`);
       return [];
     }
   }
   /**
-   * Salva embedding per un'osservazione.
+   * Store embedding for an observation.
    */
   async storeEmbedding(db, observationId, embedding, model) {
     try {
@@ -1497,18 +1497,18 @@ var VectorSearch = class {
         embedding.length,
         (/* @__PURE__ */ new Date()).toISOString()
       );
-      logger.debug("VECTOR", `Embedding salvato per osservazione ${observationId}`);
+      logger.debug("VECTOR", `Embedding saved for observation ${observationId}`);
     } catch (error) {
-      logger.error("VECTOR", `Errore salvataggio embedding: ${error}`);
+      logger.error("VECTOR", `Error saving embedding: ${error}`);
     }
   }
   /**
-   * Genera embeddings per osservazioni che non li hanno ancora.
+   * Generate embeddings for observations that don't have them yet.
    */
   async backfillEmbeddings(db, batchSize = 50) {
     const embeddingService2 = getEmbeddingService();
     if (!await embeddingService2.initialize()) {
-      logger.warn("VECTOR", "Embedding service non disponibile, backfill saltato");
+      logger.warn("VECTOR", "Embedding service not available, backfill skipped");
       return 0;
     }
     const rows = db.query(`
@@ -1534,11 +1534,11 @@ var VectorSearch = class {
         count++;
       }
     }
-    logger.info("VECTOR", `Backfill completato: ${count}/${rows.length} embeddings generati`);
+    logger.info("VECTOR", `Backfill completed: ${count}/${rows.length} embeddings generated`);
     return count;
   }
   /**
-   * Statistiche sugli embeddings.
+   * Embedding statistics.
    */
   getStats(db) {
     try {
@@ -1611,21 +1611,21 @@ function knowledgeTypeBoost(type) {
 var HybridSearch = class {
   embeddingInitialized = false;
   /**
-   * Inizializza il servizio di embedding (lazy, non bloccante)
+   * Initialize the embedding service (lazy, non-blocking)
    */
   async initialize() {
     try {
       const embeddingService2 = getEmbeddingService();
       await embeddingService2.initialize();
       this.embeddingInitialized = embeddingService2.isAvailable();
-      logger.info("SEARCH", `HybridSearch inizializzato (embedding: ${this.embeddingInitialized ? "attivo" : "disattivato"})`);
+      logger.info("SEARCH", `HybridSearch initialized (embedding: ${this.embeddingInitialized ? "active" : "disabled"})`);
     } catch (error) {
-      logger.warn("SEARCH", "Inizializzazione embedding fallita, uso solo FTS5", {}, error);
+      logger.warn("SEARCH", "Embedding initialization failed, using only FTS5", {}, error);
       this.embeddingInitialized = false;
     }
   }
   /**
-   * Ricerca ibrida con scoring a 4 segnali
+   * Hybrid search with 4-signal scoring
    */
   async search(db, query, options = {}) {
     const limit = options.limit || 10;
@@ -1641,7 +1641,7 @@ var HybridSearch = class {
           const vectorResults = await vectorSearch2.search(db, queryEmbedding, {
             project: options.project,
             limit: limit * 2,
-            // Prendiamo piu risultati per il ranking
+            // Fetch more results for ranking
             threshold: 0.3
           });
           for (const hit of vectorResults) {
@@ -1658,10 +1658,10 @@ var HybridSearch = class {
               source: "vector"
             });
           }
-          logger.debug("SEARCH", `Vector search: ${vectorResults.length} risultati`);
+          logger.debug("SEARCH", `Vector search: ${vectorResults.length} results`);
         }
       } catch (error) {
-        logger.warn("SEARCH", "Ricerca vettoriale fallita, uso solo keyword", {}, error);
+        logger.warn("SEARCH", "Vector search failed, using only keyword", {}, error);
       }
     }
     try {
@@ -1691,9 +1691,9 @@ var HybridSearch = class {
           });
         }
       }
-      logger.debug("SEARCH", `Keyword search: ${keywordResults.length} risultati`);
+      logger.debug("SEARCH", `Keyword search: ${keywordResults.length} results`);
     } catch (error) {
-      logger.error("SEARCH", "Ricerca keyword fallita", {}, error);
+      logger.error("SEARCH", "Keyword search failed", {}, error);
     }
     if (rawItems.size === 0) return [];
     const allFTS5Ranks = Array.from(rawItems.values()).filter((item) => item.fts5Rank !== null).map((item) => item.fts5Rank);
@@ -1781,33 +1781,33 @@ var KiroMemorySDK = class {
     };
   }
   /**
-   * Valida input per storeObservation
+   * Validate input for storeObservation
    */
   validateObservationInput(data) {
     if (!data.type || typeof data.type !== "string" || data.type.length > 100) {
-      throw new Error("type \xE8 obbligatorio (stringa, max 100 caratteri)");
+      throw new Error("type is required (string, max 100 chars)");
     }
     if (!data.title || typeof data.title !== "string" || data.title.length > 500) {
-      throw new Error("title \xE8 obbligatorio (stringa, max 500 caratteri)");
+      throw new Error("title is required (string, max 500 chars)");
     }
     if (!data.content || typeof data.content !== "string" || data.content.length > 1e5) {
-      throw new Error("content \xE8 obbligatorio (stringa, max 100KB)");
+      throw new Error("content is required (string, max 100KB)");
     }
   }
   /**
-   * Valida input per storeSummary
+   * Validate input for storeSummary
    */
   validateSummaryInput(data) {
     const MAX = 5e4;
     for (const [key, val] of Object.entries(data)) {
       if (val !== void 0 && val !== null) {
-        if (typeof val !== "string") throw new Error(`${key} deve essere una stringa`);
-        if (val.length > MAX) throw new Error(`${key} troppo grande (max 50KB)`);
+        if (typeof val !== "string") throw new Error(`${key} must be a string`);
+        if (val.length > MAX) throw new Error(`${key} too large (max 50KB)`);
       }
     }
   }
   /**
-   * Genera e salva embedding per un'osservazione (fire-and-forget, non blocca)
+   * Generate and store embedding for an observation (fire-and-forget, non-blocking)
    */
   async generateEmbeddingAsync(observationId, title, content, concepts) {
     try {
@@ -1827,39 +1827,39 @@ var KiroMemorySDK = class {
         );
       }
     } catch (error) {
-      logger.debug("SDK", `Embedding generation fallita per obs ${observationId}: ${error}`);
+      logger.debug("SDK", `Embedding generation failed for obs ${observationId}: ${error}`);
     }
   }
   /**
-   * Genera content hash SHA256 per deduplicazione basata su contenuto.
-   * Usa (project + type + title + narrative) come tupla di identità semantica.
-   * NON include sessionId perché è unico ad ogni invocazione.
+   * Generate SHA256 content hash for content-based deduplication.
+   * Uses (project + type + title + narrative) as semantic identity tuple.
+   * Does NOT include sessionId since it's unique per invocation.
    */
   generateContentHash(type, title, narrative) {
     const payload = `${this.project}|${type}|${title}|${narrative || ""}`;
     return createHash("sha256").update(payload).digest("hex");
   }
   /**
-   * Finestre di deduplicazione per tipo (ms).
-   * Tipi con molte ripetizioni hanno finestre più ampie.
+   * Deduplication windows per type (ms).
+   * Types with many repetitions have wider windows.
    */
   getDeduplicationWindow(type) {
     switch (type) {
       case "file-read":
         return 6e4;
-      // 60s — letture frequenti sugli stessi file
+      // 60s — frequent reads on the same files
       case "file-write":
         return 1e4;
-      // 10s — scritture rapide consecutive
+      // 10s — rapid consecutive writes
       case "command":
         return 3e4;
       // 30s — standard
       case "research":
         return 12e4;
-      // 120s — web search e fetch ripetuti
+      // 120s — repeated web search and fetch
       case "delegation":
         return 6e4;
-      // 60s — delegazioni rapide
+      // 60s — rapid delegations
       default:
         return 3e4;
     }
@@ -1873,7 +1873,7 @@ var KiroMemorySDK = class {
     const contentHash = this.generateContentHash(data.type, data.title, data.narrative);
     const dedupWindow = this.getDeduplicationWindow(data.type);
     if (isDuplicateObservation(this.db.db, contentHash, dedupWindow)) {
-      logger.debug("SDK", `Osservazione duplicata scartata (${data.type}, ${dedupWindow}ms): ${data.title}`);
+      logger.debug("SDK", `Duplicate observation discarded (${data.type}, ${dedupWindow}ms): ${data.title}`);
       return -1;
     }
     const filesRead = data.filesRead || (data.type === "file-read" ? data.files : void 0);
@@ -1901,12 +1901,12 @@ var KiroMemorySDK = class {
     return observationId;
   }
   /**
-   * Salva conoscenza strutturata (constraint, decision, heuristic, rejected).
-   * Usa il campo `type` per il knowledgeType e `facts` per i metadati JSON.
+   * Store structured knowledge (constraint, decision, heuristic, rejected).
+   * Uses the `type` field for knowledgeType and `facts` for JSON metadata.
    */
   async storeKnowledge(data) {
     if (!KNOWLEDGE_TYPES.includes(data.knowledgeType)) {
-      throw new Error(`knowledgeType non valido: ${data.knowledgeType}. Valori ammessi: ${KNOWLEDGE_TYPES.join(", ")}`);
+      throw new Error(`Invalid knowledgeType: ${data.knowledgeType}. Allowed values: ${KNOWLEDGE_TYPES.join(", ")}`);
     }
     this.validateObservationInput({ type: data.knowledgeType, title: data.title, content: data.content });
     const metadata = (() => {
@@ -1940,7 +1940,7 @@ var KiroMemorySDK = class {
     const sessionId = "sdk-" + Date.now();
     const contentHash = this.generateContentHash(data.knowledgeType, data.title);
     if (isDuplicateObservation(this.db.db, contentHash)) {
-      logger.debug("SDK", `Knowledge duplicata scartata: ${data.title}`);
+      logger.debug("SDK", `Duplicate knowledge discarded: ${data.title}`);
       return -1;
     }
     const discoveryTokens = Math.ceil(data.content.length / 4);
@@ -1957,11 +1957,11 @@ var KiroMemorySDK = class {
       null,
       // narrative
       JSON.stringify(metadata),
-      // facts = metadati JSON
+      // facts = JSON metadata
       data.concepts?.join(", ") || null,
       data.files?.join(", ") || null,
       null,
-      // filesModified: knowledge non modifica file
+      // filesModified: knowledge doesn't modify files
       0,
       // prompt_number
       contentHash,
@@ -2072,8 +2072,8 @@ var KiroMemorySDK = class {
     return this.project;
   }
   /**
-   * Ricerca ibrida: vector search + keyword FTS5
-   * Richiede inizializzazione HybridSearch (embedding service)
+   * Hybrid search: vector search + keyword FTS5
+   * Requires HybridSearch initialization (embedding service)
    */
   async hybridSearch(query, options = {}) {
     const hybridSearch2 = getHybridSearch();
@@ -2083,8 +2083,8 @@ var KiroMemorySDK = class {
     });
   }
   /**
-   * Ricerca solo semantica (vector search)
-   * Ritorna risultati basati su similarità coseno con gli embeddings
+   * Semantic-only search (vector search)
+   * Returns results based on cosine similarity with embeddings
    */
   async semanticSearch(query, options = {}) {
     const embeddingService2 = getEmbeddingService();
@@ -2119,21 +2119,21 @@ var KiroMemorySDK = class {
     }));
   }
   /**
-   * Genera embeddings per osservazioni che non li hanno ancora
+   * Generate embeddings for observations that don't have them yet
    */
   async backfillEmbeddings(batchSize = 50) {
     const vectorSearch2 = getVectorSearch();
     return vectorSearch2.backfillEmbeddings(this.db.db, batchSize);
   }
   /**
-   * Statistiche sugli embeddings nel database
+   * Embedding statistics in the database
    */
   getEmbeddingStats() {
     const vectorSearch2 = getVectorSearch();
     return vectorSearch2.getStats(this.db.db);
   }
   /**
-   * Inizializza il servizio di embedding (lazy, chiamare prima di hybridSearch)
+   * Initialize the embedding service (lazy, call before hybridSearch)
    */
   async initializeEmbeddings() {
     const hybridSearch2 = getHybridSearch();
@@ -2141,10 +2141,10 @@ var KiroMemorySDK = class {
     return getEmbeddingService().isAvailable();
   }
   /**
-   * Contesto smart con ranking a 4 segnali e budget token.
+   * Smart context with 4-signal ranking and token budget.
    *
-   * Se query presente: usa HybridSearch con SEARCH_WEIGHTS.
-   * Se senza query: ranking per recency + project match (CONTEXT_WEIGHTS).
+   * If query present: uses HybridSearch with SEARCH_WEIGHTS.
+   * If no query: ranking by recency + project match (CONTEXT_WEIGHTS).
    */
   async getSmartContext(options = {}) {
     const tokenBudget = options.tokenBudget || parseInt(process.env.KIRO_MEMORY_CONTEXT_TOKENS || "0", 10) || 2e3;
@@ -2218,8 +2218,8 @@ var KiroMemorySDK = class {
     };
   }
   /**
-   * Rileva osservazioni stale (file modificati dopo la creazione) e le marca nel DB.
-   * Ritorna il numero di osservazioni marcate come stale.
+   * Detect stale observations (files modified after creation) and mark them in DB.
+   * Returns the number of observations marked as stale.
    */
   async detectStaleObservations() {
     const staleObs = getStaleObservations(this.db.db, this.project);
@@ -2230,14 +2230,14 @@ var KiroMemorySDK = class {
     return staleObs.length;
   }
   /**
-   * Consolida osservazioni duplicate sullo stesso file e tipo.
-   * Raggruppa per (project, type, files_modified), mantiene la piu recente.
+   * Consolidate duplicate observations on the same file and type.
+   * Groups by (project, type, files_modified), keeps the most recent.
    */
   async consolidateObservations(options = {}) {
     return consolidateObservations(this.db.db, this.project, options);
   }
   /**
-   * Statistiche decay: totale, stale, mai accedute, accedute di recente.
+   * Decay statistics: total, stale, never accessed, recently accessed.
    */
   async getDecayStats() {
     const total = this.db.db.query(
@@ -2256,8 +2256,8 @@ var KiroMemorySDK = class {
     return { total, stale, neverAccessed, recentlyAccessed };
   }
   /**
-   * Crea un checkpoint strutturato per resume sessione.
-   * Salva automaticamente un context_snapshot con le ultime 10 osservazioni.
+   * Create a structured checkpoint for session resume.
+   * Automatically saves a context_snapshot with the last 10 observations.
    */
   async createCheckpoint(sessionId, data) {
     const recentObs = getObservationsByProject(this.db.db, this.project, 10);
@@ -2274,21 +2274,21 @@ var KiroMemorySDK = class {
     });
   }
   /**
-   * Recupera l'ultimo checkpoint di una sessione specifica.
+   * Retrieve the latest checkpoint of a specific session.
    */
   async getCheckpoint(sessionId) {
     return getLatestCheckpoint(this.db.db, sessionId);
   }
   /**
-   * Recupera l'ultimo checkpoint per il progetto corrente.
-   * Utile per resume automatico senza specificare session ID.
+   * Retrieve the latest checkpoint for the current project.
+   * Useful for automatic resume without specifying session ID.
    */
   async getLatestProjectCheckpoint() {
     return getLatestCheckpointByProject(this.db.db, this.project);
   }
   /**
-   * Genera un report di attività per il progetto corrente.
-   * Aggrega osservazioni, sessioni, summaries e file per un periodo temporale.
+   * Generate an activity report for the current project.
+   * Aggregates observations, sessions, summaries and files for a time period.
    */
   async generateReport(options) {
     const now = /* @__PURE__ */ new Date();

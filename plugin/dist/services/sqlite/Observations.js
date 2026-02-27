@@ -110,7 +110,7 @@ function consolidateObservations(db, project, options = {}) {
       const consolidatedText = Array.from(uniqueTexts).join("\n---\n").substring(0, 1e5);
       db.run(
         "UPDATE observations SET text = ?, title = ? WHERE id = ?",
-        [consolidatedText, `[consolidato x${observations.length}] ${keeper.title}`, keeper.id]
+        [consolidatedText, `[consolidated x${observations.length}] ${keeper.title}`, keeper.id]
       );
       const removeIds = others.map((o) => o.id);
       const removePlaceholders = removeIds.map(() => "?").join(",");

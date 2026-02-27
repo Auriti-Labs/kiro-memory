@@ -1,5 +1,5 @@
 /**
- * Router Sessions: lista sessioni, checkpoint, prompts.
+ * Router Sessions: session list, checkpoints, prompts.
  */
 
 import { Router } from 'express';
@@ -12,7 +12,7 @@ import { logger } from '../../utils/logger.js';
 export function createSessionsRouter(ctx: WorkerContext): Router {
   const router = Router();
 
-  // Lista sessioni
+  // Session list
   router.get('/api/sessions', (req, res) => {
     const { project } = req.query as { project?: string };
 
@@ -27,12 +27,12 @@ export function createSessionsRouter(ctx: WorkerContext): Router {
         : getAllSessions(ctx.db.db, 50);
       res.json(sessions);
     } catch (error) {
-      logger.error('WORKER', 'Lista sessioni fallita', { project }, error as Error);
+      logger.error('WORKER', 'Session list failed', { project }, error as Error);
       res.status(500).json({ error: 'Sessions list failed' });
     }
   });
 
-  // Checkpoint per sessione
+  // Checkpoint by session
   router.get('/api/sessions/:id/checkpoint', (req, res) => {
     const sessionId = parseInt(req.params.id, 10);
 
@@ -49,12 +49,12 @@ export function createSessionsRouter(ctx: WorkerContext): Router {
       }
       res.json(checkpoint);
     } catch (error) {
-      logger.error('WORKER', 'Checkpoint fetch fallito', { sessionId }, error as Error);
+      logger.error('WORKER', 'Checkpoint fetch failed', { sessionId }, error as Error);
       res.status(500).json({ error: 'Checkpoint fetch failed' });
     }
   });
 
-  // Checkpoint per progetto
+  // Checkpoint by project
   router.get('/api/checkpoint', (req, res) => {
     const { project } = req.query as { project?: string };
 
@@ -75,12 +75,12 @@ export function createSessionsRouter(ctx: WorkerContext): Router {
       }
       res.json(checkpoint);
     } catch (error) {
-      logger.error('WORKER', 'Checkpoint per progetto fallito', { project }, error as Error);
+      logger.error('WORKER', 'Project checkpoint fetch failed', { project }, error as Error);
       res.status(500).json({ error: 'Project checkpoint fetch failed' });
     }
   });
 
-  // Lista prompt paginata
+  // Paginated prompt list
   router.get('/api/prompts', (req, res) => {
     const { offset, limit, project } = req.query as { offset?: string; limit?: string; project?: string };
     const _offset = parseIntSafe(offset, 0, 0, 1_000_000);
@@ -101,7 +101,7 @@ export function createSessionsRouter(ctx: WorkerContext): Router {
       res.setHeader('X-Total-Count', total);
       res.json(rows);
     } catch (error) {
-      logger.error('WORKER', 'Lista prompt fallita', {}, error as Error);
+      logger.error('WORKER', 'Prompt list failed', {}, error as Error);
       res.status(500).json({ error: 'Failed to list prompts' });
     }
   });

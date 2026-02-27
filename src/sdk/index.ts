@@ -45,7 +45,7 @@ import { KNOWLEDGE_TYPES } from '../types/worker-types.js';
 export interface KiroMemoryConfig {
   dataDir?: string;
   project?: string;
-  /** Salta il migration check per performance (usare nei hook ad alta frequenza) */
+  /** Skip migration check for performance (use in high-frequency hooks) */
   skipMigrations?: boolean;
 }
 
@@ -85,42 +85,42 @@ export class KiroMemorySDK {
   }
 
   /**
-   * Valida input per storeObservation
+   * Validate input for storeObservation
    */
   private validateObservationInput(data: { type: string; title: string; content: string }): void {
     if (!data.type || typeof data.type !== 'string' || data.type.length > 100) {
-      throw new Error('type è obbligatorio (stringa, max 100 caratteri)');
+      throw new Error('type is required (string, max 100 chars)');
     }
     if (!data.title || typeof data.title !== 'string' || data.title.length > 500) {
-      throw new Error('title è obbligatorio (stringa, max 500 caratteri)');
+      throw new Error('title is required (string, max 500 chars)');
     }
     if (!data.content || typeof data.content !== 'string' || data.content.length > 100_000) {
-      throw new Error('content è obbligatorio (stringa, max 100KB)');
+      throw new Error('content is required (string, max 100KB)');
     }
   }
 
   /**
-   * Valida input per storeSummary
+   * Validate input for storeSummary
    */
   private validateSummaryInput(data: Record<string, unknown>): void {
     const MAX = 50_000;
     for (const [key, val] of Object.entries(data)) {
       if (val !== undefined && val !== null) {
-        if (typeof val !== 'string') throw new Error(`${key} deve essere una stringa`);
-        if (val.length > MAX) throw new Error(`${key} troppo grande (max 50KB)`);
+        if (typeof val !== 'string') throw new Error(`${key} must be a string`);
+        if (val.length > MAX) throw new Error(`${key} too large (max 50KB)`);
       }
     }
   }
 
   /**
-   * Genera e salva embedding per un'osservazione (fire-and-forget, non blocca)
+   * Generate and store embedding for an observation (fire-and-forget, non-blocking)
    */
   private async generateEmbeddingAsync(observationId: number, title: string, content: string, concepts?: string[]): Promise<void> {
     try {
       const embeddingService = getEmbeddingService();
       if (!embeddingService.isAvailable()) return;
 
-      // Componi testo per embedding: title + content + concepts
+      // Compose text for embedding: title + content + concepts
       const parts = [title, content];
       if (concepts?.length) parts.push(concepts.join(', '));
       const fullText = parts.join(' ').substring(0, 2000);
@@ -136,15 +136,15 @@ export class KiroMemorySDK {
         );
       }
     } catch (error) {
-      // Non propagare errori — embedding è opzionale
-      logger.debug('SDK', `Embedding generation fallita per obs ${observationId}: ${error}`);
+      // Don't propagate errors — embedding is optional
+      logger.debug('SDK', `Embedding generation failed for obs ${observationId}: ${error}`);
     }
   }
 
   /**
-   * Genera content hash SHA256 per deduplicazione basata su contenuto.
-   * Usa (project + type + title + narrative) come tupla di identità semantica.
-   * NON include sessionId perché è unico ad ogni invocazione.
+   * Generate SHA256 content hash for content-based deduplication.
+   * Uses (project + type + title + narrative) as semantic identity tuple.
+   * Does NOT include sessionId since it's unique per invocation.
    */
   private generateContentHash(type: string, title: string, narrative?: string): string {
     const payload = `${this.project}|${type}|${title}|${narrative || ''}`;
@@ -152,16 +152,16 @@ export class KiroMemorySDK {
   }
 
   /**
-   * Finestre di deduplicazione per tipo (ms).
-   * Tipi con molte ripetizioni hanno finestre più ampie.
+   * Deduplication windows per type (ms).
+   * Types with many repetitions have wider windows.
    */
   private getDeduplicationWindow(type: string): number {
     switch (type) {
-      case 'file-read':    return 60_000;  // 60s — letture frequenti sugli stessi file
-      case 'file-write':   return 10_000;  // 10s — scritture rapide consecutive
+      case 'file-read':    return 60_000;  // 60s — frequent reads on the same files
+      case 'file-write':   return 10_000;  // 10s — rapid consecutive writes
       case 'command':      return 30_000;  // 30s — standard
-      case 'research':     return 120_000; // 120s — web search e fetch ripetuti
-      case 'delegation':   return 60_000;  // 60s — delegazioni rapide
+      case 'research':     return 120_000; // 120s — repeated web search and fetch
+      case 'delegation':   return 60_000;  // 60s — rapid delegations
       default:             return 30_000;  // 30s — default
     }
   }
@@ -177,7 +177,7 @@ export class KiroMemorySDK {
     narrative?: string;
     facts?: string;
     concepts?: string[];
-    /** @deprecated Usa filesRead/filesModified per separare i file */
+    /** @deprecated Use filesRead/filesModified to separate files */
     files?: string[];
     filesRead?: string[];
     filesModified?: string[];
@@ -186,19 +186,19 @@ export class KiroMemorySDK {
 
     const sessionId = 'sdk-' + Date.now();
 
-    // Deduplicazione con content hash (finestra tipo-specifica)
+    // Deduplication with content hash (type-specific window)
     const contentHash = this.generateContentHash(data.type, data.title, data.narrative);
     const dedupWindow = this.getDeduplicationWindow(data.type);
     if (isDuplicateObservation(this.db.db, contentHash, dedupWindow)) {
-      logger.debug('SDK', `Osservazione duplicata scartata (${data.type}, ${dedupWindow}ms): ${data.title}`);
+      logger.debug('SDK', `Duplicate observation discarded (${data.type}, ${dedupWindow}ms): ${data.title}`);
       return -1;
     }
 
-    // Separa filesRead e filesModified (retrocompatibile con files generico)
+    // Separate filesRead and filesModified (backward-compatible with generic files)
     const filesRead = data.filesRead || (data.type === 'file-read' ? data.files : undefined);
     const filesModified = data.filesModified || (data.type === 'file-write' ? data.files : undefined);
 
-    // Token economics: stima costo discovery (content completo / 4 chars per token)
+    // Token economics: estimate discovery cost (full content / 4 chars per token)
     const discoveryTokens = Math.ceil(data.content.length / 4);
 
     const observationId = createObservation(
@@ -219,25 +219,25 @@ export class KiroMemorySDK {
       discoveryTokens
     );
 
-    // Genera embedding in background (fire-and-forget, non blocca)
+    // Generate embedding in background (fire-and-forget, non-blocking)
     this.generateEmbeddingAsync(observationId, data.title, data.content, data.concepts)
-      .catch(() => {}); // Ignora errori silenziosamente
+      .catch(() => {}); // Silently ignore errors
 
     return observationId;
   }
 
   /**
-   * Salva conoscenza strutturata (constraint, decision, heuristic, rejected).
-   * Usa il campo `type` per il knowledgeType e `facts` per i metadati JSON.
+   * Store structured knowledge (constraint, decision, heuristic, rejected).
+   * Uses the `type` field for knowledgeType and `facts` for JSON metadata.
    */
   async storeKnowledge(data: StoreKnowledgeInput): Promise<number> {
-    // Valida knowledgeType contro enum
+    // Validate knowledgeType against enum
     if (!KNOWLEDGE_TYPES.includes(data.knowledgeType)) {
-      throw new Error(`knowledgeType non valido: ${data.knowledgeType}. Valori ammessi: ${KNOWLEDGE_TYPES.join(', ')}`);
+      throw new Error(`Invalid knowledgeType: ${data.knowledgeType}. Allowed values: ${KNOWLEDGE_TYPES.join(', ')}`);
     }
     this.validateObservationInput({ type: data.knowledgeType, title: data.title, content: data.content });
 
-    // Costruisci metadati JSON in base al tipo
+    // Build JSON metadata based on type
     const metadata: KnowledgeMetadata = (() => {
       switch (data.knowledgeType) {
         case 'constraint':
@@ -270,7 +270,7 @@ export class KiroMemorySDK {
     const sessionId = 'sdk-' + Date.now();
     const contentHash = this.generateContentHash(data.knowledgeType, data.title);
     if (isDuplicateObservation(this.db.db, contentHash)) {
-      logger.debug('SDK', `Knowledge duplicata scartata: ${data.title}`);
+      logger.debug('SDK', `Duplicate knowledge discarded: ${data.title}`);
       return -1;
     }
 
@@ -285,16 +285,16 @@ export class KiroMemorySDK {
       null,                     // subtitle
       data.content,
       null,                     // narrative
-      JSON.stringify(metadata), // facts = metadati JSON
+      JSON.stringify(metadata), // facts = JSON metadata
       data.concepts?.join(', ') || null,
       data.files?.join(', ') || null,
-      null,                     // filesModified: knowledge non modifica file
+      null,                     // filesModified: knowledge doesn't modify files
       0,                        // prompt_number
       contentHash,
       discoveryTokens
     );
 
-    // Genera embedding in background
+    // Generate embedding in background
     this.generateEmbeddingAsync(observationId, data.title, data.content, data.concepts)
       .catch(() => {});
 
@@ -421,8 +421,8 @@ export class KiroMemorySDK {
   }
 
   /**
-   * Ricerca ibrida: vector search + keyword FTS5
-   * Richiede inizializzazione HybridSearch (embedding service)
+   * Hybrid search: vector search + keyword FTS5
+   * Requires HybridSearch initialization (embedding service)
    */
   async hybridSearch(query: string, options: { limit?: number } = {}): Promise<SearchResult[]> {
     const hybridSearch = getHybridSearch();
@@ -433,8 +433,8 @@ export class KiroMemorySDK {
   }
 
   /**
-   * Ricerca solo semantica (vector search)
-   * Ritorna risultati basati su similarità coseno con gli embeddings
+   * Semantic-only search (vector search)
+   * Returns results based on cosine similarity with embeddings
    */
   async semanticSearch(query: string, options: { limit?: number; threshold?: number } = {}): Promise<SearchResult[]> {
     const embeddingService = getEmbeddingService();
@@ -473,7 +473,7 @@ export class KiroMemorySDK {
   }
 
   /**
-   * Genera embeddings per osservazioni che non li hanno ancora
+   * Generate embeddings for observations that don't have them yet
    */
   async backfillEmbeddings(batchSize: number = 50): Promise<number> {
     const vectorSearch = getVectorSearch();
@@ -481,7 +481,7 @@ export class KiroMemorySDK {
   }
 
   /**
-   * Statistiche sugli embeddings nel database
+   * Embedding statistics in the database
    */
   getEmbeddingStats(): { total: number; embedded: number; percentage: number } {
     const vectorSearch = getVectorSearch();
@@ -489,7 +489,7 @@ export class KiroMemorySDK {
   }
 
   /**
-   * Inizializza il servizio di embedding (lazy, chiamare prima di hybridSearch)
+   * Initialize the embedding service (lazy, call before hybridSearch)
    */
   async initializeEmbeddings(): Promise<boolean> {
     const hybridSearch = getHybridSearch();
@@ -498,10 +498,10 @@ export class KiroMemorySDK {
   }
 
   /**
-   * Contesto smart con ranking a 4 segnali e budget token.
+   * Smart context with 4-signal ranking and token budget.
    *
-   * Se query presente: usa HybridSearch con SEARCH_WEIGHTS.
-   * Se senza query: ranking per recency + project match (CONTEXT_WEIGHTS).
+   * If query present: uses HybridSearch with SEARCH_WEIGHTS.
+   * If no query: ranking by recency + project match (CONTEXT_WEIGHTS).
    */
   async getSmartContext(options: {
     tokenBudget?: number;
@@ -511,13 +511,13 @@ export class KiroMemorySDK {
       || parseInt(process.env.KIRO_MEMORY_CONTEXT_TOKENS || '0', 10)
       || 2000;
 
-    // Sommari sempre inclusi
+    // Summaries always included
     const summaries = getSummariesByProject(this.db.db, this.project, 5);
 
     let items: ScoredItem[];
 
     if (options.query) {
-      // Modalita SEARCH: usa HybridSearch con scoring completo
+      // SEARCH mode: use HybridSearch with full scoring
       const hybridSearch = getHybridSearch();
       const results = await hybridSearch.search(this.db.db, options.query, {
         project: this.project,
@@ -536,10 +536,10 @@ export class KiroMemorySDK {
         signals: r.signals
       }));
     } else {
-      // Modalita CONTEXT: ranking per recency + project match
+      // CONTEXT mode: ranking by recency + project match
       const observations = getObservationsByProject(this.db.db, this.project, 30);
 
-      // Separa knowledge items (prioritari) da osservazioni normali
+      // Separate knowledge items (prioritized) from normal observations
       const knowledgeTypes = new Set(KNOWLEDGE_TYPES as readonly string[]);
       const knowledgeObs: typeof observations = [];
       const normalObs: typeof observations = [];
@@ -569,13 +569,13 @@ export class KiroMemorySDK {
         };
       };
 
-      // Knowledge sempre in cima (ordinati per score), poi osservazioni normali
+      // Knowledge always on top (sorted by score), then normal observations
       const scoredKnowledge = knowledgeObs.map(scoreObs).sort((a, b) => b.score - a.score);
       const scoredNormal = normalObs.map(scoreObs).sort((a, b) => b.score - a.score);
       items = [...scoredKnowledge, ...scoredNormal];
     }
 
-    // Tronca al budget token (knowledge items hanno priorità essendo in cima)
+    // Truncate to token budget (knowledge items have priority being at the top)
     let tokensUsed = 0;
     const budgetItems: ScoredItem[] = [];
     for (const item of items) {
@@ -596,8 +596,8 @@ export class KiroMemorySDK {
   }
 
   /**
-   * Rileva osservazioni stale (file modificati dopo la creazione) e le marca nel DB.
-   * Ritorna il numero di osservazioni marcate come stale.
+   * Detect stale observations (files modified after creation) and mark them in DB.
+   * Returns the number of observations marked as stale.
    */
   async detectStaleObservations(): Promise<number> {
     const staleObs = dbGetStaleObservations(this.db.db, this.project);
@@ -609,15 +609,15 @@ export class KiroMemorySDK {
   }
 
   /**
-   * Consolida osservazioni duplicate sullo stesso file e tipo.
-   * Raggruppa per (project, type, files_modified), mantiene la piu recente.
+   * Consolidate duplicate observations on the same file and type.
+   * Groups by (project, type, files_modified), keeps the most recent.
    */
   async consolidateObservations(options: { dryRun?: boolean } = {}): Promise<{ merged: number; removed: number }> {
     return dbConsolidateObservations(this.db.db, this.project, options);
   }
 
   /**
-   * Statistiche decay: totale, stale, mai accedute, accedute di recente.
+   * Decay statistics: total, stale, never accessed, recently accessed.
    */
   async getDecayStats(): Promise<{
     total: number;
@@ -637,7 +637,7 @@ export class KiroMemorySDK {
       'SELECT COUNT(*) as count FROM observations WHERE project = ? AND last_accessed_epoch IS NULL'
     ).get(this.project) as any)?.count || 0;
 
-    // "Recentemente accedute" = ultimo accesso nelle ultime 48 ore
+    // "Recently accessed" = last access within the past 48 hours
     const recentThreshold = Date.now() - (48 * 60 * 60 * 1000);
     const recentlyAccessed = (this.db.db.query(
       'SELECT COUNT(*) as count FROM observations WHERE project = ? AND last_accessed_epoch > ?'
@@ -647,8 +647,8 @@ export class KiroMemorySDK {
   }
 
   /**
-   * Crea un checkpoint strutturato per resume sessione.
-   * Salva automaticamente un context_snapshot con le ultime 10 osservazioni.
+   * Create a structured checkpoint for session resume.
+   * Automatically saves a context_snapshot with the last 10 observations.
    */
   async createCheckpoint(sessionId: number, data: {
     task: string;
@@ -657,7 +657,7 @@ export class KiroMemorySDK {
     openQuestions?: string;
     relevantFiles?: string[];
   }): Promise<number> {
-    // Serializza ultime 10 osservazioni della sessione come context snapshot
+    // Serialize last 10 session observations as context snapshot
     const recentObs = getObservationsByProject(this.db.db, this.project, 10);
     const contextSnapshot = JSON.stringify(
       recentObs.map(o => ({ id: o.id, type: o.type, title: o.title, text: o.text?.substring(0, 200) }))
@@ -674,23 +674,23 @@ export class KiroMemorySDK {
   }
 
   /**
-   * Recupera l'ultimo checkpoint di una sessione specifica.
+   * Retrieve the latest checkpoint of a specific session.
    */
   async getCheckpoint(sessionId: number): Promise<DBCheckpoint | null> {
     return dbGetLatestCheckpoint(this.db.db, sessionId);
   }
 
   /**
-   * Recupera l'ultimo checkpoint per il progetto corrente.
-   * Utile per resume automatico senza specificare session ID.
+   * Retrieve the latest checkpoint for the current project.
+   * Useful for automatic resume without specifying session ID.
    */
   async getLatestProjectCheckpoint(): Promise<DBCheckpoint | null> {
     return dbGetLatestCheckpointByProject(this.db.db, this.project);
   }
 
   /**
-   * Genera un report di attività per il progetto corrente.
-   * Aggrega osservazioni, sessioni, summaries e file per un periodo temporale.
+   * Generate an activity report for the current project.
+   * Aggregates observations, sessions, summaries and files for a time period.
    */
   async generateReport(options?: {
     period?: 'weekly' | 'monthly';

@@ -1,18 +1,18 @@
 import type { ReportData } from '../types/worker-types.js';
 
 /**
- * Formattatori report per Kiro Memory.
- * Tre output: testo ANSI (CLI), markdown (file/condivisione), JSON (automazioni).
+ * Report formatters for Kiro Memory.
+ * Three outputs: ANSI text (CLI), markdown (file/sharing), JSON (automations).
  */
 
 // ============================================================================
-// Formato testo ANSI (per CLI)
+// ANSI text format (for CLI)
 // ============================================================================
 
 export function formatReportText(data: ReportData): string {
   const lines: string[] = [];
 
-  // Intestazione
+  // Header
   lines.push('');
   lines.push(`  \x1b[36m═══ Kiro Memory Report — ${data.period.label} ═══\x1b[0m`);
   lines.push(`  \x1b[2m${data.period.start} → ${data.period.end} (${data.period.days} days)\x1b[0m`);
@@ -57,7 +57,7 @@ export function formatReportText(data: ReportData): string {
     lines.push('');
   }
 
-  // Distribuzione tipi
+  // Type distribution
   if (data.typeDistribution.length > 0) {
     lines.push(`  \x1b[1mBy Type\x1b[0m`);
     for (const entry of data.typeDistribution) {
@@ -106,19 +106,19 @@ export function formatReportText(data: ReportData): string {
 }
 
 // ============================================================================
-// Formato Markdown (per file/condivisione)
+// Markdown format (for file/sharing)
 // ============================================================================
 
 export function formatReportMarkdown(data: ReportData): string {
   const lines: string[] = [];
 
-  // Intestazione
+  // Header
   lines.push(`# Kiro Memory Report — ${data.period.label}`);
   lines.push('');
   lines.push(`**Period**: ${data.period.start} → ${data.period.end} (${data.period.days} days)`);
   lines.push('');
 
-  // Overview tabella
+  // Overview table
   lines.push('## Overview');
   lines.push('');
   lines.push('| Metric | Count |');
@@ -158,7 +158,7 @@ export function formatReportMarkdown(data: ReportData): string {
     lines.push('');
   }
 
-  // Distribuzione tipi
+  // Type distribution
   if (data.typeDistribution.length > 0) {
     lines.push('## Observation Types');
     lines.push('');
@@ -214,7 +214,7 @@ export function formatReportMarkdown(data: ReportData): string {
 }
 
 // ============================================================================
-// Formato JSON (per automazioni/webhook)
+// JSON format (for automations/webhooks)
 // ============================================================================
 
 export function formatReportJson(data: ReportData): string {

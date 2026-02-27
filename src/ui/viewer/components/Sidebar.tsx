@@ -11,7 +11,7 @@ const TYPE_CONFIG: Record<string, { color: string; label: string }> = {
   'tool-use': { color: 'bg-zinc-400', label: 'Tools' },
 };
 
-/* Colori per progetto (hash deterministico) */
+/* Project colors (deterministic hash) */
 const PROJECT_COLORS = [
   { bg: 'bg-accent-violet/15', text: 'text-accent-violet', ring: 'ring-accent-violet/30' },
   { bg: 'bg-accent-blue/15', text: 'text-accent-blue', ring: 'ring-accent-blue/30' },
@@ -49,7 +49,7 @@ export function Sidebar({
   const [projectSearch, setProjectSearch] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
 
-  /* Filtra progetti per ricerca */
+  /* Filter projects by search */
   const filteredProjects = projectSearch
     ? projects.filter(p => getDisplayName(p).toLowerCase().includes(projectSearch.toLowerCase()) || p.toLowerCase().includes(projectSearch.toLowerCase()))
     : projects;
@@ -75,7 +75,7 @@ export function Sidebar({
       } catch {
         setRenameFeedback({ project: editingProject, success: false });
       }
-      /* Nascondi feedback dopo 2 secondi */
+      /* Hide feedback after 2 seconds */
       setTimeout(() => setRenameFeedback(null), 2000);
     }
     setEditingProject(null);
@@ -90,7 +90,7 @@ export function Sidebar({
 
   return (
     <aside className="h-full overflow-y-auto bg-surface-1 border-r border-border flex flex-col">
-      {/* Brand con logo rete/nodi */}
+      {/* Brand with network/node logo */}
       <div className="flex items-center gap-3 px-4 h-14 border-b border-border flex-shrink-0">
         <svg className="w-8 h-8 flex-shrink-0" viewBox="0 0 96 96">
           <defs>
@@ -99,18 +99,18 @@ export function Sidebar({
               <stop offset="100%" stopColor="#3B82F6" />
             </linearGradient>
           </defs>
-          {/* Anello esterno */}
+          {/* Outer ring */}
           <circle cx="48" cy="48" r="44" fill="none" stroke="url(#km-grad)" strokeWidth="1.5" opacity="0.4" />
-          {/* Nodo centrale */}
+          {/* Central node */}
           <circle cx="48" cy="48" r="10" fill="url(#km-grad)" opacity="0.9" />
-          {/* Nodi satellite */}
+          {/* Satellite nodes */}
           <circle cx="48" cy="8" r="5" fill="#7C5AFF" opacity="0.9" />
           <circle cx="82" cy="28" r="4" fill="#6366F1" opacity="0.7" />
           <circle cx="82" cy="68" r="3.5" fill="#3B82F6" opacity="0.5" />
           <circle cx="48" cy="88" r="3" fill="#2563EB" opacity="0.4" />
           <circle cx="14" cy="68" r="2.5" fill="#3B82F6" opacity="0.3" />
           <circle cx="14" cy="28" r="2" fill="#7C5AFF" opacity="0.25" />
-          {/* Connessioni */}
+          {/* Connections */}
           <line x1="48" y1="13" x2="48" y2="38" stroke="#7C5AFF" strokeWidth="1" opacity="0.3" strokeDasharray="3 4" />
           <line x1="78" y1="30" x2="56" y2="44" stroke="#6366F1" strokeWidth="1" opacity="0.25" strokeDasharray="3 4" />
           <line x1="78" y1="66" x2="56" y2="52" stroke="#3B82F6" strokeWidth="1" opacity="0.2" strokeDasharray="3 4" />
@@ -123,7 +123,7 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* Sezione: Progetti */}
+      {/* Section: Projects */}
       <div className="p-4">
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-3 px-2">Projects</h3>
 
@@ -146,7 +146,7 @@ export function Sidebar({
           <span className="text-xs text-zinc-600 font-mono tabular-nums">{projects.length}</span>
         </button>
 
-        {/* Ricerca progetti (visibile con 6+ progetti) */}
+        {/* Search projects (visible with 6+ projects) */}
         {projects.length >= 6 && (
           <div className="relative mt-1 mb-2">
             <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -162,7 +162,7 @@ export function Sidebar({
           </div>
         )}
 
-        {/* Lista progetti (scrollabile con max-height) */}
+        {/* Project list (scrollable with max-height) */}
         <div className="flex flex-col gap-0.5 mt-1 max-h-[40vh] overflow-y-auto">
           {filteredProjects.map(project => {
             const pc = getProjectColorByName(project);
@@ -233,7 +233,7 @@ export function Sidebar({
       {/* Divider */}
       <div className="mx-4 h-px bg-border" />
 
-      {/* Sezione: Filtri tipo */}
+      {/* Section: Type filters */}
       <div className="p-4">
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-3 px-2">Filters</h3>
         <div className="flex flex-col gap-0.5">
@@ -269,7 +269,7 @@ export function Sidebar({
       {/* Divider */}
       <div className="mx-4 h-px bg-border" />
 
-      {/* Sezione: Statistiche */}
+      {/* Section: Statistics */}
       <div className="p-4">
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-3 px-2">Statistics</h3>
         <div className="grid grid-cols-2 gap-2">
@@ -287,7 +287,7 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* Sezione: Token Economics */}
+      {/* Section: Token Economics */}
       {(stats.tokenEconomics.discoveryTokens > 0 || stats.tokenEconomics.readTokens > 0) && (
         <>
           <div className="mx-4 h-px bg-border" />
@@ -309,7 +309,7 @@ export function Sidebar({
                   <span className="text-xs font-bold text-emerald-400 tabular-nums">{formatTokenCount(stats.tokenEconomics.savings)}</span>
                 </div>
               </div>
-              {/* Barra visuale del rapporto */}
+              {/* Visual ratio bar */}
               {stats.tokenEconomics.discoveryTokens > 0 && (
                 <div className="rounded-md overflow-hidden h-2 bg-surface-3">
                   <div
@@ -334,7 +334,7 @@ export function Sidebar({
           <a href="https://github.com/Auriti-Labs/kiro-memory" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-zinc-400 transition-colors" title="GitHub">
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/></svg>
           </a>
-          <a href="https://auritidesign.it/docs/kiro-memory/" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-zinc-400 transition-colors" title="Documentazione">
+          <a href="https://auritidesign.it/docs/kiro-memory/" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-zinc-400 transition-colors" title="Documentation">
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg>
           </a>
         </div>

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Hook stop per Kiro CLI
+ * Stop hook for Kiro CLI
  *
- * Trigger: quando l'agente completa la risposta
- * Funzione: genera e salva un sommario della sessione corrente
+ * Trigger: when the agent completes its response
+ * Function: generates and saves a summary of the current session
  */
 
 import { runHook, detectProject, notifyWorker } from './utils.js';
@@ -14,19 +14,19 @@ runHook('stop', async (input) => {
   const sdk = createKiroMemory({ project, skipMigrations: true });
 
   try {
-    // Recupera o crea la sessione DB per questo content_session_id
+    // Get or create DB session for this content_session_id
     const contentSessionId = input.session_id || `stop-${Date.now()}`;
     const session = await sdk.getOrCreateSession(contentSessionId);
 
-    // Filtra osservazioni: usa started_at_epoch della sessione se disponibile,
-    // altrimenti fallback a finestra 4h. Fix: content_session_id ≠ memory_session_id
+    // Filter observations: use session's started_at_epoch if available,
+    // otherwise fallback to 4h window. Fix: content_session_id ≠ memory_session_id
     const recentObs = await sdk.getRecentObservations(50);
     const sessionStart = session.started_at_epoch || (Date.now() - (4 * 60 * 60 * 1000));
     const sessionObs = recentObs.filter(o => o.created_at_epoch >= sessionStart);
 
     if (sessionObs.length === 0) return;
 
-    // Categorizza osservazioni per tipo
+    // Categorize observations by type
     const byType = new Map<string, typeof sessionObs>();
     for (const obs of sessionObs) {
       const group = byType.get(obs.type) || [];
@@ -34,7 +34,7 @@ runHook('stop', async (input) => {
       byType.set(obs.type, group);
     }
 
-    // Sezione "investigated": file letti e ricerche
+    // Section "investigated": files read and research
     const readFiles = byType.get('file-read') || [];
     const researched = byType.get('research') || [];
     const investigated = [
@@ -42,7 +42,7 @@ runHook('stop', async (input) => {
       ...researched.slice(0, 3).map(o => o.narrative || o.title),
     ].filter(Boolean).join('; ') || undefined;
 
-    // Sezione "completed": file modificati e comandi eseguiti
+    // Section "completed": modified files and executed commands
     const writes = byType.get('file-write') || [];
     const commands = byType.get('command') || [];
     const completed = [
@@ -50,14 +50,14 @@ runHook('stop', async (input) => {
       ...commands.slice(0, 3).map(o => o.narrative || o.title),
     ].filter(Boolean).join('; ') || undefined;
 
-    // Sezione "learned": contenuto ricerca e code-intelligence
+    // Section "learned": research content and code-intelligence
     const learned = researched
       .map(o => o.text?.substring(0, 150))
       .filter(Boolean)
       .slice(0, 5)
       .join('; ') || undefined;
 
-    // File modificati unici
+    // Unique modified files
     const filesModified = [...new Set(
       sessionObs
         .filter(o => o.files_modified)
@@ -65,25 +65,25 @@ runHook('stop', async (input) => {
         .flatMap(f => f.split(',').map(s => s.trim()))
     )];
 
-    // Concetti unici dalla sessione
+    // Unique concepts from the session
     const sessionConcepts = [...new Set(
       sessionObs
         .filter(o => o.concepts)
         .flatMap(o => o.concepts!.split(',').map(c => c.trim()))
     )].slice(0, 10);
 
-    // Sezione "next_steps": file toccati + concetti
+    // Section "next_steps": modified files + concepts
     const nextSteps = [
       filesModified.length > 0 ? `Files modified: ${filesModified.slice(0, 10).join(', ')}` : '',
       sessionConcepts.length > 0 ? `Concepts: ${sessionConcepts.join(', ')}` : '',
     ].filter(Boolean).join('. ') || undefined;
 
-    // Titolo basato sull'azione principale
+    // Title based on main action
     const mainAction = writes.length > 0
-      ? `${writes.length} file modific${writes.length === 1 ? 'ato' : 'ati'}`
+      ? `${writes.length} file${writes.length === 1 ? '' : 's'} modified`
       : commands.length > 0
-        ? `${commands.length} comand${commands.length === 1 ? 'o' : 'i'}`
-        : `${sessionObs.length} osservazion${sessionObs.length === 1 ? 'e' : 'i'}`;
+        ? `${commands.length} command${commands.length === 1 ? '' : 's'}`
+        : `${sessionObs.length} observation${sessionObs.length === 1 ? '' : 's'}`;
 
     await sdk.storeSummary({
       request: `${project} — ${mainAction} — ${new Date().toISOString().split('T')[0]}`,
@@ -93,10 +93,10 @@ runHook('stop', async (input) => {
       nextSteps,
     });
 
-    // Notifica la dashboard in tempo reale
+    // Notify dashboard in real-time
     await notifyWorker('summary-created', { project });
 
-    // Crea checkpoint strutturato per resume futuro (sessione già recuperata sopra)
+    // Create structured checkpoint for future resume (session already retrieved above)
     const task = sessionObs[0]?.title || `${project} session`;
     const progress = completed || 'No progress recorded';
     const nextStepsCheckpoint = filesModified.length > 0
@@ -110,7 +110,7 @@ runHook('stop', async (input) => {
       relevantFiles: filesModified.slice(0, 20)
     });
 
-    // Completa la sessione (imposta status='completed' e completed_at)
+    // Complete the session (sets status='completed' and completed_at)
     await sdk.completeSession(session.id);
 
     await notifyWorker('checkpoint-created', { project });

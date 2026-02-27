@@ -9,12 +9,12 @@ interface AnalyticsData {
   isLoading: boolean;
 }
 
-/** Intervallo polling analytics (ms) — sincronizzato col polling di useSSE */
+/** Analytics polling interval (ms) — synchronized with useSSE polling */
 const POLL_INTERVAL = 30_000;
 
 /**
- * Hook per fetch dati analytics con polling automatico.
- * NON apre EventSource propria — usa polling a 30s per aggiornamenti.
+ * Hook for fetching analytics data with automatic polling.
+ * Does NOT open its own EventSource — uses 30s polling for updates.
  */
 export function useAnalytics(project: string): AnalyticsData {
   const [data, setData] = useState<AnalyticsData>({
@@ -59,11 +59,11 @@ export function useAnalytics(project: string): AnalyticsData {
   useEffect(() => {
     mountedRef.current = true;
 
-    // Fetch iniziale
+    // Initial fetch
     setData(prev => ({ ...prev, isLoading: true }));
     fetchAnalytics();
 
-    // Polling automatico ogni 30s
+    // Automatic polling every 30s
     const interval = setInterval(() => {
       if (mountedRef.current) fetchAnalytics();
     }, POLL_INTERVAL);

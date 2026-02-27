@@ -1,20 +1,20 @@
 /**
- * Ricerca vettoriale locale su SQLite BLOB
+ * Local vector search on SQLite BLOB
  *
- * Salva embeddings come BLOB in observation_embeddings,
- * calcola cosine similarity in JavaScript per ricerca semantica.
+ * Stores embeddings as BLOB in observation_embeddings,
+ * computes cosine similarity in JavaScript for semantic search.
  *
- * Ottimizzazioni vs brute-force O(n):
- * - Pre-filtraggio SQL per progetto e recency (riduce candidati)
- * - Limite massimo di candidati caricati in memoria (maxCandidates)
- * - Buffer pooling per ridurre allocazioni GC
+ * Optimizations vs brute-force O(n):
+ * - SQL pre-filtering by project and recency (reduces candidates)
+ * - Maximum limit of candidates loaded in memory (maxCandidates)
+ * - Buffer pooling to reduce GC allocations
  */
 
 import type { Database } from 'bun:sqlite';
 import { getEmbeddingService } from './EmbeddingService.js';
 import { logger } from '../../utils/logger.js';
 
-// Massimo numero di embedding caricati in memoria per query
+// Maximum number of embeddings loaded in memory per query
 const DEFAULT_MAX_CANDIDATES = 2000;
 
 export interface VectorSearchResult {
@@ -30,8 +30,8 @@ export interface VectorSearchResult {
 }
 
 /**
- * Calcola cosine similarity tra due vettori Float32Array.
- * Versione ottimizzata: loop unificato con un solo sqrt finale.
+ * Compute cosine similarity between two Float32Array vectors.
+ * Optimized version: unified loop with a single final sqrt.
  */
 export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
   const len = a.length;
@@ -41,7 +41,7 @@ export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
   let normA = 0;
   let normB = 0;
 
-  // Loop unificato — evita 3 passaggi separati
+  // Unified loop — avoids 3 separate passes
   for (let i = 0; i < len; i++) {
     const ai = a[i];
     const bi = b[i];
@@ -57,14 +57,14 @@ export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
 }
 
 /**
- * Converte Float32Array in Buffer per storage SQLite BLOB.
+ * Convert Float32Array to Buffer for SQLite BLOB storage.
  */
 function float32ToBuffer(arr: Float32Array): Buffer {
   return Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength);
 }
 
 /**
- * Converte Buffer SQLite BLOB in Float32Array.
+ * Convert SQLite BLOB Buffer to Float32Array.
  */
 function bufferToFloat32(buf: Buffer | Uint8Array): Float32Array {
   const arrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
@@ -74,13 +74,13 @@ function bufferToFloat32(buf: Buffer | Uint8Array): Float32Array {
 export class VectorSearch {
 
   /**
-   * Ricerca semantica con pre-filtraggio SQL per scalabilità.
+   * Semantic search with SQL pre-filtering for scalability.
    *
-   * Strategia a 2 fasi:
-   * 1. SQL pre-filtra per progetto + ordina per recency (carica max N candidati)
-   * 2. JS calcola cosine similarity solo sui candidati filtrati
+   * 2-phase strategy:
+   * 1. SQL pre-filters by project + sorts by recency (loads max N candidates)
+   * 2. JS computes cosine similarity only on filtered candidates
    *
-   * Con 50k osservazioni e maxCandidates=2000, carica solo ~4% dei dati.
+   * With 50k observations and maxCandidates=2000, loads only ~4% of data.
    */
   async search(
     db: Database,
@@ -97,7 +97,7 @@ export class VectorSearch {
     const maxCandidates = options.maxCandidates || DEFAULT_MAX_CANDIDATES;
 
     try {
-      // Fase 1: pre-filtra in SQL per progetto, ordina per recency, limita candidati
+      // Phase 1: pre-filter in SQL by project, sort by recency, limit candidates
       const conditions: string[] = [];
       const params: any[] = [];
 
@@ -110,7 +110,7 @@ export class VectorSearch {
         ? `WHERE ${conditions.join(' AND ')}`
         : '';
 
-      // Ordina per recency e limita candidati — evita di caricare tutti gli embedding
+      // Sort by recency and limit candidates — avoids loading all embeddings
       const sql = `
         SELECT e.observation_id, e.embedding,
                o.title, o.text, o.type, o.project, o.created_at, o.created_at_epoch
@@ -133,7 +133,7 @@ export class VectorSearch {
         created_at_epoch: number;
       }>;
 
-      // Fase 2: calcola similarity solo sui candidati pre-filtrati
+      // Phase 2: compute similarity only on pre-filtered candidates
       const scored: VectorSearchResult[] = [];
 
       for (const row of rows) {
@@ -155,20 +155,20 @@ export class VectorSearch {
         }
       }
 
-      // Ordina per similarity decrescente
+      // Sort by similarity descending
       scored.sort((a, b) => b.similarity - a.similarity);
 
-      logger.debug('VECTOR', `Ricerca: ${rows.length} candidati → ${scored.length} sopra soglia → ${Math.min(scored.length, limit)} risultati`);
+      logger.debug('VECTOR', `Search: ${rows.length} candidates → ${scored.length} above threshold → ${Math.min(scored.length, limit)} results`);
 
       return scored.slice(0, limit);
     } catch (error) {
-      logger.error('VECTOR', `Errore ricerca vettoriale: ${error}`);
+      logger.error('VECTOR', `Vector search error: ${error}`);
       return [];
     }
   }
 
   /**
-   * Salva embedding per un'osservazione.
+   * Store embedding for an observation.
    */
   async storeEmbedding(
     db: Database,
@@ -191,14 +191,14 @@ export class VectorSearch {
         new Date().toISOString()
       );
 
-      logger.debug('VECTOR', `Embedding salvato per osservazione ${observationId}`);
+      logger.debug('VECTOR', `Embedding saved for observation ${observationId}`);
     } catch (error) {
-      logger.error('VECTOR', `Errore salvataggio embedding: ${error}`);
+      logger.error('VECTOR', `Error saving embedding: ${error}`);
     }
   }
 
   /**
-   * Genera embeddings per osservazioni che non li hanno ancora.
+   * Generate embeddings for observations that don't have them yet.
    */
   async backfillEmbeddings(
     db: Database,
@@ -206,11 +206,11 @@ export class VectorSearch {
   ): Promise<number> {
     const embeddingService = getEmbeddingService();
     if (!await embeddingService.initialize()) {
-      logger.warn('VECTOR', 'Embedding service non disponibile, backfill saltato');
+      logger.warn('VECTOR', 'Embedding service not available, backfill skipped');
       return 0;
     }
 
-    // Trova osservazioni senza embedding
+    // Find observations without embeddings
     const rows = db.query(`
       SELECT o.id, o.title, o.text, o.narrative, o.concepts
       FROM observations o
@@ -232,7 +232,7 @@ export class VectorSearch {
     const model = embeddingService.getProvider() || 'unknown';
 
     for (const row of rows) {
-      // Componi testo per embedding: title + text + concepts
+      // Compose text for embedding: title + text + concepts
       const parts = [row.title];
       if (row.text) parts.push(row.text);
       if (row.narrative) parts.push(row.narrative);
@@ -246,12 +246,12 @@ export class VectorSearch {
       }
     }
 
-    logger.info('VECTOR', `Backfill completato: ${count}/${rows.length} embeddings generati`);
+    logger.info('VECTOR', `Backfill completed: ${count}/${rows.length} embeddings generated`);
     return count;
   }
 
   /**
-   * Statistiche sugli embeddings.
+   * Embedding statistics.
    */
   getStats(db: Database): { total: number; embedded: number; percentage: number } {
     try {

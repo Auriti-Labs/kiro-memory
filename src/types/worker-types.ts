@@ -40,7 +40,7 @@ export interface Observation {
   created_at: string;
   created_at_epoch: number;
   last_accessed_epoch: number | null;
-  is_stale: number; // 0 = fresh, 1 = file modificato dopo l'osservazione
+  is_stale: number; // 0 = fresh, 1 = file modified after the observation
 }
 
 export interface Summary {
@@ -156,13 +156,13 @@ export interface ContextContext {
 // ============================================================================
 
 /**
- * Input JSON ricevuto via stdin dagli hook Kiro CLI / Claude Code
+ * Input JSON received via stdin from Kiro CLI / Claude Code hooks
  *
- * Campi comuni a tutti gli hook:
+ * Fields common to all hooks:
  * - session_id, cwd, hook_event_name
  *
- * Campi specifici per hook:
- * - UserPromptSubmit: prompt (testo dell'utente, top-level)
+ * Hook-specific fields:
+ * - UserPromptSubmit: prompt (user text, top-level)
  * - PostToolUse: tool_name, tool_input, tool_response, tool_use_id
  * - Stop: stop_hook_active, transcript_path
  * - SessionStart/agentSpawn: transcript_path
@@ -174,7 +174,7 @@ export interface KiroHookInput {
   transcript_path?: string;
   permission_mode?: string;
 
-  // UserPromptSubmit: il prompt è top-level, NON in tool_input
+  // UserPromptSubmit: the prompt is top-level, NOT in tool_input
   prompt?: string;
   user_prompt?: string;
 
@@ -187,7 +187,7 @@ export interface KiroHookInput {
   // Stop
   stop_hook_active?: boolean;
 
-  // Catch-all per campi non ancora mappati
+  // Catch-all for fields not yet mapped
   [key: string]: any;
 }
 
@@ -223,7 +223,7 @@ export interface TimelineEntry {
 // Smart Ranking Types (Phase 2B)
 // ============================================================================
 
-/** Pesi per i 4 segnali di scoring */
+/** Weights for the 4 scoring signals */
 export interface ScoringWeights {
   semantic: number;
   fts5: number;
@@ -231,7 +231,7 @@ export interface ScoringWeights {
   projectMatch: number;
 }
 
-/** Item con score composito e segnali individuali */
+/** Item with composite score and individual signals */
 export interface ScoredItem {
   id: number;
   title: string;
@@ -249,7 +249,7 @@ export interface ScoredItem {
   };
 }
 
-/** Contesto smart con budget token */
+/** Smart context with token budget */
 export interface SmartContext {
   project: string;
   items: ScoredItem[];
@@ -262,44 +262,44 @@ export interface SmartContext {
 // Structured Knowledge Types (Phase 5A)
 // ============================================================================
 
-/** Tipi di conoscenza strutturata */
+/** Structured knowledge types */
 export type KnowledgeType = 'constraint' | 'decision' | 'heuristic' | 'rejected';
 
-/** Costante per validazione runtime */
+/** Constant for runtime validation */
 export const KNOWLEDGE_TYPES: KnowledgeType[] = ['constraint', 'decision', 'heuristic', 'rejected'];
 
-/** Metadati per vincoli (regole hard/soft) */
+/** Metadata for constraints (hard/soft rules) */
 export interface ConstraintMeta {
   knowledgeType: 'constraint';
   severity: 'hard' | 'soft';
   reason?: string;
 }
 
-/** Metadati per decisioni architetturali */
+/** Metadata for architectural decisions */
 export interface DecisionMeta {
   knowledgeType: 'decision';
   alternatives?: string[];
   reason?: string;
 }
 
-/** Metadati per preferenze/euristiche */
+/** Metadata for preferences/heuristics */
 export interface HeuristicMeta {
   knowledgeType: 'heuristic';
   context?: string;
   confidence?: 'high' | 'medium' | 'low';
 }
 
-/** Metadati per soluzioni scartate */
+/** Metadata for rejected solutions */
 export interface RejectedMeta {
   knowledgeType: 'rejected';
   reason: string;
   alternatives?: string[];
 }
 
-/** Union discriminata per metadati knowledge */
+/** Discriminated union for knowledge metadata */
 export type KnowledgeMetadata = ConstraintMeta | DecisionMeta | HeuristicMeta | RejectedMeta;
 
-/** Input per salvare conoscenza strutturata */
+/** Input for storing structured knowledge */
 export interface StoreKnowledgeInput {
   project: string;
   knowledgeType: KnowledgeType;
@@ -307,7 +307,7 @@ export interface StoreKnowledgeInput {
   content: string;
   concepts?: string[];
   files?: string[];
-  /** Metadati specifici per tipo (severity, alternatives, reason, context, confidence) */
+  /** Type-specific metadata (severity, alternatives, reason, context, confidence) */
   metadata?: Partial<Omit<ConstraintMeta, 'knowledgeType'>> &
     Partial<Omit<DecisionMeta, 'knowledgeType'>> &
     Partial<Omit<HeuristicMeta, 'knowledgeType'>> &

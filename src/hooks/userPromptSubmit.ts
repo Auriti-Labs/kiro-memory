@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /**
- * Hook userPromptSubmit per Kiro CLI
+ * userPromptSubmit hook for Kiro CLI
  *
- * Trigger: quando l'utente invia un prompt
- * Funzione: salva il prompt nel database per contesto futuro
+ * Trigger: when the user submits a prompt
+ * Function: saves the prompt in the database for future context
  */
 
 import { runHook, detectProject, notifyWorker } from './utils.js';
 import { createKiroMemory } from '../sdk/index.js';
 
 runHook('userPromptSubmit', async (input) => {
-  // Il prompt è un campo top-level, NON dentro tool_input
+  // The prompt is a top-level field, NOT inside tool_input
   const promptText = input.prompt
     || input.user_prompt
     || input.tool_input?.prompt
@@ -22,16 +22,16 @@ runHook('userPromptSubmit', async (input) => {
   const sdk = createKiroMemory({ project, skipMigrations: true });
 
   try {
-    // Usa session_id da Kiro se disponibile, altrimenti genera uno
+    // Use session_id from Kiro if available, otherwise generate one
     const sessionId = input.session_id
       || `kiro-${new Date().toISOString().split('T')[0]}-${project}`;
 
     await sdk.storePrompt(sessionId, Date.now(), promptText.trim());
 
-    // Notifica la dashboard in tempo reale
+    // Notify the dashboard in real-time
     await notifyWorker('prompt-created', { project });
 
-    // Cursor beforeSubmitPrompt richiede output JSON per proseguire
+    // Cursor beforeSubmitPrompt requires JSON output to proceed
     if (input.hook_event_name === 'beforeSubmitPrompt') {
       process.stdout.write(JSON.stringify({ continue: true }));
     }

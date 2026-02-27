@@ -226,8 +226,8 @@ var EmbeddingService = class {
   initialized = false;
   initializing = null;
   /**
-   * Inizializza il servizio di embedding.
-   * Tenta fastembed, poi @huggingface/transformers, poi fallback a null.
+   * Initialize the embedding service.
+   * Tries fastembed, then @huggingface/transformers, then fallback to null.
    */
   async initialize() {
     if (this.initialized) return this.provider !== null;
@@ -248,11 +248,11 @@ var EmbeddingService = class {
         });
         this.provider = "fastembed";
         this.initialized = true;
-        logger.info("EMBEDDING", "Inizializzato con fastembed (BGE-small-en-v1.5)");
+        logger.info("EMBEDDING", "Initialized with fastembed (BGE-small-en-v1.5)");
         return true;
       }
     } catch (error) {
-      logger.debug("EMBEDDING", `fastembed non disponibile: ${error}`);
+      logger.debug("EMBEDDING", `fastembed not available: ${error}`);
     }
     try {
       const transformers = await import("@huggingface/transformers");
@@ -263,20 +263,20 @@ var EmbeddingService = class {
         });
         this.provider = "transformers";
         this.initialized = true;
-        logger.info("EMBEDDING", "Inizializzato con @huggingface/transformers (all-MiniLM-L6-v2)");
+        logger.info("EMBEDDING", "Initialized with @huggingface/transformers (all-MiniLM-L6-v2)");
         return true;
       }
     } catch (error) {
-      logger.debug("EMBEDDING", `@huggingface/transformers non disponibile: ${error}`);
+      logger.debug("EMBEDDING", `@huggingface/transformers not available: ${error}`);
     }
     this.provider = null;
     this.initialized = true;
-    logger.warn("EMBEDDING", "Nessun provider embedding disponibile, ricerca semantica disabilitata");
+    logger.warn("EMBEDDING", "No embedding provider available, semantic search disabled");
     return false;
   }
   /**
-   * Genera embedding per un singolo testo.
-   * Ritorna Float32Array con 384 dimensioni, o null se non disponibile.
+   * Generate embedding for a single text.
+   * Returns Float32Array with 384 dimensions, or null if not available.
    */
   async embed(text) {
     if (!this.initialized) await this.initialize();
@@ -289,12 +289,12 @@ var EmbeddingService = class {
         return await this._embedTransformers(truncated);
       }
     } catch (error) {
-      logger.error("EMBEDDING", `Errore generazione embedding: ${error}`);
+      logger.error("EMBEDDING", `Error generating embedding: ${error}`);
     }
     return null;
   }
   /**
-   * Genera embeddings in batch.
+   * Generate embeddings in batch.
    */
   async embedBatch(texts) {
     if (!this.initialized) await this.initialize();
@@ -311,24 +311,24 @@ var EmbeddingService = class {
     return results;
   }
   /**
-   * Verifica se il servizio è disponibile.
+   * Check if the service is available.
    */
   isAvailable() {
     return this.initialized && this.provider !== null;
   }
   /**
-   * Nome del provider attivo.
+   * Name of the active provider.
    */
   getProvider() {
     return this.provider;
   }
   /**
-   * Dimensioni del vettore embedding.
+   * Embedding vector dimensions.
    */
   getDimensions() {
     return 384;
   }
-  // --- Provider specifici ---
+  // --- Provider-specific implementations ---
   async _embedFastembed(text) {
     const embeddings = this.model.embed([text], 1);
     for await (const batch of embeddings) {

@@ -1,6 +1,6 @@
 /**
- * Contesto condiviso tra tutti i router del worker.
- * Centralizza database, SSE broadcast, cache e helper di validazione.
+ * Shared context for all worker routers.
+ * Centralizes database, SSE broadcast, cache, and validation helpers.
  */
 
 import type { Response } from 'express';
@@ -9,7 +9,7 @@ import { getEmbeddingService } from './search/EmbeddingService.js';
 import { getVectorSearch } from './search/VectorSearch.js';
 import { logger } from '../utils/logger.js';
 
-// ── Tipo contesto condiviso ──
+// ── Shared context type ──
 
 export interface WorkerContext {
   db: KiroMemoryDatabase;
@@ -47,19 +47,19 @@ export function removeClient(res: Response): void {
   }
 }
 
-/** Broadcast evento SSE a tutti i client connessi */
+/** Broadcast SSE event to all connected clients */
 export function broadcast(event: string, data: any): void {
   const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   clients.forEach(client => {
     try {
       client.write(message);
     } catch (err) {
-      logger.warn('WORKER', 'Broadcast fallito verso client', {}, err as Error);
+      logger.warn('WORKER', 'Broadcast failed to client', {}, err as Error);
     }
   });
 }
 
-// ── Cache progetti ──
+// ── Projects cache ──
 
 export let projectsCache: { data: string[]; ts: number } = { data: [], ts: 0 };
 export const PROJECTS_CACHE_TTL = 60_000;
@@ -68,9 +68,9 @@ export function invalidateProjectsCache(): void {
   projectsCache.ts = 0;
 }
 
-// ── Helper di validazione (condivisi tra tutti i router) ──
+// ── Validation helpers (shared across all routers) ──
 
-/** Parsa un intero con range sicuro, ritorna default se invalido */
+/** Parse an integer with safe range, returns default if invalid */
 export function parseIntSafe(value: string | undefined, defaultVal: number, min: number, max: number): number {
   if (!value) return defaultVal;
   const parsed = parseInt(value, 10);
@@ -78,7 +78,7 @@ export function parseIntSafe(value: string | undefined, defaultVal: number, min:
   return parsed;
 }
 
-/** Valida che un nome progetto contenga solo caratteri sicuri */
+/** Validate that a project name contains only safe characters */
 export function isValidProject(project: unknown): project is string {
   return typeof project === 'string'
     && project.length > 0
@@ -87,14 +87,14 @@ export function isValidProject(project: unknown): project is string {
     && !project.includes('..');
 }
 
-/** Valida una stringa non vuota con lunghezza massima */
+/** Validate a non-empty string with maximum length */
 export function isValidString(val: unknown, maxLen: number): val is string {
   return typeof val === 'string' && val.length > 0 && val.length <= maxLen;
 }
 
 // ── Embedding helper ──
 
-/** Genera embedding per un'osservazione (fire-and-forget) */
+/** Generate embedding for an observation (fire-and-forget) */
 export async function generateEmbeddingForObservation(
   db: KiroMemoryDatabase,
   observationId: number,
@@ -122,11 +122,11 @@ export async function generateEmbeddingForObservation(
       );
     }
   } catch (error) {
-    logger.debug('WORKER', `Embedding generation fallita per obs ${observationId}: ${error}`);
+    logger.debug('WORKER', `Embedding generation failed for obs ${observationId}: ${error}`);
   }
 }
 
-// ── Factory per creare il contesto ──
+// ── Context factory ──
 
 export function createWorkerContext(db: KiroMemoryDatabase): WorkerContext {
   return {

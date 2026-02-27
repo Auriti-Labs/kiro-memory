@@ -1,6 +1,6 @@
 /**
  * Router Core: health check, SSE events, notify endpoint.
- * Gestisce infrastruttura base del worker.
+ * Manages the base worker infrastructure.
  */
 
 import { Router } from 'express';
@@ -19,7 +19,7 @@ const ALLOWED_EVENTS = new Set([
 export function createCoreRouter(ctx: WorkerContext, workerToken: string): Router {
   const router = Router();
 
-  // Rate limit dedicato per /api/notify (più restrittivo)
+  // Dedicated rate limit for /api/notify (more restrictive)
   const notifyLimiter = rateLimit({
     windowMs: 60_000,
     max: 60,
@@ -27,7 +27,7 @@ export function createCoreRouter(ctx: WorkerContext, workerToken: string): Route
     legacyHeaders: false
   });
 
-  // Notifica dagli hook → broadcast SSE ai client dashboard
+  // Notification from hooks → SSE broadcast to dashboard clients
   router.post('/api/notify', notifyLimiter, (req, res) => {
     const token = req.headers['x-worker-token'] as string;
     if (token !== workerToken) {
@@ -54,7 +54,7 @@ export function createCoreRouter(ctx: WorkerContext, workerToken: string): Route
     });
   });
 
-  // SSE endpoint con keepalive e limite connessioni
+  // SSE endpoint with keepalive and connection limit
   router.get('/events', (req, res) => {
     const clients = getClients();
     if (clients.length >= getMaxSSEClients()) {
@@ -69,12 +69,12 @@ export function createCoreRouter(ctx: WorkerContext, workerToken: string): Route
     res.flushHeaders();
 
     addClient(res);
-    logger.info('WORKER', 'SSE client connesso', { clients: clients.length });
+    logger.info('WORKER', 'SSE client connected', { clients: clients.length });
 
-    // Evento iniziale di connessione
+    // Initial connection event
     res.write(`event: connected\ndata: ${JSON.stringify({ timestamp: Date.now() })}\n\n`);
 
-    // Keepalive ogni 15 secondi
+    // Keepalive every 15 seconds
     const keepaliveInterval = setInterval(() => {
       try {
         res.write(`:keepalive ${Date.now()}\n\n`);
@@ -86,7 +86,7 @@ export function createCoreRouter(ctx: WorkerContext, workerToken: string): Route
     req.on('close', () => {
       clearInterval(keepaliveInterval);
       removeClient(res);
-      logger.info('WORKER', 'SSE client disconnesso', { clients: getClients().length });
+      logger.info('WORKER', 'SSE client disconnected', { clients: getClients().length });
     });
   });
 

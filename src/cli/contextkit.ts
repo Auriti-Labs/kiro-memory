@@ -1,6 +1,6 @@
 /**
- * Kiro Memory CLI - Interfaccia a riga di comando
- * (shebang aggiunto automaticamente dal build)
+ * Kiro Memory CLI - Command line interface
+ * (shebang added automatically by the build)
  */
 
 import { createKiroMemory } from '../sdk/index.js';
@@ -16,13 +16,13 @@ import { createInterface } from 'readline';
 const args = process.argv.slice(2);
 const command = args[0];
 
-// Rileva il path di dist dal file corrente (bundled da esbuild)
+// Detect the dist path from the current file (bundled by esbuild)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-// __dirname = .../plugin/dist/cli → risali per ottenere plugin/dist
+// __dirname = .../plugin/dist/cli → go up to get plugin/dist
 const DIST_DIR = dirname(__dirname);
 
-// Versione dal package.json (plugin/dist/cli → ../../package.json)
+// Version from package.json (plugin/dist/cli → ../../package.json)
 let PKG_VERSION = 'unknown';
 try {
   const pkgPath = join(DIST_DIR, '..', '..', 'package.json');
@@ -274,9 +274,9 @@ function printChecks(checks: CheckResult[]): { hasErrors: boolean } {
   return { hasErrors };
 }
 
-// ─── Helper: prompt interattivo ───
+// ─── Helper: interactive prompt ───
 
-/** Chiede input all'utente via stdin e ritorna la risposta */
+/** Ask the user for input via stdin and return the answer */
 function askUser(question: string): Promise<string> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
@@ -287,7 +287,7 @@ function askUser(question: string): Promise<string> {
   });
 }
 
-/** Rileva la shell corrente dell'utente */
+/** Detect the user's current shell */
 function detectShellRc(): { name: string; rcFile: string } {
   const shell = process.env.SHELL || '/bin/bash';
   if (shell.includes('zsh')) return { name: 'zsh', rcFile: join(homedir(), '.zshrc') };
@@ -295,9 +295,9 @@ function detectShellRc(): { name: string; rcFile: string } {
   return { name: 'bash', rcFile: join(homedir(), '.bashrc') };
 }
 
-// ─── Auto-fix per problemi rilevati ───
+// ─── Auto-fix for detected problems ───
 
-/** Identifica quali check falliti sono auto-fixabili */
+/** Identify which failed checks are auto-fixable */
 const AUTOFIXABLE_CHECKS = new Set([
   'WSL: npm global prefix',
   'WSL: npm binary',
@@ -305,7 +305,7 @@ const AUTOFIXABLE_CHECKS = new Set([
   'better-sqlite3',
 ]);
 
-/** Tenta il fix automatico dei problemi rilevati. Ritorna true se qualcosa è stato fixato */
+/** Attempt automatic fix of detected problems. Returns true if something was fixed */
 async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean; needsRestart: boolean }> {
   const fixable = failedChecks.filter(c => !c.ok && AUTOFIXABLE_CHECKS.has(c.name));
   if (fixable.length === 0) return { fixed: false, needsRestart: false };
@@ -328,7 +328,7 @@ async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean
 
   console.log('');
 
-  // Fix 1: npm global prefix su Windows
+  // Fix 1: npm global prefix on Windows
   const prefixCheck = fixable.find(c => c.name === 'WSL: npm global prefix');
   if (prefixCheck) {
     console.log('  Fixing npm global prefix...');
@@ -338,7 +338,7 @@ async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean
       const { spawnSync: spawnNpmConfig } = require('child_process');
       spawnNpmConfig('npm', ['config', 'set', 'prefix', npmGlobalDir], { stdio: 'ignore' });
 
-      // Aggiorna rcFile se non contiene già il path
+      // Update rcFile if it doesn't already contain the path
       const exportLine = 'export PATH="$HOME/.npm-global/bin:$PATH"';
       let alreadyInRc = false;
       if (existsSync(rcFile)) {
@@ -349,7 +349,7 @@ async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean
         appendFileSync(rcFile, `\n# npm global prefix (added by kiro-memory)\n${exportLine}\n`);
       }
 
-      // Aggiorna PATH del processo corrente
+      // Update PATH of the current process
       process.env.PATH = `${npmGlobalDir}/bin:${process.env.PATH}`;
 
       console.log(`  \x1b[32m✓\x1b[0m npm prefix set to ${npmGlobalDir}`);
@@ -360,7 +360,7 @@ async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean
     }
   }
 
-  // Fix 2: npm binary è Windows → installa nvm + Node 22 (no sudo)
+  // Fix 2: npm binary is Windows → install nvm + Node 22 (no sudo)
   const npmBinaryCheck = fixable.find(c => c.name === 'WSL: npm binary');
   if (npmBinaryCheck) {
     console.log('\n  Fixing npm binary (installing nvm + Node.js 22)...');
@@ -378,7 +378,7 @@ async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean
         console.log(`  \x1b[32m✓\x1b[0m nvm installed`);
       }
 
-      // Installa Node 22 via nvm (in una subshell che carica nvm)
+      // Install Node 22 via nvm (in a subshell that loads nvm)
       console.log('  Installing Node.js 22 via nvm...');
       execSync('bash -c "source $HOME/.nvm/nvm.sh && nvm install 22"', {
         stdio: 'inherit',
@@ -386,7 +386,7 @@ async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean
       });
       console.log(`  \x1b[32m✓\x1b[0m Node.js 22 installed`);
       anyFixed = true;
-      needsRestart = true; // Il processo corrente usa ancora il vecchio npm
+      needsRestart = true; // The current process still uses the old npm
     } catch (err: any) {
       console.log(`  \x1b[31m✗\x1b[0m Could not install nvm/Node: ${err.message}`);
       console.log('  Install manually:');
@@ -396,7 +396,7 @@ async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean
     }
   }
 
-  // Fix 3: build tools mancanti (richiede sudo)
+  // Fix 3: missing build tools (requires sudo)
   const buildCheck = fixable.find(c => c.name === 'Build tools (native modules)');
   if (buildCheck) {
     console.log('\n  Fixing build tools (requires sudo)...');
@@ -418,7 +418,7 @@ async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean
   if (sqliteCheck) {
     console.log('\n  Rebuilding better-sqlite3...');
     try {
-      // Trova il path del modulo installato globalmente
+      // Find the path of the globally installed module
       const { spawnSync: spawnRebuild } = require('child_process');
       const globalDirResult = spawnRebuild('npm', ['prefix', '-g'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
       const globalDir = (globalDirResult.stdout || '').trim();
@@ -453,12 +453,12 @@ async function installKiro() {
   let checks = runEnvironmentChecks();
   let { hasErrors } = printChecks(checks);
 
-  // Se ci sono errori, tenta auto-fix
+  // If there are errors, attempt auto-fix
   if (hasErrors) {
     const { fixed, needsRestart } = await tryAutoFix(checks);
 
     if (needsRestart) {
-      // nvm/Node installati — serve nuovo terminale
+      // nvm/Node installed — new terminal required
       console.log('  \x1b[33m┌─────────────────────────────────────────────────────────┐\x1b[0m');
       console.log('  \x1b[33m│\x1b[0m  Node.js was installed via nvm. To activate it:         \x1b[33m│\x1b[0m');
       console.log('  \x1b[33m│\x1b[0m                                                         \x1b[33m│\x1b[0m');
@@ -470,7 +470,7 @@ async function installKiro() {
     }
 
     if (fixed) {
-      // Re-run check dopo i fix applicati in-process
+      // Re-run checks after in-process fixes applied
       console.log('  Re-running checks...\n');
       checks = runEnvironmentChecks();
       ({ hasErrors } = printChecks(checks));
@@ -483,10 +483,10 @@ async function installKiro() {
     }
   }
 
-  // dist directory (dove risiedono i file compilati)
+  // dist directory (where compiled files reside)
   const distDir = DIST_DIR;
 
-  // Directory di destinazione
+  // Destination directories
   const kiroDir = process.env.KIRO_CONFIG_DIR || join(homedir(), '.kiro');
   const agentsDir = join(kiroDir, 'agents');
   const settingsDir = join(kiroDir, 'settings');
@@ -506,7 +506,7 @@ async function installKiro() {
   writeFileSync(agentDestPath, agentConfig, 'utf8');
   console.log(`  → Agent config: ${agentDestPath}`);
 
-  // Aggiorna/crea mcp.json
+  // Update/create mcp.json
   const mcpFilePath = join(settingsDir, 'mcp.json');
   let mcpConfig: any = { mcpServers: {} };
 
@@ -515,7 +515,7 @@ async function installKiro() {
       mcpConfig = JSON.parse(readFileSync(mcpFilePath, 'utf8'));
       if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
     } catch {
-      // File corrotto, sovrascrivi
+      // Corrupted file, overwrite
     }
   }
 
@@ -526,14 +526,14 @@ async function installKiro() {
   writeFileSync(mcpFilePath, JSON.stringify(mcpConfig, null, 2), 'utf8');
   console.log(`  → MCP config:   ${mcpFilePath}`);
 
-  // Scrivi steering file (da contenuto embedded)
+  // Write steering file (from embedded content)
   const steeringDestPath = join(steeringDir, 'kiro-memory.md');
   writeFileSync(steeringDestPath, STEERING_CONTENT, 'utf8');
   console.log(`  → Steering:     ${steeringDestPath}`);
 
   console.log(`  → Data dir:     ${dataDir}`);
 
-  // 3. Prompt per creazione alias
+  // 3. Prompt for alias creation
   console.log('\n[3/4] Shell alias setup\n');
 
   const { rcFile } = detectShellRc();
@@ -549,7 +549,7 @@ async function installKiro() {
   if (aliasAlreadySet) {
     console.log(`  \x1b[32m✓\x1b[0m Alias already configured in ${rcFile}`);
   } else {
-    // Box evidenziato per l'alias
+    // Highlighted box for the alias
     console.log('  \x1b[36m┌─────────────────────────────────────────────────────────┐\x1b[0m');
     console.log('  \x1b[36m│\x1b[0m  Without an alias, you must type every time:            \x1b[36m│\x1b[0m');
     console.log('  \x1b[36m│\x1b[0m    \x1b[2mkiro-cli --agent kiro-memory\x1b[0m                          \x1b[36m│\x1b[0m');
@@ -576,7 +576,7 @@ async function installKiro() {
     }
   }
 
-  // 4. Banner finale
+  // 4. Final banner
   console.log('\n[4/4] Done!\n');
   printBanner({
     editor: 'Kiro CLI',
@@ -599,7 +599,7 @@ async function installKiro() {
 
 // ─── Install Claude Code command ───
 
-/** Contenuto steering per Claude Code (iniettato in ~/.claude/CLAUDE.md) */
+/** Steering content for Claude Code (injected into ~/.claude/CLAUDE.md) */
 const CLAUDE_CODE_STEERING = `# Kiro Memory - Persistent Cross-Session Memory
 
 You have access to Kiro Memory, a persistent cross-session memory system that remembers context across sessions.
@@ -664,11 +664,11 @@ async function installClaudeCode() {
 
   console.log('[2/3] Installing Claude Code configuration...\n');
 
-  // Crea directory
+  // Create directories
   mkdirSync(claudeDir, { recursive: true });
   mkdirSync(dataDir, { recursive: true });
 
-  // --- settings.json con hooks ---
+  // --- settings.json with hooks ---
   const settingsPath = join(claudeDir, 'settings.json');
   let settings: any = {};
 
@@ -676,11 +676,11 @@ async function installClaudeCode() {
     try {
       settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
     } catch {
-      // File corrotto, lo ricreiamo
+      // Corrupted file, recreate it
     }
   }
 
-  // Mappa hook events → script (timeout in secondi per Claude Code)
+  // Map hook events → scripts (timeout in seconds for Claude Code)
   const hookMap: Record<string, { script: string; timeout: number }> = {
     'SessionStart': { script: 'hooks/agentSpawn.js', timeout: 10 },
     'UserPromptSubmit': { script: 'hooks/userPromptSubmit.js', timeout: 5 },
@@ -688,8 +688,8 @@ async function installClaudeCode() {
     'Stop': { script: 'hooks/stop.js', timeout: 10 }
   };
 
-  // Claude Code: eventi sono chiavi TOP-LEVEL in settings.json (no wrapper "hooks")
-  // Formato: { matcher: "...", hooks: [{ type, command, timeout }] }
+  // Claude Code: events are TOP-LEVEL keys in settings.json (no "hooks" wrapper)
+  // Format: { matcher: "...", hooks: [{ type, command, timeout }] }
   for (const [event, config] of Object.entries(hookMap)) {
     const hookEntry = {
       matcher: '',
@@ -703,7 +703,7 @@ async function installClaudeCode() {
     if (!settings[event]) {
       settings[event] = [hookEntry];
     } else if (Array.isArray(settings[event])) {
-      // Rimuovi eventuali hook kiro-memory precedenti e aggiungi il nuovo
+      // Remove any previous kiro-memory hooks and add the new one
       settings[event] = settings[event].filter(
         (h: any) => !h.hooks?.some((hk: any) =>
           hk.command?.includes('kiro-memory') || hk.command?.includes('contextkit')
@@ -716,7 +716,7 @@ async function installClaudeCode() {
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
   console.log(`  → Hooks config: ${settingsPath}`);
 
-  // --- .mcp.json nella home (scope globale) ---
+  // --- .mcp.json in home directory (global scope) ---
   const mcpPath = join(homedir(), '.mcp.json');
   let mcpConfig: any = {};
 
@@ -724,7 +724,7 @@ async function installClaudeCode() {
     try {
       mcpConfig = JSON.parse(readFileSync(mcpPath, 'utf8'));
     } catch {
-      // File corrotto
+      // Corrupted file
     }
   }
 
@@ -746,7 +746,7 @@ async function installClaudeCode() {
     existingSteering = readFileSync(steeringPath, 'utf8');
   }
 
-  // Aggiungi steering solo se non è già presente
+  // Add steering only if not already present
   if (!existingSteering.includes('Kiro Memory')) {
     const separator = existingSteering.length > 0 ? '\n\n---\n\n' : '';
     writeFileSync(steeringPath, existingSteering + separator + CLAUDE_CODE_STEERING, 'utf8');
@@ -757,7 +757,7 @@ async function installClaudeCode() {
 
   console.log(`  → Data dir:     ${dataDir}`);
 
-  // 3. Banner finale
+  // 3. Final banner
   console.log('\n[3/3] Done!\n');
   printBanner({
     editor: 'Claude Code',
@@ -809,7 +809,7 @@ async function installCursor() {
 
   console.log('[2/3] Installing Cursor configuration...\n');
 
-  // Crea directory
+  // Create directories
   mkdirSync(cursorDir, { recursive: true });
   mkdirSync(dataDir, { recursive: true });
 
@@ -823,11 +823,11 @@ async function installCursor() {
       if (!hooksConfig.hooks) hooksConfig.hooks = {};
       if (!hooksConfig.version) hooksConfig.version = 1;
     } catch {
-      // File corrotto, lo ricreiamo
+      // Corrupted file, recreate it
     }
   }
 
-  // Mappa eventi Cursor → script
+  // Map Cursor events → scripts
   const cursorHookMap: Record<string, string> = {
     'sessionStart': 'hooks/agentSpawn.js',
     'beforeSubmitPrompt': 'hooks/userPromptSubmit.js',
@@ -845,7 +845,7 @@ async function installCursor() {
     if (!hooksConfig.hooks[event]) {
       hooksConfig.hooks[event] = [hookEntry];
     } else if (Array.isArray(hooksConfig.hooks[event])) {
-      // Rimuovi hook kiro-memory precedenti, aggiungi il nuovo
+      // Remove previous kiro-memory hooks, add the new one
       hooksConfig.hooks[event] = hooksConfig.hooks[event].filter(
         (h: any) => !h.command?.includes('kiro-memory') && !h.command?.includes('contextkit')
       );
@@ -864,7 +864,7 @@ async function installCursor() {
     try {
       mcpConfig = JSON.parse(readFileSync(mcpPath, 'utf8'));
     } catch {
-      // File corrotto
+      // Corrupted file
     }
   }
 
@@ -879,7 +879,7 @@ async function installCursor() {
   console.log(`  → MCP config:   ${mcpPath}`);
   console.log(`  → Data dir:     ${dataDir}`);
 
-  // 3. Banner finale
+  // 3. Final banner
   console.log('\n[3/3] Done!\n');
   printBanner({
     editor: 'Cursor',
@@ -942,7 +942,7 @@ async function installWindsurf() {
     try {
       mcpConfig = JSON.parse(readFileSync(mcpPath, 'utf8'));
     } catch {
-      // File corrotto, lo ricreiamo
+      // Corrupted file, recreate it
     }
   }
 
@@ -957,7 +957,7 @@ async function installWindsurf() {
   console.log(`  → MCP config:   ${mcpPath}`);
   console.log(`  → Data dir:     ${dataDir}`);
 
-  // 3. Banner finale
+  // 3. Final banner
   console.log('\n[3/3] Done!\n');
   printBanner({
     editor: 'Windsurf',
@@ -1029,7 +1029,7 @@ async function installCline() {
     try {
       mcpConfig = JSON.parse(readFileSync(mcpPath, 'utf8'));
     } catch {
-      // File corrotto, lo ricreiamo
+      // Corrupted file, recreate it
     }
   }
 
@@ -1044,7 +1044,7 @@ async function installCline() {
   console.log(`  → MCP config:   ${mcpPath}`);
   console.log(`  → Data dir:     ${dataDir}`);
 
-  // 3. Banner finale
+  // 3. Final banner
   console.log('\n[3/3] Done!\n');
   printBanner({
     editor: 'Cline',
@@ -1106,9 +1106,9 @@ async function runDoctor() {
   if (existsSync(claudeSettingsPath)) {
     try {
       const claudeSettings = JSON.parse(readFileSync(claudeSettingsPath, 'utf8'));
-      // Claude Code: eventi sono chiavi top-level in settings.json (no wrapper "hooks")
+      // Claude Code: events are top-level keys in settings.json (no "hooks" wrapper)
       claudeHooksOk = !!(claudeSettings?.SessionStart || claudeSettings?.PostToolUse);
-      // Verifica che i hook puntino a kiro-memory
+      // Verify that hooks point to kiro-memory
       if (claudeHooksOk) {
         const allSettings = JSON.stringify(claudeSettings);
         claudeHooksOk = allSettings.includes('kiro-memory') || allSettings.includes('agentSpawn');
@@ -1127,7 +1127,7 @@ async function runDoctor() {
 
   checks.push({
     name: 'Claude Code hooks',
-    ok: true, // Non-blocking: installazione opzionale
+    ok: true, // Non-blocking: optional installation
     message: claudeHooksOk
       ? 'Configured in ~/.claude/settings.json'
       : 'Not configured (optional: run kiro-memory install --claude-code)',
@@ -1135,7 +1135,7 @@ async function runDoctor() {
 
   checks.push({
     name: 'Claude Code MCP',
-    ok: true, // Non-blocking: installazione opzionale
+    ok: true, // Non-blocking: optional installation
     message: claudeMcpOk
       ? 'kiro-memory registered in ~/.mcp.json'
       : 'Not configured (optional: run kiro-memory install --claude-code)',
@@ -1167,7 +1167,7 @@ async function runDoctor() {
 
   checks.push({
     name: 'Cursor hooks',
-    ok: true, // Non-blocking: installazione opzionale
+    ok: true, // Non-blocking: optional installation
     message: cursorHooksOk
       ? 'Configured in ~/.cursor/hooks.json'
       : 'Not configured (optional: run kiro-memory install --cursor)',
@@ -1175,7 +1175,7 @@ async function runDoctor() {
 
   checks.push({
     name: 'Cursor MCP',
-    ok: true, // Non-blocking: installazione opzionale
+    ok: true, // Non-blocking: optional installation
     message: cursorMcpOk
       ? 'kiro-memory registered in ~/.cursor/mcp.json'
       : 'Not configured (optional: run kiro-memory install --cursor)',
@@ -1193,7 +1193,7 @@ async function runDoctor() {
 
   checks.push({
     name: 'Windsurf MCP',
-    ok: true, // Non-blocking: installazione opzionale
+    ok: true, // Non-blocking: optional installation
     message: windsurfMcpOk
       ? 'kiro-memory registered in ~/.codeium/windsurf/mcp_config.json'
       : 'Not configured (optional: run kiro-memory install --windsurf)',
@@ -1218,7 +1218,7 @@ async function runDoctor() {
 
   checks.push({
     name: 'Cline MCP',
-    ok: true, // Non-blocking: installazione opzionale
+    ok: true, // Non-blocking: optional installation
     message: clineMcpOk
       ? `kiro-memory registered in cline_mcp_settings.json`
       : 'Not configured (optional: run kiro-memory install --cline)',
@@ -1253,7 +1253,7 @@ async function runDoctor() {
 // ─── Main ───
 
 async function main() {
-  // Comandi che non richiedono database
+  // Commands that don't require database
   if (command === 'install') {
     if (args.includes('--claude-code')) {
       await installClaudeCode();
@@ -1498,7 +1498,7 @@ async function addKnowledge(
     process.exit(1);
   }
 
-  // Parse opzioni dal CLI
+  // Parse options from CLI
   const severity = args.find(a => a.startsWith('--severity='))?.split('=')[1] as 'hard' | 'soft' | undefined;
   const alternativesRaw = args.find(a => a.startsWith('--alternatives='))?.split('=')[1];
   const alternatives = alternativesRaw ? alternativesRaw.split(',').map(s => s.trim()) : undefined;
@@ -1510,7 +1510,7 @@ async function addKnowledge(
   const filesRaw = args.find(a => a.startsWith('--files='))?.split('=')[1];
   const files = filesRaw ? filesRaw.split(',').map(s => s.trim()) : undefined;
 
-  // Rimuovi opzioni dal content (le opzioni --key=val non fanno parte del contenuto)
+  // Remove options from content (--key=val options are not part of the content)
   const cleanContent = content.split(' ').filter(w => !w.startsWith('--')).join(' ');
 
   const id = await sdk.storeKnowledge({
@@ -1538,7 +1538,7 @@ async function handleEmbeddings(sdk: ReturnType<typeof createKiroMemory>, subcom
       console.log(`  With embeddings:     ${stats.embedded}`);
       console.log(`  Coverage:            ${stats.percentage}%`);
 
-      // Inizializza per mostrare info provider
+      // Initialize to show provider info
       await sdk.initializeEmbeddings();
       const { getEmbeddingService } = await import('../services/search/EmbeddingService.js');
       const embService = getEmbeddingService();
@@ -1556,7 +1556,7 @@ async function handleEmbeddings(sdk: ReturnType<typeof createKiroMemory>, subcom
       const batchSize = parseInt(args[2]) || 50;
       console.log(`\nGenerating embeddings (batch size: ${batchSize})...\n`);
 
-      // Inizializza embedding service
+      // Initialize embedding service
       const available = await sdk.initializeEmbeddings();
       if (!available) {
         console.log('  No embedding provider available.');
@@ -1589,7 +1589,7 @@ async function semanticSearchCli(sdk: ReturnType<typeof createKiroMemory>, query
 
   console.log(`\nSemantic search: "${query}"...\n`);
 
-  // Inizializza embedding service
+  // Initialize embedding service
   await sdk.initializeEmbeddings();
 
   const results = await sdk.hybridSearch(query, { limit: 10 });
@@ -1663,7 +1663,7 @@ async function handleDecay(sdk: ReturnType<typeof createKiroMemory>, subcommand:
 }
 
 async function generateReportCli(sdk: ReturnType<typeof createKiroMemory>, cliArgs: string[]) {
-  // Parse opzioni
+  // Parse options
   const periodArg = cliArgs.find(a => a.startsWith('--period='))?.split('=')[1];
   const formatArg = cliArgs.find(a => a.startsWith('--format='))?.split('=')[1];
   const outputArg = cliArgs.find(a => a.startsWith('--output='))?.split('=')[1];
@@ -1711,7 +1711,7 @@ async function resumeSession(sdk: ReturnType<typeof createKiroMemory>, sessionId
     return;
   }
 
-  // Intestazione con colori ANSI
+  // Header with ANSI colors
   console.log('');
   console.log(`  \x1b[36m═══ Session Checkpoint ═══\x1b[0m`);
   console.log(`  \x1b[2mProject: ${checkpoint.project} | Session: ${checkpoint.session_id}\x1b[0m`);

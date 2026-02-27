@@ -1,12 +1,12 @@
 import { Database } from 'bun:sqlite';
 
 /**
- * Modulo analytics per Kiro Memory.
- * Query aggregate per dashboard metriche.
+ * Analytics module for Kiro Memory.
+ * Aggregate queries for metrics dashboard.
  */
 
 // ============================================================================
-// Tipi di ritorno
+// Return types
 // ============================================================================
 
 export interface TimelineDayEntry {
@@ -45,12 +45,12 @@ export interface AnalyticsOverviewResult {
 }
 
 // ============================================================================
-// Funzioni query
+// Query functions
 // ============================================================================
 
 /**
- * Osservazioni per giorno (ultimi N giorni).
- * Ritorna array ordinato cronologicamente (dal più vecchio al più recente).
+ * Observations per day (last N days).
+ * Returns array sorted chronologically (oldest to most recent).
  */
 export function getObservationsTimeline(
   db: Database,
@@ -80,8 +80,8 @@ export function getObservationsTimeline(
 }
 
 /**
- * Distribuzione osservazioni per tipo.
- * Ritorna array ordinato per conteggio decrescente.
+ * Observation distribution by type.
+ * Returns array sorted by count descending.
  */
 export function getTypeDistribution(
   db: Database,
@@ -107,7 +107,7 @@ export function getTypeDistribution(
 }
 
 /**
- * Statistiche sessioni: totale, completate, durata media.
+ * Session statistics: total, completed, average duration.
  */
 export function getSessionStats(
   db: Database,
@@ -129,7 +129,7 @@ export function getSessionStats(
     ? (completedStmt.get(project) as any)?.count || 0
     : (completedStmt.get() as any)?.count || 0;
 
-  // Durata media solo per sessioni completate (epoch in millisecondi)
+  // Average duration only for completed sessions (epoch in milliseconds)
   const avgSql = project
     ? `SELECT AVG((completed_at_epoch - started_at_epoch) / 1000.0 / 60.0) as avg_min
        FROM sessions
@@ -147,18 +147,18 @@ export function getSessionStats(
 }
 
 /**
- * Overview generale: conteggi base + trend giornaliero/settimanale.
- * Singola query CTE che sostituisce le 10 query separate (fix N+1).
+ * General overview: base counts + daily/weekly trends.
+ * Single CTE query replacing the 10 separate queries (fix N+1).
  */
 export function getAnalyticsOverview(
   db: Database,
   project?: string
 ): AnalyticsOverviewResult {
   const now = Date.now();
-  const todayStart = now - (now % (24 * 60 * 60 * 1000)); // Inizio giornata UTC
+  const todayStart = now - (now % (24 * 60 * 60 * 1000)); // Start of day UTC
   const weekStart = now - (7 * 24 * 60 * 60 * 1000);
 
-  // Singola query CTE: 10 conteggi in un solo roundtrip al DB
+  // Single CTE query: 10 counts in a single DB roundtrip
   const projectFilter = project ? 'WHERE project = @project' : '';
   const obsProjectFilter = project ? 'WHERE project = @project' : '';
 

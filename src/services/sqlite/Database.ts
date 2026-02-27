@@ -28,8 +28,8 @@ export class KiroMemoryDatabase {
   public db: Database;
 
   /**
-   * @param dbPath - Percorso al file SQLite (default: DB_PATH)
-   * @param skipMigrations - Se true, salta il migration runner (per hook ad alta frequenza)
+   * @param dbPath - Path to the SQLite file (default: DB_PATH)
+   * @param skipMigrations - If true, skip the migration runner (for high-frequency hooks)
    */
   constructor(dbPath: string = DB_PATH, skipMigrations: boolean = false) {
     // Ensure data directory exists (skip for in-memory databases)
@@ -42,14 +42,14 @@ export class KiroMemoryDatabase {
 
     // Apply optimized SQLite settings
     this.db.run('PRAGMA journal_mode = WAL');
-    this.db.run('PRAGMA busy_timeout = 5000'); // Attesa fino a 5s su lock concorrente (hook + worker)
+    this.db.run('PRAGMA busy_timeout = 5000'); // Wait up to 5s on concurrent lock (hook + worker)
     this.db.run('PRAGMA synchronous = NORMAL');
     this.db.run('PRAGMA foreign_keys = ON');
     this.db.run('PRAGMA temp_store = memory');
     this.db.run(`PRAGMA mmap_size = ${SQLITE_MMAP_SIZE_BYTES}`);
     this.db.run(`PRAGMA cache_size = ${SQLITE_CACHE_SIZE_PAGES}`);
 
-    // Esegui migrazioni solo se necessario (i hook le saltano per performance)
+    // Run migrations only if needed (hooks skip them for performance)
     if (!skipMigrations) {
       const migrationRunner = new MigrationRunner(this.db);
       migrationRunner.runAllMigrations();
@@ -57,8 +57,8 @@ export class KiroMemoryDatabase {
   }
 
   /**
-   * Esegue una funzione all'interno di una transazione atomica.
-   * Se fn() lancia un errore, la transazione viene annullata automaticamente.
+   * Executes a function within an atomic transaction.
+   * If fn() throws an error, the transaction is automatically rolled back.
    */
   withTransaction<T>(fn: (db: Database) => T): T {
     const transaction = this.db.transaction(fn);
@@ -211,7 +211,7 @@ class MigrationRunner {
       {
         version: 2,
         up: (db) => {
-          // Tabella FTS5 per ricerca full-text sulle osservazioni
+          // FTS5 table for full-text search on observations
           db.run(`
             CREATE VIRTUAL TABLE IF NOT EXISTS observations_fts USING fts5(
               title, text, narrative, concepts,
@@ -220,7 +220,7 @@ class MigrationRunner {
             )
           `);
 
-          // Trigger per mantenere FTS5 sincronizzato
+          // Triggers to keep FTS5 synchronized
           db.run(`
             CREATE TRIGGER IF NOT EXISTS observations_ai AFTER INSERT ON observations BEGIN
               INSERT INTO observations_fts(rowid, title, text, narrative, concepts)
@@ -244,13 +244,13 @@ class MigrationRunner {
             END
           `);
 
-          // Backfill osservazioni esistenti nella tabella FTS5
+          // Backfill existing observations into the FTS5 table
           db.run(`
             INSERT INTO observations_fts(rowid, title, text, narrative, concepts)
             SELECT id, title, text, narrative, concepts FROM observations
           `);
 
-          // Indici aggiuntivi per performance di ricerca
+          // Additional indexes for search performance
           db.run('CREATE INDEX IF NOT EXISTS idx_observations_type ON observations(type)');
           db.run('CREATE INDEX IF NOT EXISTS idx_observations_epoch ON observations(created_at_epoch)');
           db.run('CREATE INDEX IF NOT EXISTS idx_summaries_project ON summaries(project)');
@@ -261,7 +261,7 @@ class MigrationRunner {
       {
         version: 3,
         up: (db) => {
-          // Tabella alias per rinominare i progetti nella UI
+          // Alias table for renaming projects in the UI
           db.run(`
             CREATE TABLE IF NOT EXISTS project_aliases (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -278,7 +278,7 @@ class MigrationRunner {
       {
         version: 4,
         up: (db) => {
-          // Tabella embeddings per ricerca semantica locale
+          // Embeddings table for local semantic search
           db.run(`
             CREATE TABLE IF NOT EXISTS observation_embeddings (
               observation_id INTEGER PRIMARY KEY,
@@ -296,20 +296,20 @@ class MigrationRunner {
       {
         version: 5,
         up: (db) => {
-          // Traccia ultimo accesso (ricerca che ha trovato l'osservazione)
+          // Track last access (search that found the observation)
           db.run('ALTER TABLE observations ADD COLUMN last_accessed_epoch INTEGER');
-          // Flag stale: 0 = fresh, 1 = file modificato dopo l'osservazione
+          // Stale flag: 0 = fresh, 1 = file modified after the observation
           db.run('ALTER TABLE observations ADD COLUMN is_stale INTEGER DEFAULT 0');
-          // Indice per query decay
+          // Index for decay queries
           db.run('CREATE INDEX IF NOT EXISTS idx_observations_last_accessed ON observations(last_accessed_epoch)');
-          // Indice per query stale
+          // Index for stale queries
           db.run('CREATE INDEX IF NOT EXISTS idx_observations_stale ON observations(is_stale)');
         }
       },
       {
         version: 6,
         up: (db) => {
-          // Tabella checkpoint per session resume
+          // Checkpoint table for session resume
           db.run(`
             CREATE TABLE IF NOT EXISTS checkpoints (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -334,7 +334,7 @@ class MigrationRunner {
       {
         version: 7,
         up: (db) => {
-          // Content hash per deduplicazione basata su contenuto (SHA256)
+          // Content hash for content-based deduplication (SHA256)
           db.run('ALTER TABLE observations ADD COLUMN content_hash TEXT');
           db.run('CREATE INDEX IF NOT EXISTS idx_observations_hash ON observations(content_hash)');
         }
@@ -342,16 +342,16 @@ class MigrationRunner {
       {
         version: 8,
         up: (db) => {
-          // Token economics: token spesi per generare l'osservazione (discovery cost)
+          // Token economics: tokens spent to generate the observation (discovery cost)
           db.run('ALTER TABLE observations ADD COLUMN discovery_tokens INTEGER DEFAULT 0');
-          // Token economics sui summary
+          // Token economics on summaries
           db.run('ALTER TABLE summaries ADD COLUMN discovery_tokens INTEGER DEFAULT 0');
         }
       },
       {
         version: 9,
         up: (db) => {
-          // Indici compositi per paginazione e filtri per progetto
+          // Composite indexes for pagination and project filters
           db.run('CREATE INDEX IF NOT EXISTS idx_observations_project_epoch ON observations(project, created_at_epoch DESC)');
           db.run('CREATE INDEX IF NOT EXISTS idx_observations_project_type ON observations(project, type)');
           db.run('CREATE INDEX IF NOT EXISTS idx_summaries_project_epoch ON summaries(project, created_at_epoch DESC)');

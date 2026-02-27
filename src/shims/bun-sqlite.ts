@@ -1,27 +1,27 @@
 /**
  * Shim bun:sqlite → better-sqlite3
  *
- * Fornisce un'API compatibile con bun:sqlite usando better-sqlite3
- * per consentire l'esecuzione su Node.js puro.
+ * Provides a bun:sqlite-compatible API using better-sqlite3
+ * to allow execution on plain Node.js.
  */
 
 import BetterSqlite3 from 'better-sqlite3';
 
 /**
- * Classe Database compatibile con bun:sqlite
+ * bun:sqlite-compatible Database class
  */
 export class Database {
   private _db: BetterSqlite3.Database;
 
   constructor(path: string, options?: { create?: boolean; readwrite?: boolean }) {
     this._db = new BetterSqlite3(path, {
-      // better-sqlite3 crea il file di default (non serve 'create')
+      // better-sqlite3 creates the file by default ('create' not needed)
       readonly: options?.readwrite === false ? true : false
     });
   }
 
   /**
-   * Esegui una query SQL senza risultati
+   * Execute a SQL query without results
    */
   run(sql: string, params?: any[]): { lastInsertRowid: number | bigint; changes: number } {
     const stmt = this._db.prepare(sql);
@@ -30,21 +30,21 @@ export class Database {
   }
 
   /**
-   * Prepara una query con interfaccia compatibile bun:sqlite
+   * Prepare a query with bun:sqlite-compatible interface
    */
   query(sql: string): BunQueryCompat {
     return new BunQueryCompat(this._db, sql);
   }
 
   /**
-   * Crea una transazione
+   * Create a transaction
    */
   transaction<T>(fn: (...args: any[]) => T): (...args: any[]) => T {
     return this._db.transaction(fn) as any;
   }
 
   /**
-   * Chiudi la connessione
+   * Close the connection
    */
   close(): void {
     this._db.close();
@@ -52,7 +52,7 @@ export class Database {
 }
 
 /**
- * Wrapper query compatibile con l'API bun:sqlite Statement
+ * Query wrapper compatible with the bun:sqlite Statement API
  */
 class BunQueryCompat {
   private _db: BetterSqlite3.Database;
@@ -64,7 +64,7 @@ class BunQueryCompat {
   }
 
   /**
-   * Restituisce tutte le righe
+   * Returns all rows
    */
   all(...params: any[]): any[] {
     const stmt = this._db.prepare(this._sql);
@@ -72,7 +72,7 @@ class BunQueryCompat {
   }
 
   /**
-   * Restituisce la prima riga o null
+   * Returns the first row or null
    */
   get(...params: any[]): any {
     const stmt = this._db.prepare(this._sql);
@@ -80,7 +80,7 @@ class BunQueryCompat {
   }
 
   /**
-   * Esegui senza risultati
+   * Execute without results
    */
   run(...params: any[]): { lastInsertRowid: number | bigint; changes: number } {
     const stmt = this._db.prepare(this._sql);

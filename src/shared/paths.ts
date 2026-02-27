@@ -20,7 +20,7 @@ const _dirname = getDirname();
  */
 
 // Base directory - Kiro Memory data in home directory
-// Backward compat: se esiste ~/.contextkit (vecchio nome), usalo; altrimenti ~/.kiro-memory
+// Backward compat: if ~/.contextkit (old name) exists, use it; otherwise ~/.kiro-memory
 const _legacyDir = join(homedir(), '.contextkit');
 const _defaultDir = existsSync(_legacyDir) ? _legacyDir : join(homedir(), '.kiro-memory');
 export const DATA_DIR = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || _defaultDir;
@@ -38,7 +38,7 @@ export const TRASH_DIR = join(DATA_DIR, 'trash');
 export const BACKUPS_DIR = join(DATA_DIR, 'backups');
 export const MODES_DIR = join(DATA_DIR, 'modes');
 export const USER_SETTINGS_PATH = join(DATA_DIR, 'settings.json');
-// Backward compat: se esiste il DB col vecchio nome, usalo
+// Backward compat: if the DB with the old name exists, use it
 const _legacyDb = join(DATA_DIR, 'contextkit.db');
 export const DB_PATH = existsSync(_legacyDb) ? _legacyDb : join(DATA_DIR, 'kiro-memory.db');
 export const VECTOR_DB_DIR = join(DATA_DIR, 'vector-db');

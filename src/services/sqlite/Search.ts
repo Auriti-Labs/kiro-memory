@@ -8,23 +8,23 @@ import type { Observation, Summary, SearchFilters, TimelineEntry } from '../../t
  */
 
 /**
- * Pesi BM25 per le colonne FTS5: title, text, narrative, concepts.
- * Valori più alti = colonna più rilevante nel ranking.
+ * BM25 weights for FTS5 columns: title, text, narrative, concepts.
+ * Higher values = more relevant column in ranking.
  */
 const BM25_WEIGHTS = '10.0, 1.0, 5.0, 3.0';
 
-/** Escape dei caratteri wildcard LIKE per prevenire pattern injection */
+/** Escape LIKE wildcard characters to prevent pattern injection */
 function escapeLikePattern(input: string): string {
   return input.replace(/[%_\\]/g, '\\$&');
 }
 
 /**
- * Sanitizza una query per FTS5: wrappa ogni termine tra virgolette
- * per evitare che operatori riservati (AND, OR, NOT, NEAR, *, ^, :)
- * causino errori di parsing. Limita lunghezza e numero termini per evitare ReDoS.
+ * Sanitize a query for FTS5: wraps each term in quotes
+ * to prevent reserved operators (AND, OR, NOT, NEAR, *, ^, :)
+ * from causing parsing errors. Limits length and term count to prevent ReDoS.
  */
 function sanitizeFTS5Query(query: string): string {
-  // Limita lunghezza input prima del parsing
+  // Limit input length before parsing
   const trimmed = query.length > 10_000 ? query.substring(0, 10_000) : query;
 
   const terms = trimmed
@@ -38,8 +38,8 @@ function sanitizeFTS5Query(query: string): string {
 }
 
 /**
- * Ricerca osservazioni con FTS5 (full-text) e filtri opzionali.
- * Sanitizza la query FTS5 e fallback a LIKE in caso di errore.
+ * Search observations with FTS5 (full-text) and optional filters.
+ * Sanitizes the FTS5 query and falls back to LIKE on error.
  */
 export function searchObservationsFTS(
   db: Database,
@@ -82,15 +82,15 @@ export function searchObservationsFTS(
     const stmt = db.query(sql);
     return stmt.all(...params) as Observation[];
   } catch {
-    // Fallback a LIKE se FTS5 non disponibile o query malformata
+    // Fallback to LIKE if FTS5 is unavailable or query is malformed
     return searchObservationsLIKE(db, query, filters);
   }
 }
 
 /**
- * Ricerca FTS5 che espone il rank grezzo per scoring.
- * Il rank FTS5 e negativo: piu negativo = piu rilevante.
- * Usa sanitizeFTS5Query per sicurezza, fallback a LIKE senza rank.
+ * FTS5 search that exposes the raw rank for scoring.
+ * The FTS5 rank is negative: more negative = more relevant.
+ * Uses sanitizeFTS5Query for safety, falls back to LIKE without rank.
  */
 export function searchObservationsFTSWithRank(
   db: Database,
@@ -133,13 +133,13 @@ export function searchObservationsFTSWithRank(
     const stmt = db.query(sql);
     return stmt.all(...params) as Array<Observation & { fts5_rank: number }>;
   } catch {
-    // Fallback: nessun rank disponibile
+    // Fallback: no rank available
     return [];
   }
 }
 
 /**
- * Fallback: ricerca LIKE sulle osservazioni
+ * Fallback: LIKE search on observations
  */
 export function searchObservationsLIKE(
   db: Database,
@@ -179,7 +179,7 @@ export function searchObservationsLIKE(
 }
 
 /**
- * Ricerca sommari con filtri
+ * Search summaries with filters
  */
 export function searchSummariesFiltered(
   db: Database,
@@ -215,12 +215,12 @@ export function searchSummariesFiltered(
 }
 
 /**
- * Recupera osservazioni per ID (batch)
+ * Retrieve observations by ID (batch)
  */
 export function getObservationsByIds(db: Database, ids: number[]): Observation[] {
   if (!Array.isArray(ids) || ids.length === 0) return [];
 
-  // Valida e filtra: solo interi positivi, max 500 per query
+  // Validate and filter: only positive integers, max 500 per query
   const validIds = ids
     .filter(id => typeof id === 'number' && Number.isInteger(id) && id > 0)
     .slice(0, 500);
@@ -234,7 +234,7 @@ export function getObservationsByIds(db: Database, ids: number[]): Observation[]
 }
 
 /**
- * Timeline: contesto cronologico attorno a un'osservazione
+ * Timeline: chronological context around an observation
  */
 export function getTimeline(
   db: Database,
@@ -242,7 +242,7 @@ export function getTimeline(
   depthBefore: number = 5,
   depthAfter: number = 5
 ): TimelineEntry[] {
-  // Trova l'epoch dell'ancora
+  // Find the anchor's epoch
   const anchorStmt = db.query('SELECT created_at_epoch FROM observations WHERE id = ?');
   const anchor = anchorStmt.get(anchorId) as { created_at_epoch: number } | null;
 
@@ -250,7 +250,7 @@ export function getTimeline(
 
   const anchorEpoch = anchor.created_at_epoch;
 
-  // Osservazioni prima
+  // Observations before
   const beforeStmt = db.query(`
     SELECT id, 'observation' as type, title, text as content, project, created_at, created_at_epoch
     FROM observations
@@ -260,14 +260,14 @@ export function getTimeline(
   `);
   const before = (beforeStmt.all(anchorEpoch, depthBefore) as TimelineEntry[]).reverse();
 
-  // L'ancora stessa
+  // The anchor itself
   const selfStmt = db.query(`
     SELECT id, 'observation' as type, title, text as content, project, created_at, created_at_epoch
     FROM observations WHERE id = ?
   `);
   const self = selfStmt.all(anchorId) as TimelineEntry[];
 
-  // Osservazioni dopo
+  // Observations after
   const afterStmt = db.query(`
     SELECT id, 'observation' as type, title, text as content, project, created_at, created_at_epoch
     FROM observations
@@ -281,7 +281,7 @@ export function getTimeline(
 }
 
 /**
- * Statistiche database per un progetto
+ * Database statistics for a project
  */
 export function getProjectStats(db: Database, project: string): {
   observations: number;
@@ -295,13 +295,13 @@ export function getProjectStats(db: Database, project: string): {
   const sesStmt = db.query('SELECT COUNT(*) as count FROM sessions WHERE project = ?');
   const prmStmt = db.query('SELECT COUNT(*) as count FROM prompts WHERE project = ?');
 
-  // Token economics: discovery_tokens (costo generazione) vs read_tokens (costo lettura)
+  // Token economics: discovery_tokens (generation cost) vs read_tokens (read cost)
   const discoveryStmt = db.query(
     'SELECT COALESCE(SUM(discovery_tokens), 0) as total FROM observations WHERE project = ?'
   );
   const discoveryTokens = (discoveryStmt.get(project) as any)?.total || 0;
 
-  // read_tokens: stima basata su (title + narrative) / 4 chars per token
+  // read_tokens: estimate based on (title + narrative) / 4 chars per token
   const readStmt = db.query(
     `SELECT COALESCE(SUM(
       CAST((LENGTH(COALESCE(title, '')) + LENGTH(COALESCE(narrative, ''))) / 4 AS INTEGER)
@@ -309,7 +309,7 @@ export function getProjectStats(db: Database, project: string): {
   );
   const readTokens = (readStmt.get(project) as any)?.total || 0;
 
-  // Savings: discovery_tokens risparmiati riutilizzando contesto anziché ridiscovery
+  // Savings: discovery_tokens saved by reusing context instead of rediscovery
   const savings = Math.max(0, discoveryTokens - readTokens);
 
   return {
@@ -322,11 +322,11 @@ export function getProjectStats(db: Database, project: string): {
 }
 
 /**
- * Trova osservazioni con file modificati dopo la creazione dell'osservazione.
- * Verifica il mtime del filesystem per ogni file in files_modified.
+ * Find observations with files modified after the observation was created.
+ * Checks the filesystem mtime for each file in files_modified.
  */
 export function getStaleObservations(db: Database, project: string): Observation[] {
-  // Query osservazioni con files_modified non vuoto
+  // Query observations with non-empty files_modified
   const rows = db.query(`
     SELECT * FROM observations
     WHERE project = ? AND files_modified IS NOT NULL AND files_modified != ''
@@ -339,20 +339,20 @@ export function getStaleObservations(db: Database, project: string): Observation
   for (const obs of rows) {
     if (!obs.files_modified) continue;
 
-    // Parsa files_modified (comma-separated)
+    // Parse files_modified (comma-separated)
     const files = obs.files_modified.split(',').map(f => f.trim()).filter(Boolean);
 
     let isStale = false;
     for (const filepath of files) {
       try {
-        if (!existsSync(filepath)) continue; // File rimosso, non possiamo verificare
+        if (!existsSync(filepath)) continue; // File removed, cannot verify
         const stat = statSync(filepath);
         if (stat.mtimeMs > obs.created_at_epoch) {
           isStale = true;
           break;
         }
       } catch {
-        // File non accessibile, skip
+        // File not accessible, skip
       }
     }
 
@@ -365,7 +365,7 @@ export function getStaleObservations(db: Database, project: string): Observation
 }
 
 /**
- * Marca osservazioni come stale (1) o fresh (0) nel database.
+ * Mark observations as stale (1) or fresh (0) in the database.
  */
 export function markObservationsStale(db: Database, ids: number[], stale: boolean): void {
   if (!Array.isArray(ids) || ids.length === 0) return;

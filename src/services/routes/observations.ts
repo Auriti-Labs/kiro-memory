@@ -1,5 +1,5 @@
 /**
- * Router Observations: CRUD osservazioni, batch, knowledge, memory save.
+ * Router Observations: CRUD observations, batch, knowledge, memory save.
  */
 
 import { Router } from 'express';
@@ -15,7 +15,7 @@ import { logger } from '../../utils/logger.js';
 export function createObservationsRouter(ctx: WorkerContext): Router {
   const router = Router();
 
-  // Lista osservazioni paginata
+  // Paginated observations list
   router.get('/api/observations', (req, res) => {
     const { offset, limit, project } = req.query as { offset?: string; limit?: string; project?: string };
     const _offset = parseIntSafe(offset, 0, 0, 1_000_000);
@@ -36,12 +36,12 @@ export function createObservationsRouter(ctx: WorkerContext): Router {
       res.setHeader('X-Total-Count', total);
       res.json(rows);
     } catch (error) {
-      logger.error('WORKER', 'Lista osservazioni fallita', {}, error as Error);
+      logger.error('WORKER', 'Observation list failed', {}, error as Error);
       res.status(500).json({ error: 'Failed to list observations' });
     }
   });
 
-  // Crea osservazione
+  // Create observation
   router.post('/api/observations', (req, res) => {
     const { memorySessionId, project, type, title, content, concepts, files } = req.body;
 
@@ -86,17 +86,17 @@ export function createObservationsRouter(ctx: WorkerContext): Router {
       ctx.broadcast('observation-created', { id, project, title });
       ctx.invalidateProjectsCache();
 
-      // Embedding in background
+      // Background embedding
       ctx.generateEmbeddingForObservation(id, title, content, concepts).catch(() => {});
 
       res.json({ id, success: true });
     } catch (error) {
-      logger.error('WORKER', 'Creazione osservazione fallita', {}, error as Error);
+      logger.error('WORKER', 'Observation creation failed', {}, error as Error);
       res.status(500).json({ error: 'Failed to store observation' });
     }
   });
 
-  // Batch fetch osservazioni per ID (max 100)
+  // Batch fetch observations by ID (max 100)
   router.post('/api/observations/batch', (req, res) => {
     const { ids } = req.body;
 
@@ -113,7 +113,7 @@ export function createObservationsRouter(ctx: WorkerContext): Router {
       const observations = getObservationsByIds(ctx.db.db, ids);
       res.json({ observations });
     } catch (error) {
-      logger.error('WORKER', 'Batch fetch fallito', { ids }, error as Error);
+      logger.error('WORKER', 'Batch fetch failed', { ids }, error as Error);
       res.status(500).json({ error: 'Batch fetch failed' });
     }
   });
@@ -189,12 +189,12 @@ export function createObservationsRouter(ctx: WorkerContext): Router {
 
       res.json({ id, success: true, knowledge_type });
     } catch (error) {
-      logger.error('WORKER', 'Salvataggio knowledge fallito', {}, error as Error);
+      logger.error('WORKER', 'Knowledge save failed', {}, error as Error);
       res.status(500).json({ error: 'Failed to store knowledge' });
     }
   });
 
-  // Save memory (endpoint programmabile)
+  // Save memory (programmable endpoint)
   router.post('/api/memory/save', (req, res) => {
     const { project, title, content, type, concepts } = req.body;
 
@@ -237,12 +237,12 @@ export function createObservationsRouter(ctx: WorkerContext): Router {
 
       res.json({ id, success: true });
     } catch (error) {
-      logger.error('WORKER', 'Memory save fallito', {}, error as Error);
+      logger.error('WORKER', 'Memory save failed', {}, error as Error);
       res.status(500).json({ error: 'Failed to save memory' });
     }
   });
 
-  // Contesto per progetto
+  // Context by project
   router.get('/api/context/:project', (req, res) => {
     const { project } = req.params;
 
@@ -259,7 +259,7 @@ export function createObservationsRouter(ctx: WorkerContext): Router {
       };
       res.json(context);
     } catch (error) {
-      logger.error('WORKER', 'Contesto fallito', { project }, error as Error);
+      logger.error('WORKER', 'Context retrieval failed', { project }, error as Error);
       res.status(500).json({ error: 'Failed to get context' });
     }
   });

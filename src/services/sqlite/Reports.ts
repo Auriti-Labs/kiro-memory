@@ -2,13 +2,13 @@ import { Database } from 'bun:sqlite';
 import type { ReportData } from '../../types/worker-types.js';
 
 /**
- * Modulo report per Kiro Memory.
- * Aggrega metriche per un range temporale specifico.
+ * Report module for Kiro Memory.
+ * Aggregates metrics for a specific time range.
  */
 
 /**
- * Genera dati aggregati per un report di attività.
- * Esegue 8 query sul range [startEpoch, endEpoch].
+ * Generate aggregated data for an activity report.
+ * Executes 8 queries on the range [startEpoch, endEpoch].
  */
 export function getReportData(
   db: Database,
@@ -16,13 +16,13 @@ export function getReportData(
   startEpoch: number,
   endEpoch: number
 ): ReportData {
-  // Calcola periodo
+  // Calculate period
   const startDate = new Date(startEpoch);
   const endDate = new Date(endEpoch);
   const days = Math.ceil((endEpoch - startEpoch) / (24 * 60 * 60 * 1000));
   const label = days <= 7 ? 'Weekly' : days <= 31 ? 'Monthly' : 'Custom';
 
-  // Helper per query con filtro progetto + range temporale
+  // Helper for queries with project filter + time range
   const countInRange = (table: string, epochCol: string = 'created_at_epoch'): number => {
     const sql = project
       ? `SELECT COUNT(*) as count FROM ${table} WHERE project = ? AND ${epochCol} >= ? AND ${epochCol} <= ?`
@@ -34,14 +34,14 @@ export function getReportData(
     return row?.count || 0;
   };
 
-  // 1. Conteggi base nel periodo
+  // 1. Base counts in the period
   const observations = countInRange('observations');
   const summaries = countInRange('summaries');
   const prompts = countInRange('prompts');
-  // Sessioni: usa started_at_epoch come riferimento
+  // Sessions: use started_at_epoch as reference
   const sessions = countInRange('sessions', 'started_at_epoch');
 
-  // 2. Timeline giornaliera
+  // 2. Daily timeline
   const timelineSql = project
     ? `SELECT DATE(datetime(created_at_epoch / 1000, 'unixepoch')) as day, COUNT(*) as count
        FROM observations
@@ -57,7 +57,7 @@ export function getReportData(
     : timelineStmt.all(startEpoch, endEpoch)
   ) as Array<{ day: string; count: number }>;
 
-  // 3. Distribuzione per tipo
+  // 3. Distribution by type
   const typeSql = project
     ? `SELECT type, COUNT(*) as count FROM observations
        WHERE project = ? AND created_at_epoch >= ? AND created_at_epoch <= ?
@@ -71,7 +71,7 @@ export function getReportData(
     : typeStmt.all(startEpoch, endEpoch)
   ) as Array<{ type: string; count: number }>;
 
-  // 4. Session stats nel periodo
+  // 4. Session stats in the period
   const sessionTotalSql = project
     ? `SELECT COUNT(*) as count FROM sessions WHERE project = ? AND started_at_epoch >= ? AND started_at_epoch <= ?`
     : `SELECT COUNT(*) as count FROM sessions WHERE started_at_epoch >= ? AND started_at_epoch <= ?`;
@@ -126,7 +126,7 @@ export function getReportData(
     : (db.query(staleSql).get(startEpoch, endEpoch) as any)?.count
   ) || 0;
 
-  // 7. Contenuto summaries (learnings, completed, next steps)
+  // 7. Summary contents (learnings, completed, next steps)
   const summarySql = project
     ? `SELECT learned, completed, next_steps FROM summaries
        WHERE project = ? AND created_at_epoch >= ? AND created_at_epoch <= ?
@@ -145,7 +145,7 @@ export function getReportData(
 
   for (const row of summaryRows) {
     if (row.learned) {
-      // Splita per '; ' se sono concatenati (formato hook stop.ts)
+      // Split by '; ' if concatenated (hook stop.ts format)
       const parts = row.learned.split('; ').filter(Boolean);
       topLearnings.push(...parts);
     }
@@ -159,7 +159,7 @@ export function getReportData(
     }
   }
 
-  // 8. File hotspots (file più modificati nel periodo)
+  // 8. File hotspots (most modified files in the period)
   const filesSql = project
     ? `SELECT files_modified FROM observations
        WHERE project = ? AND created_at_epoch >= ? AND created_at_epoch <= ?

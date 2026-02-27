@@ -1,6 +1,6 @@
 /**
  * Router Data: embeddings, retention, export, report.
- * Gestisce operazioni dati pesanti e manutenzione.
+ * Handles heavy data operations and maintenance.
  */
 
 import { Router } from 'express';
@@ -15,9 +15,9 @@ import { logger } from '../../utils/logger.js';
 export function createDataRouter(ctx: WorkerContext, workerToken?: string): Router {
   const router = Router();
 
-  /** Middleware: richiede X-Worker-Token per endpoint distruttivi */
+  /** Middleware: requires X-Worker-Token for destructive endpoints */
   function requireAuth(req: import('express').Request, res: import('express').Response, next: import('express').NextFunction): void {
-    if (!workerToken) { next(); return; } // Nessun token configurato, skip
+    if (!workerToken) { next(); return; } // No token configured, skip
     const token = req.headers['x-worker-token'] as string;
     if (token !== workerToken) {
       res.status(401).json({ error: 'Invalid or missing X-Worker-Token' });
@@ -28,7 +28,7 @@ export function createDataRouter(ctx: WorkerContext, workerToken?: string): Rout
 
   // ── Embeddings ──
 
-  // Backfill embeddings per osservazioni senza embedding
+  // Backfill embeddings for observations without embeddings
   router.post('/api/embeddings/backfill', requireAuth, async (req, res) => {
     const { batchSize } = req.body || {};
 
@@ -40,12 +40,12 @@ export function createDataRouter(ctx: WorkerContext, workerToken?: string): Rout
       );
       res.json({ success: true, generated: count });
     } catch (error) {
-      logger.error('WORKER', 'Backfill embeddings fallito', {}, error as Error);
+      logger.error('WORKER', 'Backfill embeddings failed', {}, error as Error);
       res.status(500).json({ error: 'Backfill failed' });
     }
   });
 
-  // Statistiche embeddings
+  // Embedding statistics
   router.get('/api/embeddings/stats', (_req, res) => {
     try {
       const vectorSearch = getVectorSearch();
@@ -59,7 +59,7 @@ export function createDataRouter(ctx: WorkerContext, workerToken?: string): Rout
         available: embeddingService.isAvailable()
       });
     } catch (error) {
-      logger.error('WORKER', 'Embedding stats fallite', {}, error as Error);
+      logger.error('WORKER', 'Embedding stats failed', {}, error as Error);
       res.status(500).json({ error: 'Stats failed' });
     }
   });
@@ -95,10 +95,10 @@ export function createDataRouter(ctx: WorkerContext, workerToken?: string): Rout
       const deleted = cleanup();
       ctx.invalidateProjectsCache();
 
-      logger.info('WORKER', `Retention cleanup: eliminati ${deleted.observations} obs, ${deleted.summaries} sum, ${deleted.prompts} prompts (> ${days}gg)`);
+      logger.info('WORKER', `Retention cleanup: deleted ${deleted.observations} obs, ${deleted.summaries} sum, ${deleted.prompts} prompts (> ${days}d)`);
       res.json({ success: true, maxAgeDays: days, deleted });
     } catch (error) {
-      logger.error('WORKER', 'Retention cleanup fallito', { maxAgeDays: days }, error as Error);
+      logger.error('WORKER', 'Retention cleanup failed', { maxAgeDays: days }, error as Error);
       res.status(500).json({ error: 'Retention cleanup failed' });
     }
   });
@@ -169,7 +169,7 @@ export function createDataRouter(ctx: WorkerContext, workerToken?: string): Rout
         });
       }
     } catch (error) {
-      logger.error('WORKER', 'Export fallito', { project, fmt }, error as Error);
+      logger.error('WORKER', 'Export failed', { project, fmt }, error as Error);
       res.status(500).json({ error: 'Export failed' });
     }
   });
@@ -204,7 +204,7 @@ export function createDataRouter(ctx: WorkerContext, workerToken?: string): Rout
         res.json(data);
       }
     } catch (error) {
-      logger.error('WORKER', 'Report generation fallita', { project, period }, error as Error);
+      logger.error('WORKER', 'Report generation failed', { project, period }, error as Error);
       res.status(500).json({ error: 'Report generation failed' });
     }
   });

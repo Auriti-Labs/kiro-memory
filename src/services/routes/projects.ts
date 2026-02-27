@@ -1,5 +1,5 @@
 /**
- * Router Projects: lista progetti, alias, statistiche progetto.
+ * Router Projects: project list, aliases, project statistics.
  */
 
 import { Router } from 'express';
@@ -12,7 +12,7 @@ import { logger } from '../../utils/logger.js';
 export function createProjectsRouter(ctx: WorkerContext): Router {
   const router = Router();
 
-  // Lista progetti distinti (con cache TTL 60s)
+  // Distinct project list (with 60s cache TTL)
   router.get('/api/projects', (_req, res) => {
     try {
       const now = Date.now();
@@ -35,7 +35,7 @@ export function createProjectsRouter(ctx: WorkerContext): Router {
       projectsCache.ts = now;
       res.json(projectsCache.data);
     } catch (error) {
-      logger.error('WORKER', 'Lista progetti fallita', {}, error as Error);
+      logger.error('WORKER', 'Project list failed', {}, error as Error);
       res.status(500).json({ error: 'Failed to list projects' });
     }
   });
@@ -51,12 +51,12 @@ export function createProjectsRouter(ctx: WorkerContext): Router {
       }
       res.json(aliases);
     } catch (error) {
-      logger.error('WORKER', 'Lista alias fallita', {}, error as Error);
+      logger.error('WORKER', 'Alias list failed', {}, error as Error);
       res.status(500).json({ error: 'Failed to list project aliases' });
     }
   });
 
-  // PUT project alias (crea o aggiorna)
+  // PUT project alias (create or update)
   router.put('/api/project-aliases/:project', (req, res) => {
     const { project } = req.params;
     const { displayName } = req.body;
@@ -80,12 +80,12 @@ export function createProjectsRouter(ctx: WorkerContext): Router {
       stmt.run(project, displayName.trim(), now, now);
       res.json({ ok: true, project_name: project, display_name: displayName.trim() });
     } catch (error) {
-      logger.error('WORKER', 'Aggiornamento alias fallito', { project }, error as Error);
+      logger.error('WORKER', 'Alias update failed', { project }, error as Error);
       res.status(500).json({ error: 'Failed to update project alias' });
     }
   });
 
-  // Statistiche progetto
+  // Project statistics
   router.get('/api/stats/:project', (req, res) => {
     const { project } = req.params;
 
@@ -98,7 +98,7 @@ export function createProjectsRouter(ctx: WorkerContext): Router {
       const stats = getProjectStats(ctx.db.db, project);
       res.json(stats);
     } catch (error) {
-      logger.error('WORKER', 'Stats fallite', { project }, error as Error);
+      logger.error('WORKER', 'Stats failed', { project }, error as Error);
       res.status(500).json({ error: 'Stats failed' });
     }
   });

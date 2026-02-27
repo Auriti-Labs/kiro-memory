@@ -6,12 +6,12 @@ var Database = class {
   _db;
   constructor(path, options) {
     this._db = new BetterSqlite3(path, {
-      // better-sqlite3 crea il file di default (non serve 'create')
+      // better-sqlite3 creates the file by default ('create' not needed)
       readonly: options?.readwrite === false ? true : false
     });
   }
   /**
-   * Esegui una query SQL senza risultati
+   * Execute a SQL query without results
    */
   run(sql, params) {
     const stmt = this._db.prepare(sql);
@@ -19,19 +19,19 @@ var Database = class {
     return result;
   }
   /**
-   * Prepara una query con interfaccia compatibile bun:sqlite
+   * Prepare a query with bun:sqlite-compatible interface
    */
   query(sql) {
     return new BunQueryCompat(this._db, sql);
   }
   /**
-   * Crea una transazione
+   * Create a transaction
    */
   transaction(fn) {
     return this._db.transaction(fn);
   }
   /**
-   * Chiudi la connessione
+   * Close the connection
    */
   close() {
     this._db.close();
@@ -45,21 +45,21 @@ var BunQueryCompat = class {
     this._sql = sql;
   }
   /**
-   * Restituisce tutte le righe
+   * Returns all rows
    */
   all(...params) {
     const stmt = this._db.prepare(this._sql);
     return params.length > 0 ? stmt.all(...params) : stmt.all();
   }
   /**
-   * Restituisce la prima riga o null
+   * Returns the first row or null
    */
   get(...params) {
     const stmt = this._db.prepare(this._sql);
     return params.length > 0 ? stmt.get(...params) : stmt.get();
   }
   /**
-   * Esegui senza risultati
+   * Execute without results
    */
   run(...params) {
     const stmt = this._db.prepare(this._sql);
@@ -327,8 +327,8 @@ var SQLITE_CACHE_SIZE_PAGES = 1e4;
 var KiroMemoryDatabase = class {
   db;
   /**
-   * @param dbPath - Percorso al file SQLite (default: DB_PATH)
-   * @param skipMigrations - Se true, salta il migration runner (per hook ad alta frequenza)
+   * @param dbPath - Path to the SQLite file (default: DB_PATH)
+   * @param skipMigrations - If true, skip the migration runner (for high-frequency hooks)
    */
   constructor(dbPath = DB_PATH, skipMigrations = false) {
     if (dbPath !== ":memory:") {
@@ -348,8 +348,8 @@ var KiroMemoryDatabase = class {
     }
   }
   /**
-   * Esegue una funzione all'interno di una transazione atomica.
-   * Se fn() lancia un errore, la transazione viene annullata automaticamente.
+   * Executes a function within an atomic transaction.
+   * If fn() throws an error, the transaction is automatically rolled back.
    */
   withTransaction(fn) {
     const transaction = this.db.transaction(fn);
@@ -770,7 +770,7 @@ function consolidateObservations(db, project, options = {}) {
       const consolidatedText = Array.from(uniqueTexts).join("\n---\n").substring(0, 1e5);
       db.run(
         "UPDATE observations SET text = ?, title = ? WHERE id = ?",
-        [consolidatedText, `[consolidato x${observations.length}] ${keeper.title}`, keeper.id]
+        [consolidatedText, `[consolidated x${observations.length}] ${keeper.title}`, keeper.id]
       );
       const removeIds = others.map((o) => o.id);
       const removePlaceholders = removeIds.map(() => "?").join(",");

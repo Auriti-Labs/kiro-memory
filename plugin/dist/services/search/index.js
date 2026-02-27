@@ -22,7 +22,7 @@ __export(Search_exports, {
   searchObservationsLIKE: () => searchObservationsLIKE,
   searchSummariesFiltered: () => searchSummariesFiltered
 });
-import { existsSync as existsSync3, statSync } from "fs";
+import { existsSync as existsSync2, statSync } from "fs";
 function escapeLikePattern(input) {
   return input.replace(/[%_\\]/g, "\\$&");
 }
@@ -230,7 +230,7 @@ function getStaleObservations(db, project) {
     let isStale = false;
     for (const filepath of files) {
       try {
-        if (!existsSync3(filepath)) continue;
+        if (!existsSync2(filepath)) continue;
         const stat = statSync(filepath);
         if (stat.mtimeMs > obs.created_at_epoch) {
           isStale = true;
@@ -384,7 +384,7 @@ function consolidateObservations(db, project, options = {}) {
       const consolidatedText = Array.from(uniqueTexts).join("\n---\n").substring(0, 1e5);
       db.run(
         "UPDATE observations SET text = ?, title = ? WHERE id = ?",
-        [consolidatedText, `[consolidato x${observations.length}] ${keeper.title}`, keeper.id]
+        [consolidatedText, `[consolidated x${observations.length}] ${keeper.title}`, keeper.id]
       );
       const removeIds = others.map((o) => o.id);
       const removePlaceholders = removeIds.map(() => "?").join(",");
@@ -402,12 +402,6 @@ var init_Observations = __esm({
     "use strict";
   }
 });
-
-// src/services/search/ChromaManager.ts
-import { ChromaClient } from "chromadb";
-import { join as join2 } from "path";
-import { homedir as homedir2 } from "os";
-import { existsSync as existsSync2, mkdirSync as mkdirSync2 } from "fs";
 
 // src/utils/logger.ts
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "fs";
@@ -628,135 +622,6 @@ ${data.stack}` : ` ${data.message}`;
 };
 var logger = new Logger();
 
-// src/services/search/ChromaManager.ts
-var VECTOR_DB_DIR = join2(homedir2(), ".contextkit", "vector-db");
-var ChromaManager = class {
-  client;
-  collection = null;
-  isAvailable = false;
-  constructor() {
-    if (!existsSync2(VECTOR_DB_DIR)) {
-      mkdirSync2(VECTOR_DB_DIR, { recursive: true });
-    }
-    this.client = new ChromaClient({
-      path: process.env.CHROMADB_URL || "http://localhost:8000"
-    });
-  }
-  /**
-   * Initialize ChromaDB connection and collection
-   */
-  async initialize() {
-    try {
-      await this.client.heartbeat();
-      this.collection = await this.client.getOrCreateCollection({
-        name: "kiro-memory-observations",
-        metadata: { description: "Kiro Memory observation embeddings" }
-      });
-      this.isAvailable = true;
-      logger.info("CHROMA", "ChromaDB initialized successfully");
-      return true;
-    } catch (error) {
-      logger.warn("CHROMA", "ChromaDB not available, falling back to SQLite search", {}, error);
-      this.isAvailable = false;
-      return false;
-    }
-  }
-  /**
-   * Add observation embedding to ChromaDB
-   */
-  async addObservation(id, content, metadata) {
-    if (!this.isAvailable || !this.collection) {
-      logger.debug("CHROMA", "ChromaDB not available, skipping embedding");
-      return;
-    }
-    try {
-      await this.collection.add({
-        ids: [id],
-        documents: [content],
-        metadatas: [metadata]
-      });
-      logger.debug("CHROMA", `Added observation ${id} to vector DB`);
-    } catch (error) {
-      logger.error("CHROMA", `Failed to add observation ${id}`, {}, error);
-    }
-  }
-  /**
-   * Search observations by semantic similarity
-   */
-  async search(query, options = {}) {
-    if (!this.isAvailable || !this.collection) {
-      logger.debug("CHROMA", "ChromaDB not available, returning empty results");
-      return [];
-    }
-    try {
-      const where = options.project ? { project: options.project } : void 0;
-      const results = await this.collection.query({
-        queryTexts: [query],
-        nResults: options.limit || 10,
-        where
-      });
-      const hits = [];
-      if (results.ids && results.ids[0]) {
-        for (let i = 0; i < results.ids[0].length; i++) {
-          hits.push({
-            id: results.ids[0][i],
-            content: results.documents?.[0]?.[i] || "",
-            metadata: results.metadatas?.[0]?.[i] || {},
-            distance: results.distances?.[0]?.[i] || 0
-          });
-        }
-      }
-      logger.debug("CHROMA", `Search returned ${hits.length} results`);
-      return hits;
-    } catch (error) {
-      logger.error("CHROMA", "Search failed", {}, error);
-      return [];
-    }
-  }
-  /**
-   * Delete observation from ChromaDB
-   */
-  async deleteObservation(id) {
-    if (!this.isAvailable || !this.collection) {
-      return;
-    }
-    try {
-      await this.collection.delete({ ids: [id] });
-      logger.debug("CHROMA", `Deleted observation ${id}`);
-    } catch (error) {
-      logger.error("CHROMA", `Failed to delete observation ${id}`, {}, error);
-    }
-  }
-  /**
-   * Check if ChromaDB is available
-   */
-  isChromaAvailable() {
-    return this.isAvailable;
-  }
-  /**
-   * Get collection stats
-   */
-  async getStats() {
-    if (!this.isAvailable || !this.collection) {
-      return { count: 0 };
-    }
-    try {
-      const count = await this.collection.count();
-      return { count };
-    } catch (error) {
-      logger.error("CHROMA", "Failed to get stats", {}, error);
-      return { count: 0 };
-    }
-  }
-};
-var chromaManager = null;
-function getChromaManager() {
-  if (!chromaManager) {
-    chromaManager = new ChromaManager();
-  }
-  return chromaManager;
-}
-
 // src/services/search/EmbeddingService.ts
 var EmbeddingService = class {
   provider = null;
@@ -764,8 +629,8 @@ var EmbeddingService = class {
   initialized = false;
   initializing = null;
   /**
-   * Inizializza il servizio di embedding.
-   * Tenta fastembed, poi @huggingface/transformers, poi fallback a null.
+   * Initialize the embedding service.
+   * Tries fastembed, then @huggingface/transformers, then fallback to null.
    */
   async initialize() {
     if (this.initialized) return this.provider !== null;
@@ -786,11 +651,11 @@ var EmbeddingService = class {
         });
         this.provider = "fastembed";
         this.initialized = true;
-        logger.info("EMBEDDING", "Inizializzato con fastembed (BGE-small-en-v1.5)");
+        logger.info("EMBEDDING", "Initialized with fastembed (BGE-small-en-v1.5)");
         return true;
       }
     } catch (error) {
-      logger.debug("EMBEDDING", `fastembed non disponibile: ${error}`);
+      logger.debug("EMBEDDING", `fastembed not available: ${error}`);
     }
     try {
       const transformers = await import("@huggingface/transformers");
@@ -801,20 +666,20 @@ var EmbeddingService = class {
         });
         this.provider = "transformers";
         this.initialized = true;
-        logger.info("EMBEDDING", "Inizializzato con @huggingface/transformers (all-MiniLM-L6-v2)");
+        logger.info("EMBEDDING", "Initialized with @huggingface/transformers (all-MiniLM-L6-v2)");
         return true;
       }
     } catch (error) {
-      logger.debug("EMBEDDING", `@huggingface/transformers non disponibile: ${error}`);
+      logger.debug("EMBEDDING", `@huggingface/transformers not available: ${error}`);
     }
     this.provider = null;
     this.initialized = true;
-    logger.warn("EMBEDDING", "Nessun provider embedding disponibile, ricerca semantica disabilitata");
+    logger.warn("EMBEDDING", "No embedding provider available, semantic search disabled");
     return false;
   }
   /**
-   * Genera embedding per un singolo testo.
-   * Ritorna Float32Array con 384 dimensioni, o null se non disponibile.
+   * Generate embedding for a single text.
+   * Returns Float32Array with 384 dimensions, or null if not available.
    */
   async embed(text) {
     if (!this.initialized) await this.initialize();
@@ -827,12 +692,12 @@ var EmbeddingService = class {
         return await this._embedTransformers(truncated);
       }
     } catch (error) {
-      logger.error("EMBEDDING", `Errore generazione embedding: ${error}`);
+      logger.error("EMBEDDING", `Error generating embedding: ${error}`);
     }
     return null;
   }
   /**
-   * Genera embeddings in batch.
+   * Generate embeddings in batch.
    */
   async embedBatch(texts) {
     if (!this.initialized) await this.initialize();
@@ -849,24 +714,24 @@ var EmbeddingService = class {
     return results;
   }
   /**
-   * Verifica se il servizio è disponibile.
+   * Check if the service is available.
    */
   isAvailable() {
     return this.initialized && this.provider !== null;
   }
   /**
-   * Nome del provider attivo.
+   * Name of the active provider.
    */
   getProvider() {
     return this.provider;
   }
   /**
-   * Dimensioni del vettore embedding.
+   * Embedding vector dimensions.
    */
   getDimensions() {
     return 384;
   }
-  // --- Provider specifici ---
+  // --- Provider-specific implementations ---
   async _embedFastembed(text) {
     const embeddings = this.model.embed([text], 1);
     for await (const batch of embeddings) {
@@ -924,13 +789,13 @@ function bufferToFloat32(buf) {
 }
 var VectorSearch = class {
   /**
-   * Ricerca semantica con pre-filtraggio SQL per scalabilità.
+   * Semantic search with SQL pre-filtering for scalability.
    *
-   * Strategia a 2 fasi:
-   * 1. SQL pre-filtra per progetto + ordina per recency (carica max N candidati)
-   * 2. JS calcola cosine similarity solo sui candidati filtrati
+   * 2-phase strategy:
+   * 1. SQL pre-filters by project + sorts by recency (loads max N candidates)
+   * 2. JS computes cosine similarity only on filtered candidates
    *
-   * Con 50k osservazioni e maxCandidates=2000, carica solo ~4% dei dati.
+   * With 50k observations and maxCandidates=2000, loads only ~4% of data.
    */
   async search(db, queryEmbedding, options = {}) {
     const limit = options.limit || 10;
@@ -974,15 +839,15 @@ var VectorSearch = class {
         }
       }
       scored.sort((a, b) => b.similarity - a.similarity);
-      logger.debug("VECTOR", `Ricerca: ${rows.length} candidati \u2192 ${scored.length} sopra soglia \u2192 ${Math.min(scored.length, limit)} risultati`);
+      logger.debug("VECTOR", `Search: ${rows.length} candidates \u2192 ${scored.length} above threshold \u2192 ${Math.min(scored.length, limit)} results`);
       return scored.slice(0, limit);
     } catch (error) {
-      logger.error("VECTOR", `Errore ricerca vettoriale: ${error}`);
+      logger.error("VECTOR", `Vector search error: ${error}`);
       return [];
     }
   }
   /**
-   * Salva embedding per un'osservazione.
+   * Store embedding for an observation.
    */
   async storeEmbedding(db, observationId, embedding, model) {
     try {
@@ -998,18 +863,18 @@ var VectorSearch = class {
         embedding.length,
         (/* @__PURE__ */ new Date()).toISOString()
       );
-      logger.debug("VECTOR", `Embedding salvato per osservazione ${observationId}`);
+      logger.debug("VECTOR", `Embedding saved for observation ${observationId}`);
     } catch (error) {
-      logger.error("VECTOR", `Errore salvataggio embedding: ${error}`);
+      logger.error("VECTOR", `Error saving embedding: ${error}`);
     }
   }
   /**
-   * Genera embeddings per osservazioni che non li hanno ancora.
+   * Generate embeddings for observations that don't have them yet.
    */
   async backfillEmbeddings(db, batchSize = 50) {
     const embeddingService2 = getEmbeddingService();
     if (!await embeddingService2.initialize()) {
-      logger.warn("VECTOR", "Embedding service non disponibile, backfill saltato");
+      logger.warn("VECTOR", "Embedding service not available, backfill skipped");
       return 0;
     }
     const rows = db.query(`
@@ -1035,11 +900,11 @@ var VectorSearch = class {
         count++;
       }
     }
-    logger.info("VECTOR", `Backfill completato: ${count}/${rows.length} embeddings generati`);
+    logger.info("VECTOR", `Backfill completed: ${count}/${rows.length} embeddings generated`);
     return count;
   }
   /**
-   * Statistiche sugli embeddings.
+   * Embedding statistics.
    */
   getStats(db) {
     try {
@@ -1127,21 +992,21 @@ function estimateTokens(text) {
 var HybridSearch = class {
   embeddingInitialized = false;
   /**
-   * Inizializza il servizio di embedding (lazy, non bloccante)
+   * Initialize the embedding service (lazy, non-blocking)
    */
   async initialize() {
     try {
       const embeddingService2 = getEmbeddingService();
       await embeddingService2.initialize();
       this.embeddingInitialized = embeddingService2.isAvailable();
-      logger.info("SEARCH", `HybridSearch inizializzato (embedding: ${this.embeddingInitialized ? "attivo" : "disattivato"})`);
+      logger.info("SEARCH", `HybridSearch initialized (embedding: ${this.embeddingInitialized ? "active" : "disabled"})`);
     } catch (error) {
-      logger.warn("SEARCH", "Inizializzazione embedding fallita, uso solo FTS5", {}, error);
+      logger.warn("SEARCH", "Embedding initialization failed, using only FTS5", {}, error);
       this.embeddingInitialized = false;
     }
   }
   /**
-   * Ricerca ibrida con scoring a 4 segnali
+   * Hybrid search with 4-signal scoring
    */
   async search(db, query, options = {}) {
     const limit = options.limit || 10;
@@ -1157,7 +1022,7 @@ var HybridSearch = class {
           const vectorResults = await vectorSearch2.search(db, queryEmbedding, {
             project: options.project,
             limit: limit * 2,
-            // Prendiamo piu risultati per il ranking
+            // Fetch more results for ranking
             threshold: 0.3
           });
           for (const hit of vectorResults) {
@@ -1174,10 +1039,10 @@ var HybridSearch = class {
               source: "vector"
             });
           }
-          logger.debug("SEARCH", `Vector search: ${vectorResults.length} risultati`);
+          logger.debug("SEARCH", `Vector search: ${vectorResults.length} results`);
         }
       } catch (error) {
-        logger.warn("SEARCH", "Ricerca vettoriale fallita, uso solo keyword", {}, error);
+        logger.warn("SEARCH", "Vector search failed, using only keyword", {}, error);
       }
     }
     try {
@@ -1207,9 +1072,9 @@ var HybridSearch = class {
           });
         }
       }
-      logger.debug("SEARCH", `Keyword search: ${keywordResults.length} risultati`);
+      logger.debug("SEARCH", `Keyword search: ${keywordResults.length} results`);
     } catch (error) {
-      logger.error("SEARCH", "Ricerca keyword fallita", {}, error);
+      logger.error("SEARCH", "Keyword search failed", {}, error);
     }
     if (rawItems.size === 0) return [];
     const allFTS5Ranks = Array.from(rawItems.values()).filter((item) => item.fts5Rank !== null).map((item) => item.fts5Rank);
@@ -1262,14 +1127,12 @@ function getHybridSearch() {
 }
 export {
   CONTEXT_WEIGHTS,
-  ChromaManager,
   HybridSearch,
   KNOWLEDGE_TYPE_BOOST,
   SEARCH_WEIGHTS,
   accessRecencyScore,
   computeCompositeScore,
   estimateTokens,
-  getChromaManager,
   getHybridSearch,
   knowledgeTypeBoost,
   normalizeFTS5Rank,

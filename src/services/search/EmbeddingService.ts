@@ -1,9 +1,9 @@
 /**
- * Servizio di embedding locale per Kiro Memory
+ * Local embedding service for Kiro Memory
  *
- * Provider: fastembed (primario) → @huggingface/transformers (fallback) → null (FTS5 only)
- * Genera embedding vettoriali 384-dim per ricerca semantica.
- * Lazy loading: il modello viene caricato solo al primo utilizzo.
+ * Provider: fastembed (primary) → @huggingface/transformers (fallback) → null (FTS5 only)
+ * Generates 384-dim vector embeddings for semantic search.
+ * Lazy loading: the model is loaded only on first use.
  */
 
 import { logger } from '../../utils/logger.js';
@@ -17,13 +17,13 @@ export class EmbeddingService {
   private initializing: Promise<boolean> | null = null;
 
   /**
-   * Inizializza il servizio di embedding.
-   * Tenta fastembed, poi @huggingface/transformers, poi fallback a null.
+   * Initialize the embedding service.
+   * Tries fastembed, then @huggingface/transformers, then fallback to null.
    */
   async initialize(): Promise<boolean> {
     if (this.initialized) return this.provider !== null;
 
-    // Evita inizializzazioni concorrenti
+    // Avoid concurrent initializations
     if (this.initializing) return this.initializing;
 
     this.initializing = this._doInitialize();
@@ -33,7 +33,7 @@ export class EmbeddingService {
   }
 
   private async _doInitialize(): Promise<boolean> {
-    // Tentativo 1: fastembed
+    // Attempt 1: fastembed
     try {
       const fastembed = await import('fastembed');
       const EmbeddingModel = fastembed.EmbeddingModel || fastembed.default?.EmbeddingModel;
@@ -45,14 +45,14 @@ export class EmbeddingService {
         });
         this.provider = 'fastembed';
         this.initialized = true;
-        logger.info('EMBEDDING', 'Inizializzato con fastembed (BGE-small-en-v1.5)');
+        logger.info('EMBEDDING', 'Initialized with fastembed (BGE-small-en-v1.5)');
         return true;
       }
     } catch (error) {
-      logger.debug('EMBEDDING', `fastembed non disponibile: ${error}`);
+      logger.debug('EMBEDDING', `fastembed not available: ${error}`);
     }
 
-    // Tentativo 2: @huggingface/transformers
+    // Attempt 2: @huggingface/transformers
     try {
       const transformers = await import('@huggingface/transformers');
       const pipeline = (transformers as any).pipeline || (transformers as any).default?.pipeline;
@@ -63,30 +63,30 @@ export class EmbeddingService {
         } as any);
         this.provider = 'transformers';
         this.initialized = true;
-        logger.info('EMBEDDING', 'Inizializzato con @huggingface/transformers (all-MiniLM-L6-v2)');
+        logger.info('EMBEDDING', 'Initialized with @huggingface/transformers (all-MiniLM-L6-v2)');
         return true;
       }
     } catch (error) {
-      logger.debug('EMBEDDING', `@huggingface/transformers non disponibile: ${error}`);
+      logger.debug('EMBEDDING', `@huggingface/transformers not available: ${error}`);
     }
 
-    // Nessun provider disponibile
+    // No provider available
     this.provider = null;
     this.initialized = true;
-    logger.warn('EMBEDDING', 'Nessun provider embedding disponibile, ricerca semantica disabilitata');
+    logger.warn('EMBEDDING', 'No embedding provider available, semantic search disabled');
     return false;
   }
 
   /**
-   * Genera embedding per un singolo testo.
-   * Ritorna Float32Array con 384 dimensioni, o null se non disponibile.
+   * Generate embedding for a single text.
+   * Returns Float32Array with 384 dimensions, or null if not available.
    */
   async embed(text: string): Promise<Float32Array | null> {
     if (!this.initialized) await this.initialize();
     if (!this.provider || !this.model) return null;
 
     try {
-      // Tronca testo troppo lungo (max ~512 token ≈ 2000 char)
+      // Truncate text that is too long (max ~512 tokens ≈ 2000 chars)
       const truncated = text.substring(0, 2000);
 
       if (this.provider === 'fastembed') {
@@ -95,14 +95,14 @@ export class EmbeddingService {
         return await this._embedTransformers(truncated);
       }
     } catch (error) {
-      logger.error('EMBEDDING', `Errore generazione embedding: ${error}`);
+      logger.error('EMBEDDING', `Error generating embedding: ${error}`);
     }
 
     return null;
   }
 
   /**
-   * Genera embeddings in batch.
+   * Generate embeddings in batch.
    */
   async embedBatch(texts: string[]): Promise<(Float32Array | null)[]> {
     if (!this.initialized) await this.initialize();
@@ -123,33 +123,33 @@ export class EmbeddingService {
   }
 
   /**
-   * Verifica se il servizio è disponibile.
+   * Check if the service is available.
    */
   isAvailable(): boolean {
     return this.initialized && this.provider !== null;
   }
 
   /**
-   * Nome del provider attivo.
+   * Name of the active provider.
    */
   getProvider(): string | null {
     return this.provider;
   }
 
   /**
-   * Dimensioni del vettore embedding.
+   * Embedding vector dimensions.
    */
   getDimensions(): number {
     return 384;
   }
 
-  // --- Provider specifici ---
+  // --- Provider-specific implementations ---
 
   private async _embedFastembed(text: string): Promise<Float32Array | null> {
     const embeddings = this.model.embed([text], 1);
     for await (const batch of embeddings) {
       if (batch && batch.length > 0) {
-        // fastembed ritorna array di array
+        // fastembed returns array of arrays
         const vec = batch[0];
         return vec instanceof Float32Array ? vec : new Float32Array(vec);
       }
@@ -163,7 +163,7 @@ export class EmbeddingService {
       normalize: true
     });
 
-    // transformers.js ritorna un Tensor, estraiamo i dati
+    // transformers.js returns a Tensor, extract the data
     if (output?.data) {
       return output.data instanceof Float32Array
         ? output.data

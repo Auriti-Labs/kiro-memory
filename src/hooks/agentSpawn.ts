@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Hook agentSpawn per Kiro CLI
+ * agentSpawn hook for Kiro CLI
  *
- * Trigger: quando l'agente si attiva
- * Funzione: avvia il worker (se non attivo) e inietta contesto su stdout
+ * Trigger: when the agent activates
+ * Function: starts the worker (if not running) and injects context to stdout
  */
 
 import { runHook, detectProject, formatSmartContext } from './utils.js';
@@ -16,28 +16,28 @@ const __filename_hook = fileURLToPath(import.meta.url);
 const __dirname_hook = dirname(__filename_hook);
 
 /**
- * Avvia il worker in background se non è già attivo
+ * Start the worker in background if not already running
  */
 async function ensureWorkerRunning(): Promise<void> {
   const host = process.env.KIRO_MEMORY_WORKER_HOST || '127.0.0.1';
   const port = process.env.KIRO_MEMORY_WORKER_PORT || '3001';
   const healthUrl = `http://${host}:${port}/health`;
 
-  // Controlla se il worker è già attivo
+  // Check if worker is already running
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 1500);
     const resp = await fetch(healthUrl, { signal: controller.signal });
     clearTimeout(timeout);
-    if (resp.ok) return; // Worker già attivo
+    if (resp.ok) return; // Worker already running
   } catch {
-    // Worker non raggiungibile, lo avviamo
+    // Worker unreachable, starting it
   }
 
-  // Percorso al worker compilato (stesso livello dist)
+  // Path to compiled worker (same dist level)
   const workerPath = join(__dirname_hook, '..', 'worker-service.js');
 
-  // Avvia come processo detached in background
+  // Start as detached background process
   const child = spawn('node', [workerPath], {
     detached: true,
     stdio: 'ignore',
@@ -45,7 +45,7 @@ async function ensureWorkerRunning(): Promise<void> {
   });
   child.unref();
 
-  // Attendi che il worker sia pronto (max 3 secondi)
+  // Wait for worker to be ready (max 3 seconds)
   for (let i = 0; i < 6; i++) {
     await new Promise(r => setTimeout(r, 500));
     try {
@@ -55,14 +55,14 @@ async function ensureWorkerRunning(): Promise<void> {
       clearTimeout(timeout);
       if (resp.ok) return;
     } catch {
-      // Ancora in avvio, riprova
+      // Still starting, retry
     }
   }
-  // Se dopo 3s non risponde, proseguiamo comunque (hook funziona senza worker)
+  // If no response after 3s, continue anyway (hook works without worker)
 }
 
 runHook('agentSpawn', async (input) => {
-  // Avvia il worker in background (non blocca se fallisce)
+  // Start worker in background (non-blocking on failure)
   await ensureWorkerRunning().catch(() => {});
 
   const project = detectProject(input.cwd);
@@ -71,7 +71,7 @@ runHook('agentSpawn', async (input) => {
   try {
     const smartCtx = await sdk.getSmartContext();
 
-    // Se non c'e contesto, esci silenziosamente
+    // No context available, exit silently
     if (smartCtx.items.length === 0 && smartCtx.summaries.length === 0) {
       return;
     }
@@ -82,9 +82,9 @@ runHook('agentSpawn', async (input) => {
       project
     });
 
-    output += `> UI disponibile su http://127.0.0.1:${process.env.KIRO_MEMORY_WORKER_PORT || '3001'}\n`;
+    output += `> UI available at http://127.0.0.1:${process.env.KIRO_MEMORY_WORKER_PORT || '3001'}\n`;
 
-    // Stdout viene iniettato nel contesto dell'agente Kiro
+    // Stdout gets injected into the Kiro agent context
     process.stdout.write(output);
   } finally {
     sdk.close();

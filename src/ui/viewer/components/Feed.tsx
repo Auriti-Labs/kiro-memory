@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Observation, Summary, UserPrompt } from '../types';
 import { timeAgo } from '../utils/format';
 
-/* ── Configurazione colori per tipo osservazione ── */
+/* ── Color configuration by observation type ── */
 const TYPE_STYLES: Record<string, { border: string; bg: string; text: string; dot: string; label: string }> = {
   'file-write': { border: 'border-l-emerald-500', bg: 'bg-emerald-500/10', text: 'text-emerald-400', dot: 'bg-emerald-500', label: 'change' },
   'file-read': { border: 'border-l-cyan-500', bg: 'bg-cyan-500/10', text: 'text-cyan-400', dot: 'bg-cyan-500', label: 'read' },
@@ -16,7 +16,7 @@ function getTypeStyle(type: string) {
   return TYPE_STYLES[type] || TYPE_STYLES['tool-use'];
 }
 
-/* ── Colori per i concept badges ── */
+/* ── Colors for concept badges ── */
 const CONCEPT_COLORS: Record<string, string> = {
   'testing': 'bg-emerald-500/15 text-emerald-400 ring-emerald-500/25',
   'ui-component': 'bg-violet-500/15 text-violet-400 ring-violet-500/25',
@@ -44,7 +44,7 @@ const CONCEPT_COLORS: Record<string, string> = {
   'error-handling': 'bg-rose-500/15 text-rose-400 ring-rose-500/25',
 };
 
-/* ── Utilità ── */
+/* ── Utilities ── */
 
 function basename(filePath: string): string {
   return filePath.split('/').pop() || filePath;
@@ -54,7 +54,7 @@ function stripProjectRoot(path: string): string {
   return path.replace(/^\/home\/[^/]+\/[^/]+\//, '');
 }
 
-/** Genera il testo narrativo principale per la card */
+/** Generate the main narrative text for the card */
 function generateNarrative(obs: Observation): string {
   if (obs.narrative) return obs.narrative;
 
@@ -97,7 +97,7 @@ function generateNarrative(obs: Observation): string {
   }
 }
 
-/** Genera una riga di dettaglio compatta (file coinvolti) */
+/** Generate a compact detail line (involved files) */
 function getDetailLine(obs: Observation): string | null {
   const parts: string[] = [];
 
@@ -113,7 +113,7 @@ function getDetailLine(obs: Observation): string | null {
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
-/* ── Render testo con supporto **bold** e `code` ── */
+/* ── Render text with **bold** and `code` support ── */
 function renderMarkdown(text: string) {
   return text.split('**').map((segment, i) => {
     if (i % 2 === 1) return <strong key={i} className="text-zinc-100 font-semibold">{segment}</strong>;
@@ -126,7 +126,7 @@ function renderMarkdown(text: string) {
 }
 
 /* ══════════════════════════════════════════════════════
-   Feed — lista principale
+   Feed — main list
    ══════════════════════════════════════════════════════ */
 
 interface FeedProps {
@@ -140,7 +140,7 @@ interface FeedProps {
 }
 
 export function Feed({ observations, summaries, prompts, onLoadMore, isLoading, hasMore, getDisplayName }: FeedProps) {
-  /* Sort memoizzato per evitare ricalcolo ad ogni render */
+  /* Memoized sort to avoid recalculation on every render */
   const items = useMemo(() =>
     [...observations, ...summaries, ...prompts].sort(
       (a, b) => b.created_at_epoch - a.created_at_epoch
@@ -226,7 +226,7 @@ export function Feed({ observations, summaries, prompts, onLoadMore, isLoading, 
 }
 
 /* ══════════════════════════════════════════════════════
-   Observation Card — design pulito senza toggle
+   Observation Card — clean design without toggle
    ══════════════════════════════════════════════════════ */
 function ObservationCard({ obs, getDisplayName }: { obs: Observation; getDisplayName: (p: string) => string }) {
   const style = getTypeStyle(obs.type);
@@ -236,7 +236,7 @@ function ObservationCard({ obs, getDisplayName }: { obs: Observation; getDisplay
   return (
     <div className={`bg-surface-1 border border-border rounded-lg border-l-[3px] ${style.border} shadow-card hover:shadow-card-hover hover:border-border-hover transition-all overflow-hidden`}>
       <div className="px-4 py-3.5 min-w-0">
-        {/* Riga 1: badge tipo + progetto + tempo */}
+        {/* Row 1: type badge + project + time */}
         <div className="flex items-center gap-2 mb-2 flex-wrap">
           <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md ${style.bg} ${style.text}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
@@ -246,29 +246,29 @@ function ObservationCard({ obs, getDisplayName }: { obs: Observation; getDisplay
             {getDisplayName(obs.project)}
           </span>
           {obs.is_stale === 1 && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/25" title="File modificato dopo l'osservazione">
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/25" title="File modified after observation">
               stale
             </span>
           )}
           <span className="text-[11px] text-zinc-500 font-mono ml-auto tabular-nums">{timeAgo(obs.created_at_epoch)}</span>
         </div>
 
-        {/* Riga 2: narrativa principale */}
+        {/* Row 2: main narrative */}
         <h4 className="text-sm text-zinc-200 leading-snug break-words">{renderMarkdown(narrative)}</h4>
 
-        {/* Riga 3: subtitle (path relativo, nome comando, URL) */}
+        {/* Row 3: subtitle (relative path, command name, URL) */}
         {obs.subtitle && obs.subtitle !== obs.title && (
           <p className="text-[12px] text-zinc-500 mt-1 font-mono truncate">{stripProjectRoot(obs.subtitle)}</p>
         )}
 
-        {/* Riga 4: dettaglio file coinvolti */}
+        {/* Row 4: involved files detail */}
         {detail && (
           <p className="text-[11px] text-zinc-600 mt-1.5">{detail}</p>
         )}
 
-        {/* Riga 5: concept badges + ID */}
+        {/* Row 5: concept badges + ID */}
         <div className="flex items-center gap-2 mt-2.5">
-          {/* Concetti */}
+          {/* Concepts */}
           {obs.concepts && (
             <div className="flex flex-wrap gap-1">
               {obs.concepts.split(', ').map((concept, i) => {
@@ -281,7 +281,7 @@ function ObservationCard({ obs, getDisplayName }: { obs: Observation; getDisplay
               })}
             </div>
           )}
-          {/* ID a destra */}
+          {/* ID on the right */}
           <span className="text-[10px] text-zinc-700 font-mono ml-auto tabular-nums">#{obs.id}</span>
         </div>
       </div>

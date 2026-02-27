@@ -1,10 +1,10 @@
 /**
- * Utility condivise per gli hook Kiro CLI
+ * Shared utilities for Kiro CLI hooks
  *
- * Contratto Kiro:
- * - Input: JSON via stdin con { hook_event_name, cwd, tool_name, tool_input, tool_response }
- * - Output: testo su stdout (iniettato nel contesto dell'agente)
- * - Exit code 0 = successo, 2 = blocco (stderr inviato all'LLM)
+ * Kiro contract:
+ * - Input: JSON via stdin with { hook_event_name, cwd, tool_name, tool_input, tool_response }
+ * - Output: text on stdout (injected into agent context)
+ * - Exit code 0 = success, 2 = block (stderr sent to LLM)
  */
 
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'fs';
@@ -12,7 +12,7 @@ import { join } from 'path';
 import type { KiroHookInput, ScoredItem, Summary } from '../types/worker-types.js';
 import { estimateTokens } from '../services/search/ScoringEngine.js';
 
-// Percorso del token condiviso con il worker
+// Path to shared authentication token with the worker
 const DATA_DIR = process.env.KIRO_MEMORY_DATA_DIR
   || process.env.CONTEXTKIT_DATA_DIR
   || join(process.env.HOME || '/tmp', '.kiro-memory');
@@ -34,19 +34,19 @@ export function debugLog(hookName: string, label: string, data: unknown): void {
     const logFile = join(logDir, `hooks-${new Date().toISOString().split('T')[0]}.log`);
     writeFileSync(logFile, line, { flag: 'a' });
   } catch {
-    // Il logging non deve mai bloccare l'hook
+    // Logging must never block the hook
   }
 }
 
 /**
- * Legge e parsa JSON da stdin
+ * Read and parse JSON from stdin
  */
 export async function readStdin(): Promise<KiroHookInput> {
   return new Promise((resolve, reject) => {
     let data = '';
 
     process.stdin.setEncoding('utf8');
-    // Timeout di sicurezza: 5 secondi (cancellato in end/error per evitare leak)
+    // Safety timeout: 5 seconds (cleared in end/error to prevent leaks)
     const safetyTimeout = setTimeout(() => {
       if (!data.trim()) {
         resolve({
@@ -69,7 +69,7 @@ export async function readStdin(): Promise<KiroHookInput> {
         }
         resolve(JSON.parse(data));
       } catch (err) {
-        reject(new Error(`Errore parsing stdin JSON: ${err}`));
+        reject(new Error(`Error parsing stdin JSON: ${err}`));
       }
     });
     process.stdin.on('error', (err) => {
@@ -80,7 +80,7 @@ export async function readStdin(): Promise<KiroHookInput> {
 }
 
 /**
- * Rileva il nome del progetto dalla cwd
+ * Detect project name from cwd
  */
 export function detectProject(cwd: string): string {
   try {
@@ -92,13 +92,13 @@ export function detectProject(cwd: string): string {
     }).trim();
     return gitRoot.split('/').pop() || 'default';
   } catch {
-    // Fallback: ultimo segmento del path
+    // Fallback: last path segment
     return cwd.split('/').pop() || 'default';
   }
 }
 
 /**
- * Formatta il contesto per l'iniezione in Kiro
+ * Format context for injection into Kiro
  */
 export function formatContext(data: {
   observations?: Array<{ title: string; text?: string | null; type?: string; created_at?: string }>;
@@ -108,17 +108,17 @@ export function formatContext(data: {
   let output = '';
 
   if (data.summaries && data.summaries.length > 0) {
-    output += '## Sessioni Precedenti\n\n';
+    output += '## Previous Sessions\n\n';
     data.summaries.slice(0, 3).forEach(sum => {
-      if (sum.learned) output += `- **Appreso**: ${sum.learned}\n`;
-      if (sum.completed) output += `- **Completato**: ${sum.completed}\n`;
-      if (sum.next_steps) output += `- **Prossimi passi**: ${sum.next_steps}\n`;
+      if (sum.learned) output += `- **Learned**: ${sum.learned}\n`;
+      if (sum.completed) output += `- **Completed**: ${sum.completed}\n`;
+      if (sum.next_steps) output += `- **Next steps**: ${sum.next_steps}\n`;
       output += '\n';
     });
   }
 
   if (data.observations && data.observations.length > 0) {
-    output += '## Osservazioni Recenti\n\n';
+    output += '## Recent Observations\n\n';
     data.observations.slice(0, 10).forEach(obs => {
       const text = obs.text ? obs.text.substring(0, 150) : '';
       output += `- **[${obs.type || 'obs'}] ${obs.title}**: ${text}\n`;
@@ -130,20 +130,20 @@ export function formatContext(data: {
 }
 
 /**
- * Notifica il worker che ci sono nuovi dati.
- * Chiama POST /api/notify per triggerare il broadcast SSE ai client della dashboard.
- * Non-bloccante: se il worker non è attivo, ignora silenziosamente.
+ * Notify the worker that new data is available.
+ * Calls POST /api/notify to trigger SSE broadcast to dashboard clients.
+ * Non-blocking: silently ignores if the worker is not running.
  */
 export async function notifyWorker(event: string, data?: Record<string, unknown>): Promise<void> {
   const host = process.env.KIRO_MEMORY_WORKER_HOST || '127.0.0.1';
   const port = process.env.KIRO_MEMORY_WORKER_PORT || '3001';
   try {
-    // Leggi token di autenticazione condiviso con il worker
+    // Read shared authentication token with the worker
     let token = '';
     try {
       token = readFileSync(TOKEN_FILE, 'utf-8').trim();
     } catch {
-      // Token non trovato: il worker potrebbe non essere attivo
+      // Token not found: worker might not be running
       return;
     }
 
@@ -160,14 +160,14 @@ export async function notifyWorker(event: string, data?: Record<string, unknown>
     });
     clearTimeout(timeout);
   } catch {
-    // Worker non attivo — ignora silenziosamente
+    // Worker not running — silently ignore
   }
 }
 
 /**
- * Formatta contesto smart con budget token.
- * Riempie il budget con item ordinati per score decrescente.
- * Sommari sempre inclusi (max 3). Item troncati se necessario.
+ * Format smart context with token budget.
+ * Fills the budget with items sorted by descending score.
+ * Summaries always included (max 3). Items truncated if needed.
  */
 export function formatSmartContext(data: {
   items: ScoredItem[];
@@ -183,42 +183,42 @@ export function formatSmartContext(data: {
   let tokensUsed = 0;
 
   // Header
-  const header = '# Kiro Memory: Contesto Sessioni Precedenti\n\n';
+  const header = '# Kiro Memory: Previous Sessions Context\n\n';
   tokensUsed += estimateTokens(header);
   output += header;
 
-  // Sommari (sempre inclusi, max 3)
+  // Summaries (always included, max 3)
   if (data.summaries && data.summaries.length > 0) {
-    let sumSection = '## Sessioni Precedenti\n\n';
+    let sumSection = '## Previous Sessions\n\n';
     for (const sum of data.summaries.slice(0, 3)) {
-      if (sum.learned) sumSection += `- **Appreso**: ${sum.learned}\n`;
-      if (sum.completed) sumSection += `- **Completato**: ${sum.completed}\n`;
-      if (sum.next_steps) sumSection += `- **Prossimi passi**: ${sum.next_steps}\n`;
+      if (sum.learned) sumSection += `- **Learned**: ${sum.learned}\n`;
+      if (sum.completed) sumSection += `- **Completed**: ${sum.completed}\n`;
+      if (sum.next_steps) sumSection += `- **Next steps**: ${sum.next_steps}\n`;
       sumSection += '\n';
     }
     tokensUsed += estimateTokens(sumSection);
     output += sumSection;
   }
 
-  // Osservazioni ordinate per score (riempimento greedy)
+  // Observations sorted by score (greedy filling)
   if (data.items && data.items.length > 0) {
-    let obsSection = '## Osservazioni Rilevanti\n\n';
+    let obsSection = '## Relevant Observations\n\n';
     tokensUsed += estimateTokens(obsSection);
 
-    // Ordina per score decrescente (dovrebbero gia essere ordinati, ma assicuriamoci)
+    // Sort by descending score (should already be sorted, but ensure it)
     const sorted = [...data.items].sort((a, b) => b.score - a.score);
 
     for (const item of sorted) {
-      // Riga base: tipo + titolo
+      // Base line: type + title
       const linePrefix = `- **[${item.type}] ${item.title}**: `;
       const linePrefixTokens = estimateTokens(linePrefix);
 
-      // Budget rimanente per il contenuto
+      // Remaining budget for content
       const remainingTokens = budget - tokensUsed - linePrefixTokens - 1; // 1 per \n
 
-      if (remainingTokens <= 0) break; // Budget esaurito
+      if (remainingTokens <= 0) break; // Budget exhausted
 
-      // Tronca contenuto al budget rimanente
+      // Truncate content to remaining budget
       const maxContentChars = remainingTokens * 4; // 1 token ≈ 4 char
       const content = item.content
         ? item.content.substring(0, Math.min(maxContentChars, 300))
@@ -228,22 +228,22 @@ export function formatSmartContext(data: {
       tokensUsed += estimateTokens(line);
       obsSection += line;
 
-      // Se abbiamo superato il budget, fermiamoci
+      // If we exceeded the budget, stop
       if (tokensUsed >= budget) break;
     }
 
     output += obsSection;
   }
 
-  // Footer con stats
-  const footer = `\n> Progetto: ${data.project} | Items: ${data.items?.length || 0} | Token usati: ~${tokensUsed}/${budget}\n`;
+  // Footer with stats
+  const footer = `\n> Project: ${data.project} | Items: ${data.items?.length || 0} | Tokens used: ~${tokensUsed}/${budget}\n`;
   output += footer;
 
   return output;
 }
 
 /**
- * Wrapper sicuro per eseguire un hook con gestione errori
+ * Safe wrapper to execute a hook with error handling
  */
 export async function runHook(
   name: string,
@@ -252,7 +252,7 @@ export async function runHook(
   try {
     const input = await readStdin();
 
-    // Normalizzazione cross-platform: Cursor usa workspace_roots e conversation_id
+    // Cross-platform normalization: Cursor uses workspace_roots and conversation_id
     if (!input.cwd && input.workspace_roots?.[0]) {
       input.cwd = input.workspace_roots[0];
     }
@@ -262,11 +262,11 @@ export async function runHook(
 
     debugLog(name, 'stdin', input);
     await handler(input);
-    debugLog(name, 'completato', { success: true });
+    debugLog(name, 'completed', { success: true });
     process.exit(0);
   } catch (error) {
-    debugLog(name, 'errore', { error: String(error) });
-    process.stderr.write(`[kiro-memory:${name}] Errore: ${error}\n`);
-    process.exit(0); // Exit 0 per degradazione silenziosa (non bloccare Kiro)
+    debugLog(name, 'error', { error: String(error) });
+    process.stderr.write(`[kiro-memory:${name}] Error: ${error}\n`);
+    process.exit(0); // Exit 0 for silent degradation (don't block Kiro)
   }
 }

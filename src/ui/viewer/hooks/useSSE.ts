@@ -10,12 +10,12 @@ interface SSEState {
   lastEventTime: number;
 }
 
-/** Intervallo polling di fallback (ms) */
+/** Fallback polling interval (ms) */
 const POLL_INTERVAL = 30_000;
 
 /**
- * Hook SSE con auto-reconnect, polling fallback e timestamp ultimo aggiornamento.
- * EventSource singola per tutta l'app — gli altri hook NON devono aprire connessioni SSE proprie.
+ * SSE hook with auto-reconnect, polling fallback and last update timestamp.
+ * Single EventSource for the entire app — other hooks MUST NOT open their own SSE connections.
  */
 export function useSSE(): SSEState {
   const [state, setState] = useState<SSEState>({
@@ -29,7 +29,7 @@ export function useSSE(): SSEState {
 
   const mountedRef = useRef(true);
 
-  /** Aggiorna il timestamp dell'ultimo refresh riuscito */
+  /** Update the timestamp of the last successful refresh */
   const touchLastEvent = useCallback(() => {
     if (mountedRef.current) {
       setState(prev => ({ ...prev, lastEventTime: Date.now() }));
@@ -93,7 +93,7 @@ export function useSSE(): SSEState {
       }
     };
 
-    /** Re-fetch completo di tutti i dati */
+    /** Full re-fetch of all data */
     const fetchAll = () => {
       fetchObservations();
       fetchSummaries();
@@ -107,7 +107,7 @@ export function useSSE(): SSEState {
     const onPrompt = () => { fetchPrompts(); };
     const onSession = () => { fetchProjects(); };
 
-    /* ── Polling fallback: safety net per aggiornamenti persi ── */
+    /* ── Polling fallback: safety net for missed updates ── */
     const startPolling = () => {
       if (pollInterval) clearInterval(pollInterval);
       pollInterval = setInterval(() => {
@@ -115,7 +115,7 @@ export function useSSE(): SSEState {
       }, POLL_INTERVAL);
     };
 
-    /* ── SSE con exponential backoff ── */
+    /* ── SSE with exponential backoff ── */
     let wasConnected = false;
 
     const connect = () => {
@@ -125,7 +125,7 @@ export function useSSE(): SSEState {
 
       eventSource.onopen = () => {
         if (!mountedRef.current) return;
-        // Se è un reconnect, re-fetch tutti i dati per recuperare eventi persi
+        // If reconnecting, re-fetch all data to recover missed events
         if (wasConnected) {
           fetchAll();
         }
@@ -138,7 +138,7 @@ export function useSSE(): SSEState {
         if (!mountedRef.current) return;
         setState(prev => ({ ...prev, isConnected: false }));
 
-        // Rimuovi listener prima di chiudere per evitare leak
+        // Remove listeners before closing to avoid leaks
         if (eventSource) {
           eventSource.removeEventListener('observation-created', onObservation);
           eventSource.removeEventListener('summary-created', onSummary);
@@ -159,13 +159,13 @@ export function useSSE(): SSEState {
       eventSource.addEventListener('session-created', onSession);
     };
 
-    // Fetch iniziale di tutti i dati
+    // Initial fetch of all data
     fetchAll();
 
-    // Avvia connessione SSE
+    // Start SSE connection
     connect();
 
-    // Avvia polling di fallback (safety net)
+    // Start fallback polling (safety net)
     startPolling();
 
     return () => {

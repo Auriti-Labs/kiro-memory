@@ -1,13 +1,13 @@
 /**
- * Ricerca ibrida: combina vector search locale (SQLite BLOB) con keyword search (FTS5)
+ * Hybrid search: combines local vector search (SQLite BLOB) with keyword search (FTS5)
  *
- * Scoring a 4 segnali:
- * - semantic: cosine similarity dall'embedding
- * - fts5: rank FTS5 normalizzato
- * - recency: decadimento esponenziale
- * - projectMatch: corrispondenza progetto
+ * 4-signal scoring:
+ * - semantic: cosine similarity from embedding
+ * - fts5: normalized FTS5 rank
+ * - recency: exponential decay
+ * - projectMatch: project match
  *
- * Se il servizio di embedding non e disponibile, fallback a solo FTS5.
+ * If the embedding service is not available, falls back to FTS5 only.
  */
 
 import { getEmbeddingService } from './EmbeddingService.js';
@@ -46,22 +46,22 @@ export class HybridSearch {
   private embeddingInitialized = false;
 
   /**
-   * Inizializza il servizio di embedding (lazy, non bloccante)
+   * Initialize the embedding service (lazy, non-blocking)
    */
   async initialize(): Promise<void> {
     try {
       const embeddingService = getEmbeddingService();
       await embeddingService.initialize();
       this.embeddingInitialized = embeddingService.isAvailable();
-      logger.info('SEARCH', `HybridSearch inizializzato (embedding: ${this.embeddingInitialized ? 'attivo' : 'disattivato'})`);
+      logger.info('SEARCH', `HybridSearch initialized (embedding: ${this.embeddingInitialized ? 'active' : 'disabled'})`);
     } catch (error) {
-      logger.warn('SEARCH', 'Inizializzazione embedding fallita, uso solo FTS5', {}, error as Error);
+      logger.warn('SEARCH', 'Embedding initialization failed, using only FTS5', {}, error as Error);
       this.embeddingInitialized = false;
     }
   }
 
   /**
-   * Ricerca ibrida con scoring a 4 segnali
+   * Hybrid search with 4-signal scoring
    */
   async search(
     db: Database,
@@ -76,7 +76,7 @@ export class HybridSearch {
     const weights = options.weights || SEARCH_WEIGHTS;
     const targetProject = options.project || '';
 
-    // Raccogliamo risultati grezzi da entrambe le sorgenti
+    // Collect raw results from both sources
     const rawItems = new Map<string, {
       id: string;
       title: string;
@@ -86,11 +86,11 @@ export class HybridSearch {
       created_at: string;
       created_at_epoch: number;
       semanticScore: number;
-      fts5Rank: number | null; // rank grezzo, da normalizzare dopo
+      fts5Rank: number | null; // raw rank, to be normalized later
       source: 'vector' | 'keyword';
     }>();
 
-    // Ricerca vettoriale (se embedding disponibile)
+    // Vector search (if embedding available)
     if (this.embeddingInitialized) {
       try {
         const embeddingService = getEmbeddingService();
@@ -100,7 +100,7 @@ export class HybridSearch {
           const vectorSearch = getVectorSearch();
           const vectorResults = await vectorSearch.search(db, queryEmbedding, {
             project: options.project,
-            limit: limit * 2, // Prendiamo piu risultati per il ranking
+            limit: limit * 2, // Fetch more results for ranking
             threshold: 0.3
           });
 
@@ -119,14 +119,14 @@ export class HybridSearch {
             });
           }
 
-          logger.debug('SEARCH', `Vector search: ${vectorResults.length} risultati`);
+          logger.debug('SEARCH', `Vector search: ${vectorResults.length} results`);
         }
       } catch (error) {
-        logger.warn('SEARCH', 'Ricerca vettoriale fallita, uso solo keyword', {}, error as Error);
+        logger.warn('SEARCH', 'Vector search failed, using only keyword', {}, error as Error);
       }
     }
 
-    // Ricerca keyword FTS5 con rank (sempre attiva)
+    // Keyword search FTS5 with rank (always active)
     try {
       const { searchObservationsFTSWithRank } = await import('../sqlite/Search.js');
       const keywordResults = searchObservationsFTSWithRank(db, query, {
@@ -139,9 +139,9 @@ export class HybridSearch {
         const existing = rawItems.get(id);
 
         if (existing) {
-          // Presente in entrambe le sorgenti: aggiungi rank FTS5
+          // Present in both sources: add FTS5 rank
           existing.fts5Rank = obs.fts5_rank;
-          existing.source = 'vector'; // Manteniamo vector come sorgente primaria
+          existing.source = 'vector'; // Keep vector as primary source
         } else {
           rawItems.set(id, {
             id,
@@ -158,20 +158,20 @@ export class HybridSearch {
         }
       }
 
-      logger.debug('SEARCH', `Keyword search: ${keywordResults.length} risultati`);
+      logger.debug('SEARCH', `Keyword search: ${keywordResults.length} results`);
     } catch (error) {
-      logger.error('SEARCH', 'Ricerca keyword fallita', {}, error as Error);
+      logger.error('SEARCH', 'Keyword search failed', {}, error as Error);
     }
 
-    // Nessun risultato
+    // No results
     if (rawItems.size === 0) return [];
 
-    // Normalizza i rank FTS5
+    // Normalize FTS5 ranks
     const allFTS5Ranks = Array.from(rawItems.values())
       .filter(item => item.fts5Rank !== null)
       .map(item => item.fts5Rank as number);
 
-    // Calcola score composito per ogni item
+    // Compute composite score for each item
     const scored: SearchResult[] = [];
 
     for (const item of rawItems.values()) {
@@ -184,10 +184,10 @@ export class HybridSearch {
 
       const score = computeCompositeScore(signals, weights);
 
-      // Boost per item presenti in entrambe le sorgenti
+      // Boost for items present in both sources
       const isHybrid = item.semanticScore > 0 && item.fts5Rank !== null;
       const hybridBoost = isHybrid ? 1.15 : 1.0;
-      // Boost per tipi knowledge (constraint, decision, heuristic, rejected)
+      // Boost for knowledge types (constraint, decision, heuristic, rejected)
       const finalScore = Math.min(1, score * hybridBoost * knowledgeTypeBoost(item.type));
 
       scored.push({
@@ -204,11 +204,11 @@ export class HybridSearch {
       });
     }
 
-    // Ordina per score decrescente e limita
+    // Sort by score descending and limit
     scored.sort((a, b) => b.score - a.score);
     const finalResults = scored.slice(0, limit);
 
-    // Access tracking: aggiorna last_accessed_epoch per i risultati trovati (fire-and-forget)
+    // Access tracking: update last_accessed_epoch for found results (fire-and-forget)
     if (finalResults.length > 0) {
       try {
         const { updateLastAccessed } = await import('../sqlite/Observations.js');
@@ -217,7 +217,7 @@ export class HybridSearch {
           updateLastAccessed(db, ids);
         }
       } catch {
-        // Non propagare errori — access tracking e opzionale
+        // Don't propagate errors — access tracking is optional
       }
     }
 

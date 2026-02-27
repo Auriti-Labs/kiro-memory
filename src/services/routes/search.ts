@@ -1,5 +1,5 @@
 /**
- * Router Search: ricerca FTS5, ricerca ibrida, timeline.
+ * Router Search: FTS5 search, hybrid search, timeline.
  */
 
 import { Router } from 'express';
@@ -12,7 +12,7 @@ import { logger } from '../../utils/logger.js';
 export function createSearchRouter(ctx: WorkerContext): Router {
   const router = Router();
 
-  // Ricerca FTS5 con filtri
+  // FTS5 search with filters
   router.get('/api/search', (req, res) => {
     const { q, project, type, limit } = req.query as { q: string; project?: string; type?: string; limit?: string };
 
@@ -35,12 +35,12 @@ export function createSearchRouter(ctx: WorkerContext): Router {
 
       res.json(results);
     } catch (error) {
-      logger.error('WORKER', 'Ricerca fallita', { query: q }, error as Error);
+      logger.error('WORKER', 'Search failed', { query: q }, error as Error);
       res.status(500).json({ error: 'Search failed' });
     }
   });
 
-  // Ricerca ibrida (vector + keyword)
+  // Hybrid search (vector + keyword)
   router.get('/api/hybrid-search', async (req, res) => {
     const { q, project, limit } = req.query as { q: string; project?: string; limit?: string };
 
@@ -58,12 +58,12 @@ export function createSearchRouter(ctx: WorkerContext): Router {
 
       res.json({ results, count: results.length });
     } catch (error) {
-      logger.error('WORKER', 'Ricerca ibrida fallita', { query: q }, error as Error);
+      logger.error('WORKER', 'Hybrid search failed', { query: q }, error as Error);
       res.status(500).json({ error: 'Hybrid search failed' });
     }
   });
 
-  // Timeline: contesto cronologico attorno a un'osservazione
+  // Timeline: chronological context around an observation
   router.get('/api/timeline', (req, res) => {
     const { anchor, depth_before, depth_after } = req.query as { anchor: string; depth_before?: string; depth_after?: string };
 
@@ -88,7 +88,7 @@ export function createSearchRouter(ctx: WorkerContext): Router {
 
       res.json({ timeline });
     } catch (error) {
-      logger.error('WORKER', 'Timeline fallita', { anchor }, error as Error);
+      logger.error('WORKER', 'Timeline failed', { anchor }, error as Error);
       res.status(500).json({ error: 'Timeline failed' });
     }
   });

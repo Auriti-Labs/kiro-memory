@@ -1,5 +1,5 @@
 /**
- * Router Summaries: CRUD summary di sessione.
+ * Router Summaries: session summary CRUD.
  */
 
 import { Router } from 'express';
@@ -11,7 +11,7 @@ import { logger } from '../../utils/logger.js';
 export function createSummariesRouter(ctx: WorkerContext): Router {
   const router = Router();
 
-  // Lista summary paginata
+  // Paginated summary list
   router.get('/api/summaries', (req, res) => {
     const { offset, limit, project } = req.query as { offset?: string; limit?: string; project?: string };
     const _offset = parseIntSafe(offset, 0, 0, 1_000_000);
@@ -32,12 +32,12 @@ export function createSummariesRouter(ctx: WorkerContext): Router {
       res.setHeader('X-Total-Count', total);
       res.json(rows);
     } catch (error) {
-      logger.error('WORKER', 'Lista summary fallita', {}, error as Error);
+      logger.error('WORKER', 'Summary list failed', {}, error as Error);
       res.status(500).json({ error: 'Failed to list summaries' });
     }
   });
 
-  // Crea summary
+  // Create summary
   router.post('/api/summaries', (req, res) => {
     const { sessionId, project, request, learned, completed, nextSteps } = req.body;
 
@@ -67,7 +67,7 @@ export function createSummariesRouter(ctx: WorkerContext): Router {
       ctx.broadcast('summary-created', { id, project });
       res.json({ id, success: true });
     } catch (error) {
-      logger.error('WORKER', 'Creazione summary fallita', {}, error as Error);
+      logger.error('WORKER', 'Summary creation failed', {}, error as Error);
       res.status(500).json({ error: 'Failed to store summary' });
     }
   });

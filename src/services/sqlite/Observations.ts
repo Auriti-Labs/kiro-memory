@@ -5,14 +5,14 @@ import type { Observation } from '../../types/worker-types.js';
  * Observation operations for Kiro Memory database
  */
 
-/** Escape dei caratteri wildcard LIKE per prevenire pattern injection */
+/** Escape LIKE wildcard characters to prevent pattern injection */
 function escapeLikePattern(input: string): string {
   return input.replace(/[%_\\]/g, '\\$&');
 }
 
 /**
- * Verifica se esiste un'osservazione con lo stesso content_hash negli ultimi 30 secondi.
- * Ritorna true se è un duplicato (da scartare).
+ * Check if an observation with the same content_hash exists within the last 30 seconds.
+ * Returns true if it is a duplicate (to be discarded).
  */
 export function isDuplicateObservation(db: Database, contentHash: string, windowMs: number = 30_000): boolean {
   if (!contentHash) return false;
@@ -87,8 +87,8 @@ export function deleteObservation(db: Database, id: number): void {
 }
 
 /**
- * Aggiorna il timestamp di ultimo accesso per le osservazioni trovate in ricerca.
- * Fire-and-forget: non bloccante, ignora errori.
+ * Update the last access timestamp for observations found in search.
+ * Fire-and-forget: non-blocking, ignores errors.
  */
 export function updateLastAccessed(db: Database, ids: number[]): void {
   if (!Array.isArray(ids) || ids.length === 0) return;
@@ -108,12 +108,12 @@ export function updateLastAccessed(db: Database, ids: number[]): void {
 }
 
 /**
- * Consolida osservazioni duplicate sullo stesso file e tipo.
- * Raggruppa per (project, type, files_modified), mantiene la piu recente,
- * concatena contenuti unici, elimina le vecchie.
+ * Consolidate duplicate observations on the same file and type.
+ * Groups by (project, type, files_modified), keeps the most recent,
+ * concatenates unique contents, deletes the old ones.
  *
- * Fix: conteggi calcolati dentro la transaction e ritornati direttamente,
- * dry-run separato dalla transaction per evitare lock inutili.
+ * Fix: counts calculated inside the transaction and returned directly,
+ * dry-run separated from the transaction to avoid unnecessary locks.
  */
 export function consolidateObservations(
   db: Database,
@@ -122,7 +122,7 @@ export function consolidateObservations(
 ): { merged: number; removed: number } {
   const minGroupSize = options.minGroupSize || 3;
 
-  // Trova gruppi di osservazioni con stesso (project, type, files_modified)
+  // Find groups of observations with the same (project, type, files_modified)
   const groups = db.query(`
     SELECT type, files_modified, COUNT(*) as cnt, GROUP_CONCAT(id) as ids
     FROM observations
@@ -139,7 +139,7 @@ export function consolidateObservations(
 
   if (groups.length === 0) return { merged: 0, removed: 0 };
 
-  // Dry-run: calcola conteggi senza aprire transaction
+  // Dry-run: calculate counts without opening a transaction
   if (options.dryRun) {
     let totalMerged = 0;
     let totalRemoved = 0;
@@ -160,9 +160,9 @@ export function consolidateObservations(
     return { merged: totalMerged, removed: totalRemoved };
   }
 
-  // Esegui consolidamento in transazione atomica.
-  // I conteggi sono calcolati e ritornati dalla transaction stessa,
-  // così se fallisce non restano valori parziali.
+  // Execute consolidation in an atomic transaction.
+  // Counts are calculated and returned by the transaction itself,
+  // so if it fails no partial values remain.
   const runConsolidation = db.transaction(() => {
     let merged = 0;
     let removed = 0;
@@ -176,7 +176,7 @@ export function consolidateObservations(
 
       if (observations.length < minGroupSize) continue;
 
-      // Mantieni la più recente, concatena contenuti unici dalle altre
+      // Keep the most recent, concatenate unique contents from the others
       const keeper = observations[0];
       const others = observations.slice(1);
 
@@ -188,14 +188,14 @@ export function consolidateObservations(
         }
       }
 
-      // Aggiorna il keeper con testo consolidato
+      // Update the keeper with consolidated text
       const consolidatedText = Array.from(uniqueTexts).join('\n---\n').substring(0, 100_000);
       db.run(
         'UPDATE observations SET text = ?, title = ? WHERE id = ?',
-        [consolidatedText, `[consolidato x${observations.length}] ${keeper.title}`, keeper.id]
+        [consolidatedText, `[consolidated x${observations.length}] ${keeper.title}`, keeper.id]
       );
 
-      // Elimina le osservazioni vecchie (e i loro embeddings)
+      // Delete old observations (and their embeddings)
       const removeIds = others.map(o => o.id);
       const removePlaceholders = removeIds.map(() => '?').join(',');
       db.run(`DELETE FROM observations WHERE id IN (${removePlaceholders})`, removeIds);
