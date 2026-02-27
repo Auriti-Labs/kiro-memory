@@ -71,24 +71,51 @@ class BunQueryCompat {
   }
 
   /**
+   * Adatta parametri named da formato bun:sqlite a better-sqlite3.
+   * bun:sqlite: chiavi CON prefisso (es. { $todayStart: 123 })
+   * better-sqlite3: chiavi SENZA prefisso (es. { todayStart: 123 })
+   */
+  private _adaptParams(params: any[]): any[] {
+    if (params.length !== 1 || typeof params[0] !== 'object' || params[0] === null || Array.isArray(params[0])) {
+      return params;
+    }
+    const obj = params[0];
+    const keys = Object.keys(obj);
+    if (keys.length === 0) return params;
+    // Se nessuna chiave ha prefisso $/@/:, già compatibile con better-sqlite3
+    if (!keys[0].startsWith('$') && !keys[0].startsWith('@') && !keys[0].startsWith(':')) {
+      return params;
+    }
+    // Rimuovi il prefisso dalle chiavi
+    const adapted: Record<string, any> = {};
+    for (const key of keys) {
+      adapted[key.slice(1)] = obj[key];
+    }
+    return [adapted];
+  }
+
+  /**
    * Returns all rows
    */
   all(...params: any[]): any[] {
-    return params.length > 0 ? this._stmt.all(...params) : this._stmt.all();
+    if (params.length === 0) return this._stmt.all();
+    return this._stmt.all(...this._adaptParams(params));
   }
 
   /**
    * Returns the first row or null
    */
   get(...params: any[]): any {
-    return params.length > 0 ? this._stmt.get(...params) : this._stmt.get();
+    if (params.length === 0) return this._stmt.get();
+    return this._stmt.get(...this._adaptParams(params));
   }
 
   /**
    * Execute without results
    */
   run(...params: any[]): { lastInsertRowid: number | bigint; changes: number } {
-    return params.length > 0 ? this._stmt.run(...params) : this._stmt.run();
+    if (params.length === 0) return this._stmt.run();
+    return this._stmt.run(...this._adaptParams(params));
   }
 }
 
