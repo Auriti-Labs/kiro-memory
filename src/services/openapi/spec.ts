@@ -127,7 +127,7 @@ export const openApiSpec = {
   openapi: '3.1.0',
   info: {
     title: 'Kiro Memory REST API',
-    version: '3.0.0',
+    version: '3.0.1',
     description: [
       'API REST del worker Kiro Memory (porta 3001).',
       'Fornisce accesso a osservazioni, sommari, sessioni, ricerca,',

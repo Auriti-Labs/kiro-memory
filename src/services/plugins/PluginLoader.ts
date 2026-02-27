@@ -25,7 +25,7 @@ import { readConfig } from '../../cli/cli-utils.js';
 import type { IPlugin } from './types.js';
 
 // ── Versione del runtime usata per la verifica minKiroVersion ──
-const KIRO_MEMORY_VERSION = '3.0.0';
+const KIRO_MEMORY_VERSION = '3.0.1';
 
 /**
  * Interfaccia minima del registry necessaria al Loader.
