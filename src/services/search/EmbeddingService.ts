@@ -55,12 +55,12 @@ export class EmbeddingService {
     // Tentativo 2: @huggingface/transformers
     try {
       const transformers = await import('@huggingface/transformers');
-      const pipeline = transformers.pipeline || transformers.default?.pipeline;
+      const pipeline = (transformers as any).pipeline || (transformers as any).default?.pipeline;
 
       if (pipeline) {
         this.model = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
           quantized: true
-        });
+        } as any);
         this.provider = 'transformers';
         this.initialized = true;
         logger.info('EMBEDDING', 'Inizializzato con @huggingface/transformers (all-MiniLM-L6-v2)');

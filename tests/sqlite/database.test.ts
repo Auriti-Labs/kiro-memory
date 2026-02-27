@@ -1,16 +1,16 @@
 /**
- * Test suite for ContextKit Database
+ * Test suite for KiroMemory Database
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { ContextKitDatabase } from '../../src/services/sqlite/Database.js';
+import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
 import type { Database } from 'bun:sqlite';
 
-describe('ContextKit Database', () => {
-  let db: ContextKitDatabase;
+describe('KiroMemory Database', () => {
+  let db: KiroMemoryDatabase;
 
   beforeEach(() => {
-    db = new ContextKitDatabase(':memory:');
+    db = new KiroMemoryDatabase(':memory:');
   });
 
   afterEach(() => {

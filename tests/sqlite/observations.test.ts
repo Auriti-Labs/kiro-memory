@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { ContextKitDatabase } from '../../src/services/sqlite/Database.js';
+import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
 import {
   createObservation,
   getObservationsBySession,
@@ -17,7 +17,7 @@ describe('Observations Module', () => {
   let db: Database;
 
   beforeEach(() => {
-    db = new ContextKitDatabase(':memory:').db;
+    db = new KiroMemoryDatabase(':memory:').db;
   });
 
   afterEach(() => {
