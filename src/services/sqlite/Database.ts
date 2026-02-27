@@ -408,6 +408,14 @@ class MigrationRunner {
           // Composite index for priority-based polling: pending jobs ordered by priority DESC, then FIFO
           db.run('CREATE INDEX IF NOT EXISTS idx_jobs_priority ON job_queue(status, priority DESC, created_at_epoch ASC)');
         }
+      },
+      {
+        version: 11,
+        up: (db) => {
+          // Auto-category column for keyword-based classification
+          db.run('ALTER TABLE observations ADD COLUMN auto_category TEXT');
+          db.run('CREATE INDEX IF NOT EXISTS idx_observations_category ON observations(auto_category)');
+        }
       }
     ];
   }

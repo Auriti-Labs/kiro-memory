@@ -1,6 +1,7 @@
 import { Database } from 'bun:sqlite';
 import type { Observation } from '../../types/worker-types.js';
 import { redactSecrets } from '../../utils/secrets.js';
+import { categorize } from '../../utils/categorizer.js';
 
 /**
  * Observation operations for Kiro Memory database
@@ -48,11 +49,22 @@ export function createObservation(
   const safeText = text ? redactSecrets(text) : text;
   const safeNarrative = narrative ? redactSecrets(narrative) : narrative;
 
+  // Assign automatic semantic category based on content keywords
+  const autoCategory = categorize({
+    type,
+    title: safeTitle,
+    text: safeText,
+    narrative: safeNarrative,
+    concepts,
+    filesModified,
+    filesRead,
+  });
+
   const result = db.run(
     `INSERT INTO observations
-     (memory_session_id, project, type, title, subtitle, text, narrative, facts, concepts, files_read, files_modified, prompt_number, created_at, created_at_epoch, content_hash, discovery_tokens)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [memorySessionId, project, type, safeTitle, subtitle, safeText, safeNarrative, facts, concepts, filesRead, filesModified, promptNumber, now.toISOString(), now.getTime(), contentHash, discoveryTokens]
+     (memory_session_id, project, type, title, subtitle, text, narrative, facts, concepts, files_read, files_modified, prompt_number, created_at, created_at_epoch, content_hash, discovery_tokens, auto_category)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [memorySessionId, project, type, safeTitle, subtitle, safeText, safeNarrative, facts, concepts, filesRead, filesModified, promptNumber, now.toISOString(), now.getTime(), contentHash, discoveryTokens, autoCategory]
   );
   return Number(result.lastInsertRowid);
 }
