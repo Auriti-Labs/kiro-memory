@@ -38,6 +38,8 @@ import { createAnalyticsRouter } from './routes/analytics.js';
 import { createSessionsRouter } from './routes/sessions.js';
 import { createProjectsRouter } from './routes/projects.js';
 import { createDataRouter } from './routes/data.js';
+// Router documentazione OpenAPI
+import { createDocsRouter } from './openapi/index.js';
 
 // ── Configuration ──
 
@@ -128,6 +130,8 @@ app.use(createAnalyticsRouter(ctx));
 app.use(createSessionsRouter(ctx));
 app.use(createProjectsRouter(ctx));
 app.use(createDataRouter(ctx, WORKER_TOKEN));
+// Documentazione OpenAPI interattiva (Swagger UI + spec JSON)
+app.use(createDocsRouter());
 
 // ── Static files and viewer ──
 
