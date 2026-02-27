@@ -1,6 +1,6 @@
 {
   "name": "kiro-memory",
-  "version": "1.9.0",
+  "version": "2.1.0",
   "description": "Persistent cross-session memory for AI coding assistants. Works with Claude Code, Cursor, Windsurf, Cline, and any MCP-compatible editor.",
   "keywords": [
     "kiro",

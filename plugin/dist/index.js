@@ -2540,7 +2540,7 @@ async function runHook(name, handler) {
 }
 
 // src/index.ts
-var VERSION = "1.9.0";
+var VERSION = "2.1.0";
 export {
   KiroMemoryDatabase,
   KiroMemorySDK,
