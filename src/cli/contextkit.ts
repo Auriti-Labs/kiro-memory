@@ -22,7 +22,8 @@ import {
 } from './cli-utils.js';
 import { KiroMemoryDatabase } from '../services/sqlite/Database.js';
 import { getObservationsByProject } from '../services/sqlite/Observations.js';
-import { DB_PATH } from '../shared/paths.js';
+import { createBackup, listBackups, restoreBackup, rotateBackups } from '../services/sqlite/Backup.js';
+import { DB_PATH, BACKUPS_DIR } from '../shared/paths.js';
 import { execSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -1322,6 +1323,11 @@ async function main() {
     return;
   }
 
+  if (command === 'backup') {
+    await handleBackup(args.slice(1));
+    return;
+  }
+
   const sdk = createKiroMemory();
 
   try {
@@ -2277,6 +2283,137 @@ async function handleConfig(subArgs: string[]) {
   }
 }
 
+// ─── Backup CLI ───
+
+/**
+ * Gestisce i sottocomandi del comando `backup`.
+ *   backup create                — crea backup manuale
+ *   backup list                  — elenca backup
+ *   backup restore <file>        — ripristina (con conferma interattiva)
+ */
+async function handleBackup(subArgs: string[]): Promise<void> {
+  const subCommand = subArgs[0];
+
+  if (!subCommand || subCommand === 'help') {
+    console.log(`
+Uso: kiro-memory backup <sottocomando>
+
+Sottocomandi:
+  create              Crea un backup manuale del database
+  list                Elenca i backup disponibili con metadata
+  restore <file>      Ripristina il database da un file backup
+`);
+    return;
+  }
+
+  if (subCommand === 'create') {
+    // Crea un backup e ruota i vecchi
+    const maxKeep = Number(getConfigValue('backup.maxKeep')) || 7;
+    const db = new KiroMemoryDatabase(DB_PATH, true); // skipMigrations=true
+    try {
+      const entry = createBackup(DB_PATH, BACKUPS_DIR, db.db);
+      const deleted = rotateBackups(BACKUPS_DIR, maxKeep);
+
+      console.log(`\n=== Kiro Memory — Backup Creato ===\n`);
+      console.log(`  File:        ${entry.metadata.filename}`);
+      console.log(`  Timestamp:   ${entry.metadata.timestamp}`);
+      console.log(`  Schema v.:   ${entry.metadata.schemaVersion}`);
+      console.log(`  Obs.:        ${entry.metadata.stats.observations}`);
+      console.log(`  Sessioni:    ${entry.metadata.stats.sessions}`);
+      console.log(`  Dimensione:  ${(entry.metadata.stats.dbSizeBytes / 1024).toFixed(1)} KB`);
+      if (deleted > 0) {
+        console.log(`  Rotazione:   ${deleted} backup rimossi (max ${maxKeep} mantenuti)`);
+      }
+      console.log(`\n  Directory:  ${BACKUPS_DIR}\n`);
+    } finally {
+      db.close();
+    }
+    return;
+  }
+
+  if (subCommand === 'list') {
+    const entries = listBackups(BACKUPS_DIR);
+
+    if (entries.length === 0) {
+      console.log('\n  Nessun backup trovato in: ' + BACKUPS_DIR + '\n');
+      return;
+    }
+
+    console.log(`\n=== Kiro Memory — Backup Disponibili ===\n`);
+    console.log(`  Directory: ${BACKUPS_DIR}\n`);
+
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      const size = (e.metadata.stats.dbSizeBytes / 1024).toFixed(1);
+      const date = new Date(e.metadata.timestampEpoch).toLocaleString('it-IT');
+      console.log(`  ${i + 1}. ${e.metadata.filename}`);
+      console.log(`     Data:      ${date}`);
+      console.log(`     Schema:    v${e.metadata.schemaVersion}`);
+      console.log(`     Obs.:      ${e.metadata.stats.observations} | Sessioni: ${e.metadata.stats.sessions}`);
+      console.log(`     Dimensione: ${size} KB`);
+      console.log('');
+    }
+    return;
+  }
+
+  if (subCommand === 'restore') {
+    const file = subArgs[1];
+    if (!file) {
+      console.error('\n  Errore: specifica il nome del file backup da ripristinare.');
+      console.error('  Esempio: kiro-memory backup restore backup-2026-02-27-150000.db\n');
+      process.exit(1);
+    }
+
+    // Validazione nome file: accetta solo nomi backup validi (con o senza millisecondi)
+    const backupPattern = /^backup-\d{4}-\d{2}-\d{2}-\d{6}(-\d{3})?\.db$/;
+    if (file.includes('/') || file.includes('..') || !backupPattern.test(file)) {
+      console.error(`\n  Errore: nome file non valido: ${file}`);
+      console.error('  Il file deve essere nel formato "backup-YYYY-MM-DD-HHmmss[-mmm].db"\n');
+      process.exit(1);
+    }
+
+    // Verifica che il backup esista
+    const entries = listBackups(BACKUPS_DIR);
+    const found = entries.find(e => e.metadata.filename === file);
+    if (!found) {
+      console.error(`\n  Errore: backup non trovato: ${file}`);
+      console.error(`  Usa "kiro-memory backup list" per vedere i backup disponibili.\n`);
+      process.exit(1);
+    }
+
+    // Conferma interattiva
+    const date = new Date(found.metadata.timestampEpoch).toLocaleString('it-IT');
+    console.log(`\n  ATTENZIONE: questa operazione sovrascrive il database corrente!`);
+    console.log(`  Backup da ripristinare: ${file}`);
+    console.log(`  Data backup:            ${date}`);
+    console.log(`  Obs. nel backup:        ${found.metadata.stats.observations}`);
+    console.log('');
+
+    // Usa readline per la conferma
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const confirmed = await new Promise<boolean>(resolve => {
+      rl.question('  Confermi il ripristino? (digita "si" per confermare): ', answer => {
+        rl.close();
+        resolve(answer.trim().toLowerCase() === 'si');
+      });
+    });
+
+    if (!confirmed) {
+      console.log('\n  Ripristino annullato.\n');
+      return;
+    }
+
+    restoreBackup(found.filePath, DB_PATH);
+    console.log(`\n  Database ripristinato da: ${file}`);
+    console.log('  Riavvia il worker per applicare le modifiche.\n');
+    return;
+  }
+
+  console.error(`\n  Sottocomando backup non riconosciuto: ${subCommand}`);
+  console.error('  Usa: create | list | restore\n');
+  process.exit(1);
+}
+
 function showHelp() {
   console.log(`Usage: kiro-memory <command> [options]
 
@@ -2322,6 +2459,9 @@ Commands:
   decay stats               Show decay statistics (stale, never accessed, etc.)
   decay detect-stale        Detect and mark stale observations
   decay consolidate [--dry-run]  Consolidate duplicate observations
+  backup create             Crea un backup manuale del database
+  backup list               Elenca tutti i backup disponibili con metadata
+  backup restore <file>     Ripristina il database da un backup (con conferma)
   help                      Show this help message
 
 Examples:
@@ -2340,6 +2480,9 @@ Examples:
   kiro-memory export --project myapp --format jsonl --output backup.jsonl
   kiro-memory export --project myapp --format md > notes.md
   kiro-memory import backup.jsonl
+  kiro-memory backup create
+  kiro-memory backup list
+  kiro-memory backup restore backup-2026-02-27-150000.db
   kiro-memory config list
   kiro-memory config get worker.port
   kiro-memory config set log.level DEBUG
