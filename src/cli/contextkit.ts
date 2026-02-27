@@ -1328,6 +1328,11 @@ async function main() {
     return;
   }
 
+  if (command === 'plugins') {
+    await handlePlugins(args.slice(1));
+    return;
+  }
+
   const sdk = createKiroMemory();
 
   try {
@@ -2414,6 +2419,144 @@ Sottocomandi:
   process.exit(1);
 }
 
+// ─── Plugins command ───
+
+/**
+ * Gestisce il comando `kiro-memory plugins <sottocomando>`.
+ *
+ * Comunica con il worker via HTTP per evitare di caricare il registry
+ * nel processo CLI (il registry vive nel worker).
+ *
+ * Sottocomandi:
+ *   list              — elenca tutti i plugin con stato
+ *   enable <nome>     — abilita un plugin registrato
+ *   disable <nome>    — disabilita un plugin attivo
+ */
+async function handlePlugins(subArgs: string[]): Promise<void> {
+  const subCommand = subArgs[0];
+  const port = process.env.KIRO_MEMORY_WORKER_PORT || process.env.CONTEXTKIT_WORKER_PORT || '3001';
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  // Helper HTTP GET sincrono via Node http
+  async function apiGet(path: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const req = http.get(`${baseUrl}${path}`, (res) => {
+        let body = '';
+        res.on('data', (chunk) => { body += chunk; });
+        res.on('end', () => {
+          try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
+          catch { reject(new Error(`Risposta non JSON: ${body}`)); }
+        });
+      });
+      req.on('error', reject);
+      req.setTimeout(5000, () => { req.destroy(new Error('Timeout')); });
+    });
+  }
+
+  // Helper HTTP POST
+  async function apiPost(path: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const options = {
+        hostname: '127.0.0.1',
+        port: parseInt(port, 10),
+        path,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': 0 }
+      };
+      const req = http.request(options, (res) => {
+        let body = '';
+        res.on('data', (chunk) => { body += chunk; });
+        res.on('end', () => {
+          try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
+          catch { reject(new Error(`Risposta non JSON: ${body}`)); }
+        });
+      });
+      req.on('error', reject);
+      req.setTimeout(10_000, () => { req.destroy(new Error('Timeout')); });
+      req.end();
+    });
+  }
+
+  if (!subCommand || subCommand === 'list') {
+    try {
+      const result = await apiGet('/api/plugins');
+      const { plugins } = result.data;
+
+      console.log('\n=== Kiro Memory — Plugin ===\n');
+
+      if (!plugins || plugins.length === 0) {
+        console.log('  Nessun plugin registrato.\n');
+        return;
+      }
+
+      for (const p of plugins) {
+        const stateColor = p.state === 'active' ? '\x1b[32m' : p.state === 'error' ? '\x1b[31m' : '\x1b[33m';
+        console.log(`  ${p.name}@${p.version}`);
+        console.log(`    Stato:    ${stateColor}${p.state}\x1b[0m`);
+        if (p.description) console.log(`    Desc.:    ${p.description}`);
+        if (p.error) console.log(`    Errore:   \x1b[31m${p.error}\x1b[0m`);
+        console.log('');
+      }
+    } catch {
+      console.error('\n  Errore: impossibile contattare il worker. Avvialo con: kiro-memory worker start\n');
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (subCommand === 'enable') {
+    const name = subArgs[1];
+    if (!name) {
+      console.error('\n  Errore: specifica il nome del plugin.\n  Esempio: kiro-memory plugins enable mio-plugin\n');
+      process.exit(1);
+    }
+
+    try {
+      const result = await apiPost(`/api/plugins/${encodeURIComponent(name)}/enable`);
+      if (result.status === 200) {
+        console.log(`\n  Plugin "${name}" abilitato con successo.`);
+        if (result.data.plugin?.state === 'error') {
+          console.log(`  Attenzione: stato corrente = error: ${result.data.plugin.error}`);
+        }
+        console.log('');
+      } else {
+        console.error(`\n  Errore: ${result.data.error}\n`);
+        process.exit(1);
+      }
+    } catch {
+      console.error('\n  Errore: impossibile contattare il worker.\n');
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (subCommand === 'disable') {
+    const name = subArgs[1];
+    if (!name) {
+      console.error('\n  Errore: specifica il nome del plugin.\n  Esempio: kiro-memory plugins disable mio-plugin\n');
+      process.exit(1);
+    }
+
+    try {
+      const result = await apiPost(`/api/plugins/${encodeURIComponent(name)}/disable`);
+      if (result.status === 200) {
+        console.log(`\n  Plugin "${name}" disabilitato.\n`);
+      } else {
+        console.error(`\n  Errore: ${result.data.error}\n`);
+        process.exit(1);
+      }
+    } catch {
+      console.error('\n  Errore: impossibile contattare il worker.\n');
+      process.exit(1);
+    }
+    return;
+  }
+
+  console.error(`\n  Sottocomando plugins non riconosciuto: ${subCommand}`);
+  console.error('  Usa: list | enable <nome> | disable <nome>\n');
+  process.exit(1);
+}
+
 function showHelp() {
   console.log(`Usage: kiro-memory <command> [options]
 
@@ -2462,6 +2605,9 @@ Commands:
   backup create             Crea un backup manuale del database
   backup list               Elenca tutti i backup disponibili con metadata
   backup restore <file>     Ripristina il database da un backup (con conferma)
+  plugins list              Elenca tutti i plugin registrati con stato
+  plugins enable <nome>     Abilita un plugin registrato
+  plugins disable <nome>    Disabilita un plugin attivo
   help                      Show this help message
 
 Examples:

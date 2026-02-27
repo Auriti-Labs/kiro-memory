@@ -33,6 +33,10 @@ import { listConfig, getConfigValue } from '../cli/cli-utils.js';
 import { logger } from '../utils/logger.js';
 import { DATA_DIR, DB_PATH, BACKUPS_DIR } from '../shared/paths.js';
 
+// Plugin system
+import { PluginLoader } from './plugins/PluginLoader.js';
+import { PluginRegistry } from './plugins/PluginRegistry.js';
+
 // Modular routers
 import { createCoreRouter } from './routes/core.js';
 import { createObservationsRouter } from './routes/observations.js';
@@ -50,6 +54,8 @@ import { createImportExportRouter } from './routes/importexport.js';
 import { createDocsRouter } from './openapi/index.js';
 // Router backup database
 import { createBackupRouter } from './routes/backup.js';
+// Router plugin system
+import { createPluginsRouter } from './routes/plugins.js';
 
 // ── Configuration ──
 
@@ -150,6 +156,8 @@ app.use(createImportExportRouter(ctx));
 app.use(createDocsRouter());
 // Backup database
 app.use(createBackupRouter(ctx, WORKER_TOKEN));
+// Plugin system
+app.use(createPluginsRouter(ctx));
 
 // ── Static files and viewer ──
 
@@ -267,11 +275,57 @@ function scheduleBackupJob(): void {
 
 scheduleBackupJob();
 
+// ── Plugin system: discovery e caricamento ──
+
+/**
+ * Avvia il plugin loader in modo asincrono e non bloccante.
+ * I plugin vengono scoperti e caricati dopo lo startup del server
+ * per non ritardare l'avvio. Gli errori di singoli plugin sono isolati.
+ */
+async function initializePlugins(): Promise<void> {
+  try {
+    const registry = PluginRegistry.getInstance();
+
+    // Adattatore IPluginRegistry (duck-type per PluginLoader)
+    // Il PluginLoader registra plugin via IPlugin del PluginLoader (con PluginContext locale).
+    // Questi plugin vengono poi abilitati dal PluginRegistry singleton con il contesto SDK.
+    const loaderRegistryAdapter = {
+      register: (p: any) => {
+        try { registry.register(p as any); }
+        catch { /* plugin già registrato, ignora */ }
+      },
+      unregister: (name: string) => { registry.unregister(name).catch(() => {}); },
+      get: (name: string) => registry.get(name) as any
+    };
+
+    const pluginLoader = new PluginLoader(loaderRegistryAdapter as any);
+    const result = await pluginLoader.loadAll();
+
+    if (result.loaded.length > 0) {
+      logger.info('WORKER', `Plugin caricati: ${result.loaded.join(', ')}`);
+    }
+    if (result.failed.length > 0) {
+      for (const { name, error } of result.failed) {
+        logger.warn('WORKER', `Plugin "${name}" non caricato: ${error}`);
+      }
+    }
+  } catch (err) {
+    // Errore non fatale: il worker continua senza plugin
+    logger.warn('WORKER', 'Inizializzazione plugin system fallita', {}, err as Error);
+  }
+}
+
 // ── Server startup ──
 
 const server = app.listen(Number(PORT), HOST, () => {
   logger.info('WORKER', `Kiro Memory worker started on http://${HOST}:${PORT}`);
   writeFileSync(PID_FILE, String(process.pid), 'utf-8');
+
+  // Avvia il plugin system in background dopo che il server è attivo.
+  // Non bloccante: errori di plugin non impattano il server.
+  initializePlugins().catch(err => {
+    logger.warn('WORKER', 'Plugin system: errore non gestito', {}, err as Error);
+  });
 });
 
 // ── Graceful shutdown ──
