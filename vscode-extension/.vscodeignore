@@ -1,0 +1,29 @@
+# File e directory da escludere durante il packaging dell'estensione
+
+# Sorgenti TypeScript (solo il compilato è necessario)
+src/
+tsconfig.json
+.eslintrc.json
+.eslintignore
+
+# Dipendenze di sviluppo
+node_modules/
+
+# File di configurazione non necessari a runtime
+.gitignore
+.editorconfig
+.prettierrc
+
+# Test e documentazione di sviluppo
+**/*.test.ts
+**/*.spec.ts
+tests/
+
+# File temporanei e OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Coverage e report
+coverage/
+.nyc_output/

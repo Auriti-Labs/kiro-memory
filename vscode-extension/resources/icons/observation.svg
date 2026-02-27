@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  <!-- Icona occhio + nota che rappresenta un'osservazione registrata -->
+
+  <!-- Forma occhio -->
+  <path
+    d="M12 5C7 5 3 9 3 12C3 15 7 19 12 19C17 19 21 15 21 12C21 9 17 5 12 5Z"
+    stroke="currentColor"
+    stroke-width="1.5"
+    fill="none"
+  />
+
+  <!-- Pupilla -->
+  <circle cx="12" cy="12" r="3" fill="currentColor" opacity="0.9"/>
+
+  <!-- Riflesso luce -->
+  <circle cx="13.5" cy="10.5" r="1" fill="currentColor" opacity="0.3"/>
+
+  <!-- Ciglia / linee di movimento -->
+  <path
+    d="M3 12 L1.5 12 M21 12 L22.5 12 M12 5 L12 3.5 M12 19 L12 20.5"
+    stroke="currentColor"
+    stroke-width="1.5"
+    stroke-linecap="round"
+    opacity="0.5"
+  />
+</svg>

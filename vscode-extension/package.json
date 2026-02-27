@@ -1,0 +1,167 @@
+{
+  "name": "kiro-memory",
+  "displayName": "Kiro Memory",
+  "description": "Persistent cross-session memory for AI coding assistants",
+  "version": "0.1.0",
+  "publisher": "auriti-labs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Auriti-Labs/kiro-memory"
+  },
+  "bugs": {
+    "url": "https://github.com/Auriti-Labs/kiro-memory/issues"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "keywords": ["kiro", "memory", "ai", "context", "coding-assistant"],
+  "icon": "resources/icons/kiro-memory.png",
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "kiro-memory-sidebar",
+          "title": "Kiro Memory",
+          "icon": "resources/icons/kiro-memory.svg"
+        }
+      ]
+    },
+    "views": {
+      "kiro-memory-sidebar": [
+        {
+          "id": "kiroMemory.projects",
+          "name": "Projects",
+          "icon": "resources/icons/kiro-memory.svg",
+          "contextualTitle": "Kiro Memory — Projects"
+        },
+        {
+          "id": "kiroMemory.observations",
+          "name": "Observations",
+          "icon": "resources/icons/observation.svg",
+          "contextualTitle": "Kiro Memory — Observations"
+        },
+        {
+          "id": "kiroMemory.sessions",
+          "name": "Sessions",
+          "contextualTitle": "Kiro Memory — Sessions"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "kiroMemory.search",
+        "title": "Kiro Memory: Search",
+        "icon": "$(search)"
+      },
+      {
+        "command": "kiroMemory.showDashboard",
+        "title": "Kiro Memory: Open Dashboard",
+        "icon": "$(browser)"
+      },
+      {
+        "command": "kiroMemory.showContext",
+        "title": "Kiro Memory: Show Context for Current Project",
+        "icon": "$(info)"
+      },
+      {
+        "command": "kiroMemory.refresh",
+        "title": "Kiro Memory: Refresh",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "kiroMemory.refresh",
+          "when": "view == kiroMemory.projects",
+          "group": "navigation"
+        },
+        {
+          "command": "kiroMemory.refresh",
+          "when": "view == kiroMemory.observations",
+          "group": "navigation"
+        },
+        {
+          "command": "kiroMemory.refresh",
+          "when": "view == kiroMemory.sessions",
+          "group": "navigation"
+        },
+        {
+          "command": "kiroMemory.search",
+          "when": "view == kiroMemory.observations",
+          "group": "navigation"
+        },
+        {
+          "command": "kiroMemory.showDashboard",
+          "when": "view == kiroMemory.projects",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "kiroMemory.search"
+        },
+        {
+          "command": "kiroMemory.showDashboard"
+        },
+        {
+          "command": "kiroMemory.showContext"
+        },
+        {
+          "command": "kiroMemory.refresh"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Kiro Memory",
+      "properties": {
+        "kiroMemory.workerHost": {
+          "type": "string",
+          "default": "127.0.0.1",
+          "description": "Host del worker Kiro Memory (default: 127.0.0.1)"
+        },
+        "kiroMemory.workerPort": {
+          "type": "number",
+          "default": 3001,
+          "minimum": 1024,
+          "maximum": 65535,
+          "description": "Porta del worker Kiro Memory (default: 3001)"
+        },
+        "kiroMemory.refreshInterval": {
+          "type": "number",
+          "default": 30,
+          "minimum": 10,
+          "maximum": 300,
+          "description": "Intervallo di aggiornamento automatico in secondi (default: 30)"
+        },
+        "kiroMemory.maxObservations": {
+          "type": "number",
+          "default": 50,
+          "minimum": 10,
+          "maximum": 200,
+          "description": "Numero massimo di osservazioni da mostrare nella tree view (default: 50)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./tsconfig.json",
+    "watch": "tsc -watch -p ./tsconfig.json",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.3.0",
+    "@vscode/vsce": "^2.24.0"
+  }
+}
