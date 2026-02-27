@@ -171,7 +171,7 @@ export function searchObservationsLIKE(
     params.push(filters.dateEnd);
   }
 
-  sql += ' ORDER BY created_at_epoch DESC LIMIT ?';
+  sql += ' ORDER BY created_at_epoch DESC, id DESC LIMIT ?';
   params.push(limit);
 
   const stmt = db.query(sql);
@@ -207,7 +207,7 @@ export function searchSummariesFiltered(
     params.push(filters.dateEnd);
   }
 
-  sql += ' ORDER BY created_at_epoch DESC LIMIT ?';
+  sql += ' ORDER BY created_at_epoch DESC, id DESC LIMIT ?';
   params.push(limit);
 
   const stmt = db.query(sql);
@@ -228,7 +228,7 @@ export function getObservationsByIds(db: Database, ids: number[]): Observation[]
   if (validIds.length === 0) return [];
 
   const placeholders = validIds.map(() => '?').join(',');
-  const sql = `SELECT * FROM observations WHERE id IN (${placeholders}) ORDER BY created_at_epoch DESC`;
+  const sql = `SELECT * FROM observations WHERE id IN (${placeholders}) ORDER BY created_at_epoch DESC, id DESC`;
   const stmt = db.query(sql);
   return stmt.all(...validIds) as Observation[];
 }
@@ -250,15 +250,15 @@ export function getTimeline(
 
   const anchorEpoch = anchor.created_at_epoch;
 
-  // Observations before
+  // Observations before (same epoch with smaller id, or earlier epoch)
   const beforeStmt = db.query(`
     SELECT id, 'observation' as type, title, text as content, project, created_at, created_at_epoch
     FROM observations
-    WHERE created_at_epoch < ?
-    ORDER BY created_at_epoch DESC
+    WHERE (created_at_epoch < ? OR (created_at_epoch = ? AND id < ?))
+    ORDER BY created_at_epoch DESC, id DESC
     LIMIT ?
   `);
-  const before = (beforeStmt.all(anchorEpoch, depthBefore) as TimelineEntry[]).reverse();
+  const before = (beforeStmt.all(anchorEpoch, anchorEpoch, anchorId, depthBefore) as TimelineEntry[]).reverse();
 
   // The anchor itself
   const selfStmt = db.query(`
@@ -267,15 +267,15 @@ export function getTimeline(
   `);
   const self = selfStmt.all(anchorId) as TimelineEntry[];
 
-  // Observations after
+  // Observations after (same epoch with larger id, or later epoch)
   const afterStmt = db.query(`
     SELECT id, 'observation' as type, title, text as content, project, created_at, created_at_epoch
     FROM observations
-    WHERE created_at_epoch > ?
-    ORDER BY created_at_epoch ASC
+    WHERE (created_at_epoch > ? OR (created_at_epoch = ? AND id > ?))
+    ORDER BY created_at_epoch ASC, id ASC
     LIMIT ?
   `);
-  const after = afterStmt.all(anchorEpoch, depthAfter) as TimelineEntry[];
+  const after = afterStmt.all(anchorEpoch, anchorEpoch, anchorId, depthAfter) as TimelineEntry[];
 
   return [...before, ...self, ...after];
 }
@@ -339,7 +339,7 @@ export function getStaleObservations(db: Database, project: string): Observation
   const rows = db.query(`
     SELECT * FROM observations
     WHERE project = ? AND files_modified IS NOT NULL AND files_modified != ''
-    ORDER BY created_at_epoch DESC
+    ORDER BY created_at_epoch DESC, id DESC
     LIMIT 500
   `).all(project) as Observation[];
 

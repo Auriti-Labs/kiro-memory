@@ -15,21 +15,21 @@ function createSummary(db, sessionId, project, request, investigated, learned, c
   return Number(result.lastInsertRowid);
 }
 function getSummaryBySession(db, sessionId) {
-  const query = db.query("SELECT * FROM summaries WHERE session_id = ? ORDER BY created_at_epoch DESC LIMIT 1");
+  const query = db.query("SELECT * FROM summaries WHERE session_id = ? ORDER BY created_at_epoch DESC, id DESC LIMIT 1");
   return query.get(sessionId);
 }
 function getSummariesByProject(db, project, limit = 50) {
   const query = db.query(
-    "SELECT * FROM summaries WHERE project = ? ORDER BY created_at_epoch DESC LIMIT ?"
+    "SELECT * FROM summaries WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT ?"
   );
   return query.all(project, limit);
 }
 function searchSummaries(db, searchTerm, project) {
   const sql = project ? `SELECT * FROM summaries
        WHERE project = ? AND (request LIKE ? ESCAPE '\\' OR learned LIKE ? ESCAPE '\\' OR completed LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\')
-       ORDER BY created_at_epoch DESC` : `SELECT * FROM summaries
+       ORDER BY created_at_epoch DESC, id DESC` : `SELECT * FROM summaries
        WHERE request LIKE ? ESCAPE '\\' OR learned LIKE ? ESCAPE '\\' OR completed LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\'
-       ORDER BY created_at_epoch DESC`;
+       ORDER BY created_at_epoch DESC, id DESC`;
   const pattern = `%${escapeLikePattern(searchTerm)}%`;
   const query = db.query(sql);
   if (project) {

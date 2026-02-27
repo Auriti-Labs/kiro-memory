@@ -105,7 +105,7 @@ function searchObservationsLIKE(db, query, filters = {}) {
     sql += " AND created_at_epoch <= ?";
     params.push(filters.dateEnd);
   }
-  sql += " ORDER BY created_at_epoch DESC LIMIT ?";
+  sql += " ORDER BY created_at_epoch DESC, id DESC LIMIT ?";
   params.push(limit);
   const stmt = db.query(sql);
   return stmt.all(...params);
@@ -130,7 +130,7 @@ function searchSummariesFiltered(db, query, filters = {}) {
     sql += " AND created_at_epoch <= ?";
     params.push(filters.dateEnd);
   }
-  sql += " ORDER BY created_at_epoch DESC LIMIT ?";
+  sql += " ORDER BY created_at_epoch DESC, id DESC LIMIT ?";
   params.push(limit);
   const stmt = db.query(sql);
   return stmt.all(...params);
@@ -140,7 +140,7 @@ function getObservationsByIds(db, ids) {
   const validIds = ids.filter((id) => typeof id === "number" && Number.isInteger(id) && id > 0).slice(0, 500);
   if (validIds.length === 0) return [];
   const placeholders = validIds.map(() => "?").join(",");
-  const sql = `SELECT * FROM observations WHERE id IN (${placeholders}) ORDER BY created_at_epoch DESC`;
+  const sql = `SELECT * FROM observations WHERE id IN (${placeholders}) ORDER BY created_at_epoch DESC, id DESC`;
   const stmt = db.query(sql);
   return stmt.all(...validIds);
 }
@@ -152,11 +152,11 @@ function getTimeline(db, anchorId, depthBefore = 5, depthAfter = 5) {
   const beforeStmt = db.query(`
     SELECT id, 'observation' as type, title, text as content, project, created_at, created_at_epoch
     FROM observations
-    WHERE created_at_epoch < ?
-    ORDER BY created_at_epoch DESC
+    WHERE (created_at_epoch < ? OR (created_at_epoch = ? AND id < ?))
+    ORDER BY created_at_epoch DESC, id DESC
     LIMIT ?
   `);
-  const before = beforeStmt.all(anchorEpoch, depthBefore).reverse();
+  const before = beforeStmt.all(anchorEpoch, anchorEpoch, anchorId, depthBefore).reverse();
   const selfStmt = db.query(`
     SELECT id, 'observation' as type, title, text as content, project, created_at, created_at_epoch
     FROM observations WHERE id = ?
@@ -165,11 +165,11 @@ function getTimeline(db, anchorId, depthBefore = 5, depthAfter = 5) {
   const afterStmt = db.query(`
     SELECT id, 'observation' as type, title, text as content, project, created_at, created_at_epoch
     FROM observations
-    WHERE created_at_epoch > ?
-    ORDER BY created_at_epoch ASC
+    WHERE (created_at_epoch > ? OR (created_at_epoch = ? AND id > ?))
+    ORDER BY created_at_epoch ASC, id ASC
     LIMIT ?
   `);
-  const after = afterStmt.all(anchorEpoch, depthAfter);
+  const after = afterStmt.all(anchorEpoch, anchorEpoch, anchorId, depthAfter);
   return [...before, ...self, ...after];
 }
 function getProjectStats(db, project) {
@@ -212,7 +212,7 @@ function getStaleObservations(db, project) {
   const rows = db.query(`
     SELECT * FROM observations
     WHERE project = ? AND files_modified IS NOT NULL AND files_modified != ''
-    ORDER BY created_at_epoch DESC
+    ORDER BY created_at_epoch DESC, id DESC
     LIMIT 500
   `).all(project);
   const staleObs = [];

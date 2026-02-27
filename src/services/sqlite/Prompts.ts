@@ -31,7 +31,7 @@ export function getPromptsBySession(db: Database, contentSessionId: string): Use
 
 export function getPromptsByProject(db: Database, project: string, limit: number = 100): UserPrompt[] {
   const query = db.query(
-    'SELECT * FROM prompts WHERE project = ? ORDER BY created_at_epoch DESC LIMIT ?'
+    'SELECT * FROM prompts WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT ?'
   );
   return query.all(project, limit) as UserPrompt[];
 }

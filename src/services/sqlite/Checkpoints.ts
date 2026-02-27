@@ -41,21 +41,21 @@ export function createCheckpoint(
 
 export function getLatestCheckpoint(db: Database, sessionId: number): DBCheckpoint | null {
   const query = db.query(
-    'SELECT * FROM checkpoints WHERE session_id = ? ORDER BY created_at_epoch DESC LIMIT 1'
+    'SELECT * FROM checkpoints WHERE session_id = ? ORDER BY created_at_epoch DESC, id DESC LIMIT 1'
   );
   return query.get(sessionId) as DBCheckpoint | null;
 }
 
 export function getLatestCheckpointByProject(db: Database, project: string): DBCheckpoint | null {
   const query = db.query(
-    'SELECT * FROM checkpoints WHERE project = ? ORDER BY created_at_epoch DESC LIMIT 1'
+    'SELECT * FROM checkpoints WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT 1'
   );
   return query.get(project) as DBCheckpoint | null;
 }
 
 export function getCheckpointsBySession(db: Database, sessionId: number): DBCheckpoint[] {
   const query = db.query(
-    'SELECT * FROM checkpoints WHERE session_id = ? ORDER BY created_at_epoch DESC'
+    'SELECT * FROM checkpoints WHERE session_id = ? ORDER BY created_at_epoch DESC, id DESC'
   );
   return query.all(sessionId) as DBCheckpoint[];
 }

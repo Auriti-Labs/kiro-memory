@@ -130,10 +130,10 @@ export function getReportData(
   const summarySql = project
     ? `SELECT learned, completed, next_steps FROM summaries
        WHERE project = ? AND created_at_epoch >= ? AND created_at_epoch <= ?
-       ORDER BY created_at_epoch DESC`
+       ORDER BY created_at_epoch DESC, id DESC`
     : `SELECT learned, completed, next_steps FROM summaries
        WHERE created_at_epoch >= ? AND created_at_epoch <= ?
-       ORDER BY created_at_epoch DESC`;
+       ORDER BY created_at_epoch DESC, id DESC`;
   const summaryRows = (project
     ? db.query(summarySql).all(project, startEpoch, endEpoch)
     : db.query(summarySql).all(startEpoch, endEpoch)

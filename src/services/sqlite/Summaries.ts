@@ -32,13 +32,13 @@ export function createSummary(
 }
 
 export function getSummaryBySession(db: Database, sessionId: string): Summary | null {
-  const query = db.query('SELECT * FROM summaries WHERE session_id = ? ORDER BY created_at_epoch DESC LIMIT 1');
+  const query = db.query('SELECT * FROM summaries WHERE session_id = ? ORDER BY created_at_epoch DESC, id DESC LIMIT 1');
   return query.get(sessionId) as Summary | null;
 }
 
 export function getSummariesByProject(db: Database, project: string, limit: number = 50): Summary[] {
   const query = db.query(
-    'SELECT * FROM summaries WHERE project = ? ORDER BY created_at_epoch DESC LIMIT ?'
+    'SELECT * FROM summaries WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT ?'
   );
   return query.all(project, limit) as Summary[];
 }
@@ -47,10 +47,10 @@ export function searchSummaries(db: Database, searchTerm: string, project?: stri
   const sql = project
     ? `SELECT * FROM summaries
        WHERE project = ? AND (request LIKE ? ESCAPE '\\' OR learned LIKE ? ESCAPE '\\' OR completed LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\')
-       ORDER BY created_at_epoch DESC`
+       ORDER BY created_at_epoch DESC, id DESC`
     : `SELECT * FROM summaries
        WHERE request LIKE ? ESCAPE '\\' OR learned LIKE ? ESCAPE '\\' OR completed LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\'
-       ORDER BY created_at_epoch DESC`;
+       ORDER BY created_at_epoch DESC, id DESC`;
 
   const pattern = `%${escapeLikePattern(searchTerm)}%`;
   const query = db.query(sql);

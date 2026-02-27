@@ -57,16 +57,16 @@ function getObservationsBySession(db, memorySessionId) {
 }
 function getObservationsByProject(db, project, limit = 100) {
   const query = db.query(
-    "SELECT * FROM observations WHERE project = ? ORDER BY created_at_epoch DESC LIMIT ?"
+    "SELECT * FROM observations WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT ?"
   );
   return query.all(project, limit);
 }
 function searchObservations(db, searchTerm, project) {
   const sql = project ? `SELECT * FROM observations
        WHERE project = ? AND (title LIKE ? ESCAPE '\\' OR text LIKE ? ESCAPE '\\' OR narrative LIKE ? ESCAPE '\\')
-       ORDER BY created_at_epoch DESC` : `SELECT * FROM observations
+       ORDER BY created_at_epoch DESC, id DESC` : `SELECT * FROM observations
        WHERE title LIKE ? ESCAPE '\\' OR text LIKE ? ESCAPE '\\' OR narrative LIKE ? ESCAPE '\\'
-       ORDER BY created_at_epoch DESC`;
+       ORDER BY created_at_epoch DESC, id DESC`;
   const pattern = `%${escapeLikePattern(searchTerm)}%`;
   const query = db.query(sql);
   if (project) {
@@ -122,7 +122,7 @@ function consolidateObservations(db, project, options = {}) {
       const obsIds = group.ids.split(",").map(Number);
       const placeholders = obsIds.map(() => "?").join(",");
       const observations = db.query(
-        `SELECT * FROM observations WHERE id IN (${placeholders}) ORDER BY created_at_epoch DESC`
+        `SELECT * FROM observations WHERE id IN (${placeholders}) ORDER BY created_at_epoch DESC, id DESC`
       ).all(...obsIds);
       if (observations.length < minGroupSize) continue;
       const keeper = observations[0];
@@ -272,7 +272,7 @@ function searchObservationsLIKE(db, query, filters = {}) {
     sql += " AND created_at_epoch <= ?";
     params.push(filters.dateEnd);
   }
-  sql += " ORDER BY created_at_epoch DESC LIMIT ?";
+  sql += " ORDER BY created_at_epoch DESC, id DESC LIMIT ?";
   params.push(limit);
   const stmt = db.query(sql);
   return stmt.all(...params);
@@ -297,7 +297,7 @@ function searchSummariesFiltered(db, query, filters = {}) {
     sql += " AND created_at_epoch <= ?";
     params.push(filters.dateEnd);
   }
-  sql += " ORDER BY created_at_epoch DESC LIMIT ?";
+  sql += " ORDER BY created_at_epoch DESC, id DESC LIMIT ?";
   params.push(limit);
   const stmt = db.query(sql);
   return stmt.all(...params);
@@ -307,7 +307,7 @@ function getObservationsByIds(db, ids) {
   const validIds = ids.filter((id) => typeof id === "number" && Number.isInteger(id) && id > 0).slice(0, 500);
   if (validIds.length === 0) return [];
   const placeholders = validIds.map(() => "?").join(",");
-  const sql = `SELECT * FROM observations WHERE id IN (${placeholders}) ORDER BY created_at_epoch DESC`;
+  const sql = `SELECT * FROM observations WHERE id IN (${placeholders}) ORDER BY created_at_epoch DESC, id DESC`;
   const stmt = db.query(sql);
   return stmt.all(...validIds);
 }
@@ -319,11 +319,11 @@ function getTimeline(db, anchorId, depthBefore = 5, depthAfter = 5) {
   const beforeStmt = db.query(`
     SELECT id, 'observation' as type, title, text as content, project, created_at, created_at_epoch
     FROM observations
-    WHERE created_at_epoch < ?
-    ORDER BY created_at_epoch DESC
+    WHERE (created_at_epoch < ? OR (created_at_epoch = ? AND id < ?))
+    ORDER BY created_at_epoch DESC, id DESC
     LIMIT ?
   `);
-  const before = beforeStmt.all(anchorEpoch, depthBefore).reverse();
+  const before = beforeStmt.all(anchorEpoch, anchorEpoch, anchorId, depthBefore).reverse();
   const selfStmt = db.query(`
     SELECT id, 'observation' as type, title, text as content, project, created_at, created_at_epoch
     FROM observations WHERE id = ?
@@ -332,11 +332,11 @@ function getTimeline(db, anchorId, depthBefore = 5, depthAfter = 5) {
   const afterStmt = db.query(`
     SELECT id, 'observation' as type, title, text as content, project, created_at, created_at_epoch
     FROM observations
-    WHERE created_at_epoch > ?
-    ORDER BY created_at_epoch ASC
+    WHERE (created_at_epoch > ? OR (created_at_epoch = ? AND id > ?))
+    ORDER BY created_at_epoch ASC, id ASC
     LIMIT ?
   `);
-  const after = afterStmt.all(anchorEpoch, depthAfter);
+  const after = afterStmt.all(anchorEpoch, anchorEpoch, anchorId, depthAfter);
   return [...before, ...self, ...after];
 }
 function getProjectStats(db, project) {
@@ -379,7 +379,7 @@ function getStaleObservations(db, project) {
   const rows = db.query(`
     SELECT * FROM observations
     WHERE project = ? AND files_modified IS NOT NULL AND files_modified != ''
-    ORDER BY created_at_epoch DESC
+    ORDER BY created_at_epoch DESC, id DESC
     LIMIT 500
   `).all(project);
   const staleObs = [];
@@ -1256,16 +1256,16 @@ function createSummary(db, sessionId, project, request, investigated, learned, c
 }
 function getSummariesByProject(db, project, limit = 50) {
   const query = db.query(
-    "SELECT * FROM summaries WHERE project = ? ORDER BY created_at_epoch DESC LIMIT ?"
+    "SELECT * FROM summaries WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT ?"
   );
   return query.all(project, limit);
 }
 function searchSummaries(db, searchTerm, project) {
   const sql = project ? `SELECT * FROM summaries
        WHERE project = ? AND (request LIKE ? ESCAPE '\\' OR learned LIKE ? ESCAPE '\\' OR completed LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\')
-       ORDER BY created_at_epoch DESC` : `SELECT * FROM summaries
+       ORDER BY created_at_epoch DESC, id DESC` : `SELECT * FROM summaries
        WHERE request LIKE ? ESCAPE '\\' OR learned LIKE ? ESCAPE '\\' OR completed LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\'
-       ORDER BY created_at_epoch DESC`;
+       ORDER BY created_at_epoch DESC, id DESC`;
   const pattern = `%${escapeLikePattern2(searchTerm)}%`;
   const query = db.query(sql);
   if (project) {
@@ -1287,7 +1287,7 @@ function createPrompt(db, contentSessionId, project, promptNumber, promptText) {
 }
 function getPromptsByProject(db, project, limit = 100) {
   const query = db.query(
-    "SELECT * FROM prompts WHERE project = ? ORDER BY created_at_epoch DESC LIMIT ?"
+    "SELECT * FROM prompts WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT ?"
   );
   return query.all(project, limit);
 }
@@ -1315,13 +1315,13 @@ function createCheckpoint(db, sessionId, project, data) {
 }
 function getLatestCheckpoint(db, sessionId) {
   const query = db.query(
-    "SELECT * FROM checkpoints WHERE session_id = ? ORDER BY created_at_epoch DESC LIMIT 1"
+    "SELECT * FROM checkpoints WHERE session_id = ? ORDER BY created_at_epoch DESC, id DESC LIMIT 1"
   );
   return query.get(sessionId);
 }
 function getLatestCheckpointByProject(db, project) {
   const query = db.query(
-    "SELECT * FROM checkpoints WHERE project = ? ORDER BY created_at_epoch DESC LIMIT 1"
+    "SELECT * FROM checkpoints WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT 1"
   );
   return query.get(project);
 }
@@ -1383,9 +1383,9 @@ function getReportData(db, project, startEpoch, endEpoch) {
   const staleCount = (project ? db.query(staleSql).get(project, startEpoch, endEpoch)?.count : db.query(staleSql).get(startEpoch, endEpoch)?.count) || 0;
   const summarySql = project ? `SELECT learned, completed, next_steps FROM summaries
        WHERE project = ? AND created_at_epoch >= ? AND created_at_epoch <= ?
-       ORDER BY created_at_epoch DESC` : `SELECT learned, completed, next_steps FROM summaries
+       ORDER BY created_at_epoch DESC, id DESC` : `SELECT learned, completed, next_steps FROM summaries
        WHERE created_at_epoch >= ? AND created_at_epoch <= ?
-       ORDER BY created_at_epoch DESC`;
+       ORDER BY created_at_epoch DESC, id DESC`;
   const summaryRows = project ? db.query(summarySql).all(project, startEpoch, endEpoch) : db.query(summarySql).all(startEpoch, endEpoch);
   const topLearnings = [];
   const completedTasks = [];

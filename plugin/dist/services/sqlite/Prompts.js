@@ -19,7 +19,7 @@ function getPromptsBySession(db, contentSessionId) {
 }
 function getPromptsByProject(db, project, limit = 100) {
   const query = db.query(
-    "SELECT * FROM prompts WHERE project = ? ORDER BY created_at_epoch DESC LIMIT ?"
+    "SELECT * FROM prompts WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT ?"
   );
   return query.all(project, limit);
 }

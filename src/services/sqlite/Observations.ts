@@ -59,7 +59,7 @@ export function getObservationsBySession(db: Database, memorySessionId: string):
 
 export function getObservationsByProject(db: Database, project: string, limit: number = 100): Observation[] {
   const query = db.query(
-    'SELECT * FROM observations WHERE project = ? ORDER BY created_at_epoch DESC LIMIT ?'
+    'SELECT * FROM observations WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT ?'
   );
   return query.all(project, limit) as Observation[];
 }
@@ -68,10 +68,10 @@ export function searchObservations(db: Database, searchTerm: string, project?: s
   const sql = project
     ? `SELECT * FROM observations
        WHERE project = ? AND (title LIKE ? ESCAPE '\\' OR text LIKE ? ESCAPE '\\' OR narrative LIKE ? ESCAPE '\\')
-       ORDER BY created_at_epoch DESC`
+       ORDER BY created_at_epoch DESC, id DESC`
     : `SELECT * FROM observations
        WHERE title LIKE ? ESCAPE '\\' OR text LIKE ? ESCAPE '\\' OR narrative LIKE ? ESCAPE '\\'
-       ORDER BY created_at_epoch DESC`;
+       ORDER BY created_at_epoch DESC, id DESC`;
 
   const pattern = `%${escapeLikePattern(searchTerm)}%`;
   const query = db.query(sql);
@@ -171,7 +171,7 @@ export function consolidateObservations(
       const obsIds = group.ids.split(',').map(Number);
       const placeholders = obsIds.map(() => '?').join(',');
       const observations = db.query(
-        `SELECT * FROM observations WHERE id IN (${placeholders}) ORDER BY created_at_epoch DESC`
+        `SELECT * FROM observations WHERE id IN (${placeholders}) ORDER BY created_at_epoch DESC, id DESC`
       ).all(...obsIds) as Observation[];
 
       if (observations.length < minGroupSize) continue;
