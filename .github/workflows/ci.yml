@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Installa dipendenze
+        run: npm ci
+
+      - name: TypeScript type-check
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: bun test
+
+      - name: Build
+        run: npm run build
+
+      - name: Verifica dimensione bundle
+        run: |
+          VIEWER_SIZE=$(stat -c%s plugin/dist/viewer.js)
+          WORKER_SIZE=$(stat -c%s plugin/dist/worker-service.js)
+          echo "viewer.js: $((VIEWER_SIZE / 1024))KB"
+          echo "worker-service.js: $((WORKER_SIZE / 1024))KB"
+          if [ "$VIEWER_SIZE" -gt 512000 ]; then
+            echo "::warning::viewer.js supera 500KB ($VIEWER_SIZE bytes)"
+          fi
+          if [ "$WORKER_SIZE" -gt 204800 ]; then
+            echo "::warning::worker-service.js supera 200KB ($WORKER_SIZE bytes)"
+          fi
+
+      - name: Verifica contenuto pacchetto
+        run: npm pack --dry-run 2>&1 | tail -5
