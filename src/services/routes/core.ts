@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import type { WorkerContext } from '../worker-context.js';
 import { getClients, getMaxSSEClients, addClient, removeClient } from '../worker-context.js';
 import { logger } from '../../utils/logger.js';
+import { VERSION } from '../../index.js';
 
 const ALLOWED_EVENTS = new Set([
   'observation-created',
@@ -50,7 +51,7 @@ export function createCoreRouter(ctx: WorkerContext, workerToken: string): Route
     res.json({
       status: 'ok',
       timestamp: Date.now(),
-      version: '1.9.0'
+      version: VERSION
     });
   });
 
