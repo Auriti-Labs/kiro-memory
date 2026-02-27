@@ -111,6 +111,9 @@ export function updateLastAccessed(db: Database, ids: number[]): void {
  * Consolida osservazioni duplicate sullo stesso file e tipo.
  * Raggruppa per (project, type, files_modified), mantiene la piu recente,
  * concatena contenuti unici, elimina le vecchie.
+ *
+ * Fix: conteggi calcolati dentro la transaction e ritornati direttamente,
+ * dry-run separato dalla transaction per evitare lock inutili.
  */
 export function consolidateObservations(
   db: Database,
@@ -136,60 +139,74 @@ export function consolidateObservations(
 
   if (groups.length === 0) return { merged: 0, removed: 0 };
 
-  let totalMerged = 0;
-  let totalRemoved = 0;
+  // Dry-run: calcola conteggi senza aprire transaction
+  if (options.dryRun) {
+    let totalMerged = 0;
+    let totalRemoved = 0;
 
-  // Esegui tutto in una transazione atomica per consistenza
-  const runConsolidation = db.transaction(() => {
-  for (const group of groups) {
-    const obsIds = group.ids.split(',').map(Number);
+    for (const group of groups) {
+      const obsIds = group.ids.split(',').map(Number);
+      const placeholders = obsIds.map(() => '?').join(',');
+      const count = (db.query(
+        `SELECT COUNT(*) as cnt FROM observations WHERE id IN (${placeholders})`
+      ).get(...obsIds) as { cnt: number })?.cnt || 0;
 
-    // Carica tutte le osservazioni del gruppo, ordinate per data (piu recente prima)
-    const placeholders = obsIds.map(() => '?').join(',');
-    const observations = db.query(
-      `SELECT * FROM observations WHERE id IN (${placeholders}) ORDER BY created_at_epoch DESC`
-    ).all(...obsIds) as Observation[];
-
-    if (observations.length < minGroupSize) continue;
-
-    if (options.dryRun) {
-      totalMerged += 1;
-      totalRemoved += observations.length - 1;
-      continue;
-    }
-
-    // Mantieni la piu recente, concatena contenuti unici dalle altre
-    const keeper = observations[0];
-    const others = observations.slice(1);
-
-    // Raccogli testi unici dalle osservazioni da eliminare
-    const uniqueTexts = new Set<string>();
-    if (keeper.text) uniqueTexts.add(keeper.text);
-    for (const obs of others) {
-      if (obs.text && !uniqueTexts.has(obs.text)) {
-        uniqueTexts.add(obs.text);
+      if (count >= minGroupSize) {
+        totalMerged += 1;
+        totalRemoved += count - 1;
       }
     }
 
-    // Aggiorna il keeper con testo consolidato
-    const consolidatedText = Array.from(uniqueTexts).join('\n---\n').substring(0, 100_000);
-    db.run(
-      'UPDATE observations SET text = ?, title = ? WHERE id = ?',
-      [consolidatedText, `[consolidato x${observations.length}] ${keeper.title}`, keeper.id]
-    );
-
-    // Elimina le osservazioni vecchie (e i loro embeddings)
-    const removeIds = others.map(o => o.id);
-    const removePlaceholders = removeIds.map(() => '?').join(',');
-    db.run(`DELETE FROM observations WHERE id IN (${removePlaceholders})`, removeIds);
-    db.run(`DELETE FROM observation_embeddings WHERE observation_id IN (${removePlaceholders})`, removeIds);
-
-    totalMerged += 1;
-    totalRemoved += removeIds.length;
+    return { merged: totalMerged, removed: totalRemoved };
   }
-  }); // fine transazione
 
-  runConsolidation();
+  // Esegui consolidamento in transazione atomica.
+  // I conteggi sono calcolati e ritornati dalla transaction stessa,
+  // così se fallisce non restano valori parziali.
+  const runConsolidation = db.transaction(() => {
+    let merged = 0;
+    let removed = 0;
 
-  return { merged: totalMerged, removed: totalRemoved };
+    for (const group of groups) {
+      const obsIds = group.ids.split(',').map(Number);
+      const placeholders = obsIds.map(() => '?').join(',');
+      const observations = db.query(
+        `SELECT * FROM observations WHERE id IN (${placeholders}) ORDER BY created_at_epoch DESC`
+      ).all(...obsIds) as Observation[];
+
+      if (observations.length < minGroupSize) continue;
+
+      // Mantieni la più recente, concatena contenuti unici dalle altre
+      const keeper = observations[0];
+      const others = observations.slice(1);
+
+      const uniqueTexts = new Set<string>();
+      if (keeper.text) uniqueTexts.add(keeper.text);
+      for (const obs of others) {
+        if (obs.text && !uniqueTexts.has(obs.text)) {
+          uniqueTexts.add(obs.text);
+        }
+      }
+
+      // Aggiorna il keeper con testo consolidato
+      const consolidatedText = Array.from(uniqueTexts).join('\n---\n').substring(0, 100_000);
+      db.run(
+        'UPDATE observations SET text = ?, title = ? WHERE id = ?',
+        [consolidatedText, `[consolidato x${observations.length}] ${keeper.title}`, keeper.id]
+      );
+
+      // Elimina le osservazioni vecchie (e i loro embeddings)
+      const removeIds = others.map(o => o.id);
+      const removePlaceholders = removeIds.map(() => '?').join(',');
+      db.run(`DELETE FROM observations WHERE id IN (${removePlaceholders})`, removeIds);
+      db.run(`DELETE FROM observation_embeddings WHERE observation_id IN (${removePlaceholders})`, removeIds);
+
+      merged += 1;
+      removed += removeIds.length;
+    }
+
+    return { merged, removed };
+  });
+
+  return runConsolidation();
 }

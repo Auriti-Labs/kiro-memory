@@ -4,22 +4,12 @@
  * @packageDocumentation
  */
 
-// Export SDK (new names)
+// Export SDK
 export { KiroMemorySDK, createKiroMemory } from './sdk/index.js';
 export type { KiroMemoryConfig } from './sdk/index.js';
 
-// Backward-compatible aliases
-export { ContextKitSDK, createContextKit } from './sdk/index.js';
-export type { ContextKitConfig } from './sdk/index.js';
-
 // Export database
-export {
-  KiroMemoryDatabase,
-  ContextKitDatabase,
-  DatabaseManager,
-  getDatabase,
-  initializeDatabase
-} from './services/sqlite/index.js';
+export { KiroMemoryDatabase } from './services/sqlite/index.js';
 
 // Export advanced search
 export {
@@ -54,4 +44,4 @@ export { logger, LogLevel } from './utils/logger.js';
 export type { Component } from './utils/logger.js';
 
 // Version
-export const VERSION = '1.5.0';
+export const VERSION = '1.9.0';

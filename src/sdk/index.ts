@@ -268,7 +268,7 @@ export class KiroMemorySDK {
     })();
 
     const sessionId = 'sdk-' + Date.now();
-    const contentHash = this.generateContentHash(data.type, data.title);
+    const contentHash = this.generateContentHash(data.knowledgeType, data.title);
     if (isDuplicateObservation(this.db.db, contentHash)) {
       logger.debug('SDK', `Knowledge duplicata scartata: ${data.title}`);
       return -1;
@@ -732,14 +732,6 @@ export class KiroMemorySDK {
 export function createKiroMemory(config?: KiroMemoryConfig): KiroMemorySDK {
   return new KiroMemorySDK(config);
 }
-
-// Backward-compatible aliases
-/** @deprecated Use KiroMemorySDK instead */
-export const ContextKitSDK = KiroMemorySDK;
-/** @deprecated Use KiroMemoryConfig instead */
-export type ContextKitConfig = KiroMemoryConfig;
-/** @deprecated Use createKiroMemory instead */
-export const createContextKit = createKiroMemory;
 
 // Re-export types
 export type {

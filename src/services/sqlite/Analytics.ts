@@ -148,6 +148,7 @@ export function getSessionStats(
 
 /**
  * Overview generale: conteggi base + trend giornaliero/settimanale.
+ * Singola query CTE che sostituisce le 10 query separate (fix N+1).
  */
 export function getAnalyticsOverview(
   db: Database,
@@ -157,82 +158,71 @@ export function getAnalyticsOverview(
   const todayStart = now - (now % (24 * 60 * 60 * 1000)); // Inizio giornata UTC
   const weekStart = now - (7 * 24 * 60 * 60 * 1000);
 
-  // Conteggi base
-  const countQuery = (table: string) => {
-    const sql = project
-      ? `SELECT COUNT(*) as count FROM ${table} WHERE project = ?`
-      : `SELECT COUNT(*) as count FROM ${table}`;
-    const stmt = db.query(sql);
-    return project
-      ? (stmt.get(project) as any)?.count || 0
-      : (stmt.get() as any)?.count || 0;
+  // Singola query CTE: 10 conteggi in un solo roundtrip al DB
+  const projectFilter = project ? 'WHERE project = @project' : '';
+  const obsProjectFilter = project ? 'WHERE project = @project' : '';
+
+  const sql = `
+    WITH
+      obs_stats AS (
+        SELECT
+          COUNT(*) as total,
+          COUNT(CASE WHEN created_at_epoch >= @todayStart THEN 1 END) as today,
+          COUNT(CASE WHEN created_at_epoch >= @weekStart THEN 1 END) as this_week,
+          COUNT(CASE WHEN is_stale = 1 THEN 1 END) as stale,
+          COUNT(CASE WHEN type IN ('constraint', 'decision', 'heuristic', 'rejected') THEN 1 END) as knowledge,
+          COALESCE(SUM(discovery_tokens), 0) as discovery_tokens,
+          COALESCE(SUM(CAST((LENGTH(COALESCE(title, '')) + LENGTH(COALESCE(narrative, ''))) / 4 AS INTEGER)), 0) as read_tokens
+        FROM observations
+        ${obsProjectFilter}
+      ),
+      sum_count AS (
+        SELECT COUNT(*) as total FROM summaries ${projectFilter}
+      ),
+      sess_count AS (
+        SELECT COUNT(*) as total FROM sessions ${projectFilter}
+      ),
+      prompt_count AS (
+        SELECT COUNT(*) as total FROM prompts ${projectFilter}
+      )
+    SELECT
+      obs_stats.total as observations,
+      obs_stats.today as observations_today,
+      obs_stats.this_week as observations_this_week,
+      obs_stats.stale as stale_count,
+      obs_stats.knowledge as knowledge_count,
+      obs_stats.discovery_tokens,
+      obs_stats.read_tokens,
+      sum_count.total as summaries,
+      sess_count.total as sessions,
+      prompt_count.total as prompts
+    FROM obs_stats, sum_count, sess_count, prompt_count
+  `;
+
+  const params: Record<string, any> = {
+    '@todayStart': todayStart,
+    '@weekStart': weekStart
   };
+  if (project) {
+    params['@project'] = project;
+  }
 
-  const observations = countQuery('observations');
-  const summaries = countQuery('summaries');
-  const sessions = countQuery('sessions');
-  const prompts = countQuery('prompts');
+  const row = db.query(sql).get(params) as any;
 
-  // Osservazioni oggi
-  const todaySql = project
-    ? 'SELECT COUNT(*) as count FROM observations WHERE project = ? AND created_at_epoch >= ?'
-    : 'SELECT COUNT(*) as count FROM observations WHERE created_at_epoch >= ?';
-  const todayStmt = db.query(todaySql);
-  const observationsToday = project
-    ? (todayStmt.get(project, todayStart) as any)?.count || 0
-    : (todayStmt.get(todayStart) as any)?.count || 0;
-
-  // Osservazioni questa settimana
-  const weekSql = project
-    ? 'SELECT COUNT(*) as count FROM observations WHERE project = ? AND created_at_epoch >= ?'
-    : 'SELECT COUNT(*) as count FROM observations WHERE created_at_epoch >= ?';
-  const weekStmt = db.query(weekSql);
-  const observationsThisWeek = project
-    ? (weekStmt.get(project, weekStart) as any)?.count || 0
-    : (weekStmt.get(weekStart) as any)?.count || 0;
-
-  // Osservazioni stale
-  const staleSql = project
-    ? 'SELECT COUNT(*) as count FROM observations WHERE project = ? AND is_stale = 1'
-    : 'SELECT COUNT(*) as count FROM observations WHERE is_stale = 1';
-  const staleStmt = db.query(staleSql);
-  const staleCount = project
-    ? (staleStmt.get(project) as any)?.count || 0
-    : (staleStmt.get() as any)?.count || 0;
-
-  // Knowledge items (constraint, decision, heuristic, rejected)
-  const knowledgeSql = project
-    ? `SELECT COUNT(*) as count FROM observations WHERE project = ? AND type IN ('constraint', 'decision', 'heuristic', 'rejected')`
-    : `SELECT COUNT(*) as count FROM observations WHERE type IN ('constraint', 'decision', 'heuristic', 'rejected')`;
-  const knowledgeStmt = db.query(knowledgeSql);
-  const knowledgeCount = project
-    ? (knowledgeStmt.get(project) as any)?.count || 0
-    : (knowledgeStmt.get() as any)?.count || 0;
-
-  // Token economics: discovery (costo generazione) vs read (costo riutilizzo)
-  const discoverySql = project
-    ? 'SELECT COALESCE(SUM(discovery_tokens), 0) as total FROM observations WHERE project = ?'
-    : 'SELECT COALESCE(SUM(discovery_tokens), 0) as total FROM observations';
-  const discoveryStmt = db.query(discoverySql);
-  const discoveryTokens = project
-    ? (discoveryStmt.get(project) as any)?.total || 0
-    : (discoveryStmt.get() as any)?.total || 0;
-
-  const readSql = project
-    ? `SELECT COALESCE(SUM(CAST((LENGTH(COALESCE(title, '')) + LENGTH(COALESCE(narrative, ''))) / 4 AS INTEGER)), 0) as total FROM observations WHERE project = ?`
-    : `SELECT COALESCE(SUM(CAST((LENGTH(COALESCE(title, '')) + LENGTH(COALESCE(narrative, ''))) / 4 AS INTEGER)), 0) as total FROM observations`;
-  const readStmt = db.query(readSql);
-  const readTokens = project
-    ? (readStmt.get(project) as any)?.total || 0
-    : (readStmt.get() as any)?.total || 0;
-
+  const discoveryTokens = row?.discovery_tokens || 0;
+  const readTokens = row?.read_tokens || 0;
   const savings = Math.max(0, discoveryTokens - readTokens);
   const reductionPct = discoveryTokens > 0 ? Math.round((1 - readTokens / discoveryTokens) * 100) : 0;
 
   return {
-    observations, summaries, sessions, prompts,
-    observationsToday, observationsThisWeek,
-    staleCount, knowledgeCount,
+    observations: row?.observations || 0,
+    summaries: row?.summaries || 0,
+    sessions: row?.sessions || 0,
+    prompts: row?.prompts || 0,
+    observationsToday: row?.observations_today || 0,
+    observationsThisWeek: row?.observations_this_week || 0,
+    staleCount: row?.stale_count || 0,
+    knowledgeCount: row?.knowledge_count || 0,
     tokenEconomics: { discoveryTokens, readTokens, savings, reductionPct }
   };
 }
