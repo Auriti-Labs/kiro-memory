@@ -141,6 +141,29 @@ async function build() {
     external: ['better-sqlite3', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
   });
 
+  // Build plugin Slack (notifiche Slack per sessioni)
+  console.log('Building plugin Slack...');
+  await esbuild.build({
+    ...nodeCommon,
+    entryPoints: [
+      join(SRC_DIR, 'plugins', 'slack', 'index.ts'),
+      join(SRC_DIR, 'plugins', 'slack', 'formatter.ts')
+    ],
+    outdir: join(DIST_DIR, 'plugins', 'slack')
+  });
+
+  // Build plugin GitHub (issue tracking e commenti automatici)
+  console.log('Building plugin GitHub...');
+  await esbuild.build({
+    ...nodeCommon,
+    entryPoints: [
+      join(SRC_DIR, 'plugins', 'github', 'index.ts'),
+      join(SRC_DIR, 'plugins', 'github', 'github-client.ts'),
+      join(SRC_DIR, 'plugins', 'github', 'issue-parser.ts')
+    ],
+    outdir: join(DIST_DIR, 'plugins', 'github')
+  });
+
   // Build shared
   console.log('Building shared...');
   await esbuild.build({
