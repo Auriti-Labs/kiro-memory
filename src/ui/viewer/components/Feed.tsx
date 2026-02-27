@@ -2,6 +2,9 @@ import React, { useMemo } from 'react';
 import { Observation, Summary, UserPrompt } from '../types';
 import { timeAgo } from '../utils/format';
 
+/** Callback opzionale per aprire il DiffViewer pre-caricato con questa osservazione */
+type OnCompareObs = (obs: Observation) => void;
+
 /* ── Color configuration by observation type ── */
 const TYPE_STYLES: Record<string, { border: string; bg: string; text: string; dot: string; label: string }> = {
   'file-write': { border: 'border-l-emerald-500', bg: 'bg-emerald-500/10', text: 'text-emerald-400', dot: 'bg-emerald-500', label: 'change' },
@@ -137,9 +140,11 @@ interface FeedProps {
   isLoading: boolean;
   hasMore: boolean;
   getDisplayName: (project: string) => string;
+  /** Callback opzionale per aprire il DiffViewer con l'osservazione selezionata */
+  onCompareObs?: OnCompareObs;
 }
 
-export function Feed({ observations, summaries, prompts, onLoadMore, isLoading, hasMore, getDisplayName }: FeedProps) {
+export function Feed({ observations, summaries, prompts, onLoadMore, isLoading, hasMore, getDisplayName, onCompareObs }: FeedProps) {
   /* Memoized sort to avoid recalculation on every render */
   const items = useMemo(() =>
     [...observations, ...summaries, ...prompts].sort(
@@ -156,7 +161,7 @@ export function Feed({ observations, summaries, prompts, onLoadMore, isLoading, 
         if ('type' in item && 'title' in item) {
           return (
             <div key={`obs-${item.id}`} data-id={`obs-${item.id}`} className={`animate-slide-up ${stagger}`}>
-              <ObservationCard obs={item as Observation} getDisplayName={getDisplayName} />
+              <ObservationCard obs={item as Observation} getDisplayName={getDisplayName} onCompare={onCompareObs} />
             </div>
           );
         } else if ('request' in item) {
@@ -226,17 +231,17 @@ export function Feed({ observations, summaries, prompts, onLoadMore, isLoading, 
 }
 
 /* ══════════════════════════════════════════════════════
-   Observation Card — clean design without toggle
+   Observation Card — design pulito con bottone Confronta
    ══════════════════════════════════════════════════════ */
-function ObservationCard({ obs, getDisplayName }: { obs: Observation; getDisplayName: (p: string) => string }) {
+function ObservationCard({ obs, getDisplayName, onCompare }: { obs: Observation; getDisplayName: (p: string) => string; onCompare?: OnCompareObs }) {
   const style = getTypeStyle(obs.type);
   const narrative = generateNarrative(obs);
   const detail = getDetailLine(obs);
 
   return (
-    <div className={`bg-surface-1 border border-border rounded-lg border-l-[3px] ${style.border} shadow-card hover:shadow-card-hover hover:border-border-hover transition-all overflow-hidden`}>
+    <div className={`bg-surface-1 border border-border rounded-lg border-l-[3px] ${style.border} shadow-card hover:shadow-card-hover hover:border-border-hover transition-all overflow-hidden group`}>
       <div className="px-4 py-3.5 min-w-0">
-        {/* Row 1: type badge + project + time */}
+        {/* Row 1: type badge + project + time + bottone confronta */}
         <div className="flex items-center gap-2 mb-2 flex-wrap">
           <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md ${style.bg} ${style.text}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
@@ -251,24 +256,37 @@ function ObservationCard({ obs, getDisplayName }: { obs: Observation; getDisplay
             </span>
           )}
           <span className="text-[11px] text-zinc-500 font-mono ml-auto tabular-nums">{timeAgo(obs.created_at_epoch)}</span>
+          {/* Bottone "Confronta" — visibile al hover della card */}
+          {onCompare && (
+            <button
+              onClick={() => onCompare(obs)}
+              className="hidden group-hover:inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-surface-3 border border-border text-zinc-400 hover:text-zinc-200 hover:border-border-hover transition-all"
+              title="Apri nel Diff Viewer"
+              aria-label="Confronta questa osservazione"
+            >
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M16 18 22 12 16 6" /><path d="M8 6 2 12 8 18" />
+              </svg>
+              Confronta
+            </button>
+          )}
         </div>
 
-        {/* Row 2: main narrative */}
+        {/* Row 2: narrativa principale */}
         <h4 className="text-sm text-zinc-200 leading-snug break-words">{renderMarkdown(narrative)}</h4>
 
-        {/* Row 3: subtitle (relative path, command name, URL) */}
+        {/* Row 3: sottotitolo (percorso relativo, comando, URL) */}
         {obs.subtitle && obs.subtitle !== obs.title && (
           <p className="text-[12px] text-zinc-500 mt-1 font-mono truncate">{stripProjectRoot(obs.subtitle)}</p>
         )}
 
-        {/* Row 4: involved files detail */}
+        {/* Row 4: dettaglio file coinvolti */}
         {detail && (
           <p className="text-[11px] text-zinc-600 mt-1.5">{detail}</p>
         )}
 
-        {/* Row 5: concept badges + ID */}
+        {/* Row 5: badge concetti + ID */}
         <div className="flex items-center gap-2 mt-2.5">
-          {/* Concepts */}
           {obs.concepts && (
             <div className="flex flex-wrap gap-1">
               {obs.concepts.split(', ').map((concept, i) => {
@@ -281,7 +299,7 @@ function ObservationCard({ obs, getDisplayName }: { obs: Observation; getDisplay
               })}
             </div>
           )}
-          {/* ID on the right */}
+          {/* ID posizionato a destra */}
           <span className="text-[10px] text-zinc-700 font-mono ml-auto tabular-nums">#{obs.id}</span>
         </div>
       </div>

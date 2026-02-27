@@ -148,6 +148,23 @@ export function Header({ isConnected, lastEventTime, resolvedTheme, themePrefere
           </svg>
           Timeline
         </button>
+        {/* Tab Diff viewer (issue #22) */}
+        <button
+          onClick={() => onViewChange('diff')}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+            currentView === 'diff'
+              ? 'bg-surface-3 text-zinc-100 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+          role="tab"
+          aria-selected={currentView === 'diff'}
+          aria-label="Confronta elementi"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M16 18 22 12 16 6" /><path d="M8 6 2 12 8 18" />
+          </svg>
+          Diff
+        </button>
       </div>
 
       {/* Theme toggle */}

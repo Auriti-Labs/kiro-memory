@@ -5,11 +5,12 @@ import { Feed } from './components/Feed';
 import { Analytics } from './components/Analytics';
 import { Sessions } from './components/Sessions';
 import { Timeline } from './components/Timeline';
+import { DiffViewer } from './components/DiffViewer';
 import { useSSE } from './hooks/useSSE';
 import { useTheme } from './hooks/useTheme';
 import { useProjectAliases } from './hooks/useProjectAliases';
 import { useFilters } from './hooks/useFilters';
-import { Observation, Summary, UserPrompt, ViewMode } from './types';
+import { Observation, Summary, UserPrompt, ViewMode, DiffSelection } from './types';
 import { mergeAndDeduplicateByProject } from './utils/data';
 
 export function App() {
@@ -21,6 +22,8 @@ export function App() {
   const [hasMore, setHasMore] = useState({ observations: true, summaries: true, prompts: true });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [highlightObsId, setHighlightObsId] = useState<number | null>(null);
+  // Selezione iniziale per il DiffViewer (passata dal bottone "Confronta" nel Feed)
+  const [diffInitialLeft, setDiffInitialLeft] = useState<DiffSelection | undefined>(undefined);
 
   const { observations, summaries, prompts, projects, isConnected, lastEventTime } = useSSE();
   const { preference: themePreference, resolvedTheme, setThemePreference } = useTheme();
@@ -242,6 +245,20 @@ export function App() {
     setHighlightObsId(obsId);
   }, [dispatchFilter]);
 
+  // Callback invocata dal Feed quando si preme "Confronta" su una card osservazione
+  const handleCompareObs = useCallback((obs: Observation) => {
+    const content = [obs.narrative, obs.text, obs.title].filter(Boolean).join('\n\n');
+    setDiffInitialLeft({
+      kind: 'observation',
+      id: obs.id,
+      title: obs.title || `Osservazione #${obs.id}`,
+      date: obs.created_at,
+      project: obs.project,
+      content,
+    });
+    setCurrentView('diff');
+  }, []);
+
   return (
     <div className="h-screen overflow-hidden flex bg-surface-0">
       {/* Sidebar desktop */}
@@ -339,6 +356,7 @@ export function App() {
                 isLoading={isLoadingMore}
                 hasMore={hasMore.observations || hasMore.summaries || hasMore.prompts}
                 getDisplayName={getDisplayName}
+                onCompareObs={handleCompareObs}
               />
             ) : currentView === 'sessions' ? (
               <Sessions
@@ -355,6 +373,16 @@ export function App() {
                   setHighlightObsId(obsId > 0 ? obsId : null);
                 }}
               />
+            ) : currentView === 'diff' ? (
+              /* Vista diff viewer (issue #22) */
+              <div className="h-[calc(100vh-8rem)]">
+                <DiffViewer
+                  observations={allObservations}
+                  summaries={allSummaries}
+                  getDisplayName={getDisplayName}
+                  initialLeft={diffInitialLeft}
+                />
+              </div>
             ) : (
               <Analytics
                 currentFilter={currentFilter}
