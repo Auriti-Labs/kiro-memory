@@ -15,3 +15,6 @@ export * from './Reports.js';
 
 // Export advanced search
 export * from './Search.js';
+
+// Export GitHub links
+export * from './GithubLinks.js';

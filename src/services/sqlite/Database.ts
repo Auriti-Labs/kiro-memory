@@ -412,9 +412,42 @@ class MigrationRunner {
       {
         version: 11,
         up: (db) => {
-          // Auto-category column for keyword-based classification
+          // Colonna auto-category per classificazione basata su keyword
           db.run('ALTER TABLE observations ADD COLUMN auto_category TEXT');
           db.run('CREATE INDEX IF NOT EXISTS idx_observations_category ON observations(auto_category)');
+        }
+      },
+      {
+        version: 12,
+        up: (db) => {
+          // Tabella per i link GitHub (webhook events: issues, PR, push)
+          db.run(`
+            CREATE TABLE IF NOT EXISTS github_links (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              observation_id INTEGER,
+              session_id TEXT,
+              repo TEXT NOT NULL,
+              issue_number INTEGER,
+              pr_number INTEGER,
+              event_type TEXT NOT NULL,
+              action TEXT,
+              title TEXT,
+              url TEXT,
+              author TEXT,
+              created_at TEXT NOT NULL,
+              created_at_epoch INTEGER NOT NULL,
+              FOREIGN KEY (observation_id) REFERENCES observations(id)
+            )
+          `);
+          // Indice per query per repository
+          db.run('CREATE INDEX IF NOT EXISTS idx_github_links_repo ON github_links(repo)');
+          // Indice per join con observations
+          db.run('CREATE INDEX IF NOT EXISTS idx_github_links_obs ON github_links(observation_id)');
+          // Indice per ricerche per tipo di evento
+          db.run('CREATE INDEX IF NOT EXISTS idx_github_links_event ON github_links(event_type)');
+          // Indice composto per query per issue/PR all\'interno di un repo
+          db.run('CREATE INDEX IF NOT EXISTS idx_github_links_repo_issue ON github_links(repo, issue_number)');
+          db.run('CREATE INDEX IF NOT EXISTS idx_github_links_repo_pr ON github_links(repo, pr_number)');
         }
       }
     ];

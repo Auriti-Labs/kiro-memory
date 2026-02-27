@@ -38,6 +38,8 @@ import { createAnalyticsRouter } from './routes/analytics.js';
 import { createSessionsRouter } from './routes/sessions.js';
 import { createProjectsRouter } from './routes/projects.js';
 import { createDataRouter } from './routes/data.js';
+// Router webhook GitHub
+import { createWebhooksRouter } from './routes/webhooks.js';
 // Router documentazione OpenAPI
 import { createDocsRouter } from './openapi/index.js';
 
@@ -130,6 +132,8 @@ app.use(createAnalyticsRouter(ctx));
 app.use(createSessionsRouter(ctx));
 app.use(createProjectsRouter(ctx));
 app.use(createDataRouter(ctx, WORKER_TOKEN));
+// Webhook GitHub e API query link
+app.use(createWebhooksRouter(ctx));
 // Documentazione OpenAPI interattiva (Swagger UI + spec JSON)
 app.use(createDocsRouter());
 
