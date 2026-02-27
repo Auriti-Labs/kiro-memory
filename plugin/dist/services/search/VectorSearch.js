@@ -295,20 +295,24 @@ var EmbeddingService = class {
   }
   /**
    * Generate embeddings in batch.
+   * Uses native batch support when available (fastembed, transformers),
+   * falls back to serial processing on batch failure.
    */
   async embedBatch(texts) {
     if (!this.initialized) await this.initialize();
     if (!this.provider || !this.model) return texts.map(() => null);
-    const results = [];
-    for (const text of texts) {
-      try {
-        const embedding = await this.embed(text);
-        results.push(embedding);
-      } catch {
-        results.push(null);
+    if (texts.length === 0) return [];
+    const truncated = texts.map((t) => t.substring(0, 2e3));
+    try {
+      if (this.provider === "fastembed") {
+        return await this._embedBatchFastembed(truncated);
+      } else if (this.provider === "transformers") {
+        return await this._embedBatchTransformers(truncated);
       }
+    } catch (error) {
+      logger.warn("EMBEDDING", `Batch embedding failed, falling back to serial: ${error}`);
     }
-    return results;
+    return this._embedBatchSerial(truncated);
   }
   /**
    * Check if the service is available.
@@ -328,7 +332,68 @@ var EmbeddingService = class {
   getDimensions() {
     return 384;
   }
-  // --- Provider-specific implementations ---
+  // --- Batch implementations ---
+  /**
+   * Native batch embedding with fastembed.
+   * FlagEmbedding.embed() accepts string[] and returns an async iterable of batches.
+   */
+  async _embedBatchFastembed(texts) {
+    const results = [];
+    const embeddings = this.model.embed(texts, texts.length);
+    for await (const batch of embeddings) {
+      if (batch) {
+        for (const vec of batch) {
+          results.push(vec instanceof Float32Array ? vec : new Float32Array(vec));
+        }
+      }
+    }
+    while (results.length < texts.length) {
+      results.push(null);
+    }
+    return results;
+  }
+  /**
+   * Batch embedding with @huggingface/transformers pipeline.
+   * The pipeline accepts string[] and returns a Tensor with shape [N, dims].
+   */
+  async _embedBatchTransformers(texts) {
+    const output = await this.model(texts, {
+      pooling: "mean",
+      normalize: true
+    });
+    if (!output?.data) {
+      return texts.map(() => null);
+    }
+    const dims = this.getDimensions();
+    const data = output.data instanceof Float32Array ? output.data : new Float32Array(output.data);
+    const results = [];
+    for (let i = 0; i < texts.length; i++) {
+      const offset = i * dims;
+      if (offset + dims <= data.length) {
+        results.push(data.slice(offset, offset + dims));
+      } else {
+        results.push(null);
+      }
+    }
+    return results;
+  }
+  /**
+   * Serial fallback: embed texts one at a time.
+   * Used when native batch fails.
+   */
+  async _embedBatchSerial(texts) {
+    const results = [];
+    for (const text of texts) {
+      try {
+        const embedding = await this.embed(text);
+        results.push(embedding);
+      } catch {
+        results.push(null);
+      }
+    }
+    return results;
+  }
+  // --- Single-text provider implementations ---
   async _embedFastembed(text) {
     const embeddings = this.model.embed([text], 1);
     for await (const batch of embeddings) {
