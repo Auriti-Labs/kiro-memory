@@ -7,6 +7,7 @@
 import * as esbuild from 'esbuild';
 import { join } from 'path';
 import { existsSync, mkdirSync, copyFileSync } from 'fs';
+import { execFileSync } from 'child_process';
 
 const ROOT_DIR = process.cwd();
 const SRC_DIR = join(ROOT_DIR, 'src');
@@ -68,13 +69,15 @@ async function build() {
     outfile: join(DIST_DIR, 'sdk', 'index.js')
   });
 
-  // Build worker service
+  // Build worker service (minificato per ridurre dimensione)
   console.log('Building worker service...');
   await esbuild.build({
     ...nodeCommon,
     entryPoints: [join(SRC_DIR, 'services', 'worker-service.ts')],
     outfile: join(DIST_DIR, 'worker-service.js'),
-    external: ['better-sqlite3', 'express', 'cors', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
+    external: ['better-sqlite3', 'express', 'cors', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers'],
+    minify: true,
+    sourcemap: true
   });
 
   // Build hook Kiro-compatibili (4 script eseguibili)
@@ -170,6 +173,15 @@ async function build() {
     external: ['better-sqlite3', 'express', 'cors', 'chromadb', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
   });
 
+  // Build Tailwind CSS (da CDN a build-time)
+  console.log('Building Tailwind CSS...');
+  execFileSync('npx', [
+    'tailwindcss',
+    '-i', join(SRC_DIR, 'ui', 'input.css'),
+    '-o', join(DIST_DIR, 'viewer.css'),
+    '--minify'
+  ], { stdio: 'pipe' });
+
   // Copy viewer HTML
   console.log('Copying viewer HTML...');
   copyFileSync(
@@ -177,7 +189,7 @@ async function build() {
     join(DIST_DIR, 'viewer.html')
   );
 
-  // Build viewer (React - browser, no shim necessario)
+  // Build viewer (React - browser, minificato con sourcemap per debug)
   console.log('Building viewer UI...');
   await esbuild.build({
     entryPoints: [join(SRC_DIR, 'ui', 'viewer', 'index.tsx')],
@@ -187,7 +199,9 @@ async function build() {
     format: 'esm',
     outfile: join(DIST_DIR, 'viewer.js'),
     external: [],
-    loader: { '.tsx': 'tsx', '.ts': 'ts' }
+    loader: { '.tsx': 'tsx', '.ts': 'ts' },
+    minify: true,
+    sourcemap: true
   });
 
   console.log('\n✅ Build complete!');
