@@ -2,78 +2,6 @@
  * Shared types for Kiro Memory Worker Service
  */
 
-import type { Response } from 'express';
-
-// ============================================================================
-// Active Session Types
-// ============================================================================
-
-/**
- * Conversation message for shared history
- * Used to maintain context across sessions
- */
-export interface ConversationMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-export interface ActiveSession {
-  sessionDbId: number;
-  contentSessionId: string;      // User's Kiro session being observed
-  memorySessionId: string | null; // Memory agent's session ID for resume
-  project: string;
-  userPrompt: string;
-  pendingMessages: PendingMessage[];
-  abortController: AbortController;
-  generatorPromise: Promise<void> | null;
-  lastPromptNumber: number;
-  startTime: number;
-  cumulativeInputTokens: number;
-  cumulativeOutputTokens: number;
-  earliestPendingTimestamp: number | null;
-  conversationHistory: ConversationMessage[];
-  currentProvider: 'kiro' | 'local' | null;
-  consecutiveRestarts: number;
-  forceInit?: boolean;
-  idleTimedOut?: boolean;
-  processingMessageIds: number[];
-}
-
-export interface PendingMessage {
-  type: 'observation' | 'summarize';
-  tool_name?: string;
-  tool_input?: any;
-  tool_response?: any;
-  prompt_number?: number;
-  cwd?: string;
-  last_assistant_message?: string;
-}
-
-export interface PendingMessageWithId extends PendingMessage {
-  _persistentId: number;
-  _originalTimestamp: number;
-}
-
-export interface ObservationData {
-  tool_name: string;
-  tool_input: any;
-  tool_response: any;
-  prompt_number: number;
-  cwd?: string;
-}
-
-// ============================================================================
-// SSE Types
-// ============================================================================
-
-export interface SSEEvent {
-  type: string;
-  timestamp?: number;
-  [key: string]: any;
-}
-
-export type SSEClient = Response;
-
 // ============================================================================
 // Pagination Types
 // ============================================================================
@@ -196,45 +124,6 @@ export interface ReportData {
   completedTasks: string[];
   nextSteps: string[];
   fileHotspots: Array<{ file: string; count: number }>;
-}
-
-// ============================================================================
-// Parsed Content Types
-// ============================================================================
-
-export interface ParsedObservation {
-  type: string;
-  title: string;
-  subtitle: string | null;
-  text: string;
-  concepts: string[];
-  files: string[];
-}
-
-export interface ParsedSummary {
-  request: string | null;
-  investigated: string | null;
-  learned: string | null;
-  completed: string | null;
-  next_steps: string | null;
-  notes: string | null;
-}
-
-// ============================================================================
-// Utility Types
-// ============================================================================
-
-export interface DatabaseStats {
-  totalObservations: number;
-  totalSessions: number;
-  totalPrompts: number;
-  totalSummaries: number;
-  projectCounts: Record<string, {
-    observations: number;
-    sessions: number;
-    prompts: number;
-    summaries: number;
-  }>;
 }
 
 // ============================================================================
