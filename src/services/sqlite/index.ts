@@ -25,3 +25,9 @@ export * from './GithubLinks.js';
 
 // Export import/export JSONL
 export * from './ImportExport.js';
+
+// Export politiche di retention
+export * from './Retention.js';
+
+// Export backup
+export * from './Backup.js';

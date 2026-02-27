@@ -10,6 +10,8 @@ import { getEmbeddingService } from '../search/EmbeddingService.js';
 import { getVectorSearch } from '../search/VectorSearch.js';
 import { getReportData } from '../sqlite/Reports.js';
 import { formatReportMarkdown } from '../report-formatter.js';
+import { getRetentionStats, applyRetention, buildRetentionConfig } from '../sqlite/Retention.js';
+import { listConfig } from '../../cli/cli-utils.js';
 import { logger } from '../../utils/logger.js';
 
 export function createDataRouter(ctx: WorkerContext, workerToken?: string): Router {
@@ -66,6 +68,47 @@ export function createDataRouter(ctx: WorkerContext, workerToken?: string): Rout
 
   // ── Retention Policy ──
 
+  /**
+   * GET /api/retention/preview
+   * Dry-run: restituisce il conteggio dei record che verrebbero eliminati
+   * secondo la configurazione retention corrente, senza modificare il DB.
+   */
+  router.get('/api/retention/preview', (_req, res) => {
+    try {
+      const config = buildRetentionConfig(listConfig());
+      const stats = getRetentionStats(ctx.db.db, config);
+      res.json({ dryRun: true, config, wouldDelete: stats });
+    } catch (error) {
+      logger.error('WORKER', 'Retention preview failed', {}, error as Error);
+      res.status(500).json({ error: 'Retention preview failed' });
+    }
+  });
+
+  /**
+   * POST /api/retention/apply
+   * Esegue il cleanup retention secondo la configurazione corrente.
+   * Richiede X-Worker-Token per proteggere l'operazione distruttiva.
+   */
+  router.post('/api/retention/apply', requireAuth, (_req, res) => {
+    try {
+      const config = buildRetentionConfig(listConfig());
+      const result = applyRetention(ctx.db.db, config);
+      ctx.invalidateProjectsCache();
+
+      logger.info('WORKER', `Retention apply: ${result.observations} obs, ${result.summaries} sum, ${result.prompts} prompts, ${result.knowledge} knowledge eliminati`);
+      res.json({ success: true, config, deleted: result });
+    } catch (error) {
+      logger.error('WORKER', 'Retention apply failed', {}, error as Error);
+      res.status(500).json({ error: 'Retention apply failed' });
+    }
+  });
+
+  /**
+   * POST /api/retention/cleanup
+   * Endpoint legacy mantenuto per backward compatibility.
+   * Usa la configurazione inline del body (maxAgeDays, dryRun).
+   * @deprecated Usare /api/retention/preview e /api/retention/apply
+   */
   router.post('/api/retention/cleanup', requireAuth, (req, res) => {
     const { maxAgeDays, dryRun } = req.body || {};
     const days = parseIntSafe(String(maxAgeDays), 90, 7, 730);
@@ -95,7 +138,7 @@ export function createDataRouter(ctx: WorkerContext, workerToken?: string): Rout
       const deleted = cleanup();
       ctx.invalidateProjectsCache();
 
-      logger.info('WORKER', `Retention cleanup: deleted ${deleted.observations} obs, ${deleted.summaries} sum, ${deleted.prompts} prompts (> ${days}d)`);
+      logger.info('WORKER', `Retention cleanup (legacy): deleted ${deleted.observations} obs, ${deleted.summaries} sum, ${deleted.prompts} prompts (> ${days}d)`);
       res.json({ success: true, maxAgeDays: days, deleted });
     } catch (error) {
       logger.error('WORKER', 'Retention cleanup failed', { maxAgeDays: days }, error as Error);

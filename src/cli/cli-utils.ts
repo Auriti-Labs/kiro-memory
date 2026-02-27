@@ -252,6 +252,19 @@ export const CONFIG_DEFAULTS: Record<string, string | number | boolean> = {
   'search.limit': 20,
   'embeddings.enabled': false,
   'decay.staleThresholdDays': 30,
+  // Politiche di retention: età massima in giorni (0 = mai eliminare)
+  'retention.observations.maxAgeDays': 90,
+  'retention.summaries.maxAgeDays': 365,
+  'retention.prompts.maxAgeDays': 30,
+  'retention.knowledge.maxAgeDays': 0,
+  // Cleanup automatico schedulato
+  'retention.autoCleanupEnabled': true,
+  'retention.autoCleanupIntervalHours': 24,
+  // Backup automatico schedulato
+  'backup.enabled': true,
+  'backup.intervalHours': 24,
+  'backup.maxKeep': 7,
+  'backup.compress': false,
 };
 
 /**

@@ -13,6 +13,7 @@
  *   sessions.ts     — sessions, checkpoint, prompts
  *   projects.ts     — project list, aliases, stats
  *   data.ts         — embeddings, retention, export, report
+ *   backup.ts       — backup create, list, restore
  */
 
 import express from 'express';
@@ -26,8 +27,11 @@ import { fileURLToPath } from 'url';
 import { KiroMemoryDatabase } from './sqlite/Database.js';
 import { getHybridSearch } from './search/HybridSearch.js';
 import { createWorkerContext, getClients } from './worker-context.js';
+import { applyRetention, buildRetentionConfig } from './sqlite/Retention.js';
+import { createBackup, rotateBackups } from './sqlite/Backup.js';
+import { listConfig, getConfigValue } from '../cli/cli-utils.js';
 import { logger } from '../utils/logger.js';
-import { DATA_DIR } from '../shared/paths.js';
+import { DATA_DIR, DB_PATH, BACKUPS_DIR } from '../shared/paths.js';
 
 // Modular routers
 import { createCoreRouter } from './routes/core.js';
@@ -44,6 +48,8 @@ import { createWebhooksRouter } from './routes/webhooks.js';
 import { createImportExportRouter } from './routes/importexport.js';
 // Router documentazione OpenAPI
 import { createDocsRouter } from './openapi/index.js';
+// Router backup database
+import { createBackupRouter } from './routes/backup.js';
 
 // ── Configuration ──
 
@@ -142,6 +148,8 @@ app.use(createWebhooksRouter(ctx));
 app.use(createImportExportRouter(ctx));
 // Documentazione OpenAPI interattiva (Swagger UI + spec JSON)
 app.use(createDocsRouter());
+// Backup database
+app.use(createBackupRouter(ctx, WORKER_TOKEN));
 
 // ── Static files and viewer ──
 
@@ -158,6 +166,106 @@ app.get('/', (_req, res) => {
     res.status(404).json({ error: 'Viewer not found. Run npm run build first.' });
   }
 });
+
+// ── Job schedulato: cleanup retention automatico ──
+
+/**
+ * Avvia il cleanup retention periodico se abilitato nella configurazione.
+ * Usa setInterval con intervallo configurabile (default: 24 ore).
+ * Il primo run avviene 30 secondi dopo lo startup per non rallentare l'avvio.
+ */
+function scheduleRetentionCleanup(): void {
+  const enabled = getConfigValue('retention.autoCleanupEnabled');
+  if (!enabled) {
+    logger.info('WORKER', 'Retention automatico disabilitato (retention.autoCleanupEnabled=false)');
+    return;
+  }
+
+  const intervalHours = Number(getConfigValue('retention.autoCleanupIntervalHours') ?? 24);
+  const intervalMs = intervalHours * 3_600_000;
+
+  // Funzione di cleanup riutilizzabile
+  function runRetentionCleanup(): void {
+    try {
+      const config = buildRetentionConfig(listConfig());
+      const result = applyRetention(db.db, config);
+      if (result.total > 0) {
+        logger.info('WORKER', `Retention schedulata: ${result.total} record eliminati (obs=${result.observations}, sum=${result.summaries}, prompts=${result.prompts}, knowledge=${result.knowledge})`);
+      } else {
+        logger.debug('WORKER', 'Retention schedulata: nessun record da eliminare');
+      }
+    } catch (err) {
+      logger.error('WORKER', 'Retention schedulata fallita', {}, err as Error);
+    }
+  }
+
+  logger.info('WORKER', `Retention automatica attiva (ogni ${intervalHours}h)`);
+
+  // Esegui alla prima occasione con un ritardo iniziale di 30s per stabilizzare il server
+  const startupDelay = setTimeout(runRetentionCleanup, 30_000);
+
+  // Poi esegui periodicamente all'intervallo configurato
+  const retentionInterval = setInterval(runRetentionCleanup, intervalMs);
+
+  // Pulisci i timer al termine del processo
+  process.once('beforeExit', () => {
+    clearTimeout(startupDelay);
+    clearInterval(retentionInterval);
+  });
+}
+
+scheduleRetentionCleanup();
+
+// ── Job schedulato: backup automatico ──
+
+/**
+ * Avvia il backup automatico periodico se abilitato nella configurazione.
+ * Usa setInterval con intervallo configurabile (default: 24 ore).
+ * Il primo run avviene 60 secondi dopo lo startup.
+ */
+function scheduleBackupJob(): void {
+  const enabled = getConfigValue('backup.enabled');
+  if (!enabled) {
+    logger.info('WORKER', 'Backup automatico disabilitato (backup.enabled=false)');
+    return;
+  }
+
+  const intervalHours = Number(getConfigValue('backup.intervalHours') ?? 24);
+  const maxKeep = Number(getConfigValue('backup.maxKeep') ?? 7);
+  const intervalMs = intervalHours * 3_600_000;
+
+  // Funzione di backup riutilizzabile
+  function runBackup(): void {
+    try {
+      const entry = createBackup(DB_PATH, BACKUPS_DIR, db.db);
+      logger.info('WORKER', `Backup schedulato creato: ${entry.metadata.filename} (obs=${entry.metadata.stats.observations})`);
+
+      // Rotazione automatica dopo ogni backup
+      const deleted = rotateBackups(BACKUPS_DIR, maxKeep);
+      if (deleted > 0) {
+        logger.info('WORKER', `Rotazione backup: ${deleted} file rimossi, ${maxKeep} mantenuti`);
+      }
+    } catch (err) {
+      logger.error('WORKER', 'Backup schedulato fallito', {}, err as Error);
+    }
+  }
+
+  logger.info('WORKER', `Backup automatico attivo (ogni ${intervalHours}h, max ${maxKeep} backup)`);
+
+  // Prima esecuzione 60 secondi dopo lo startup (dopo la retention)
+  const startupDelay = setTimeout(runBackup, 60_000);
+
+  // Poi esegui periodicamente all'intervallo configurato
+  const backupInterval = setInterval(runBackup, intervalMs);
+
+  // Pulisci i timer al termine del processo
+  process.once('beforeExit', () => {
+    clearTimeout(startupDelay);
+    clearInterval(backupInterval);
+  });
+}
+
+scheduleBackupJob();
 
 // ── Server startup ──
 
