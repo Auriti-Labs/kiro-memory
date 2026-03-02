@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-03-02
+
+### Changed
+
+- **Sidebar**: lista progetti sostituita con select dropdown compatta — riduce lo spazio verticale e semplifica la navigazione tra progetti
+- **Timeline**: barre osservazioni centrate correttamente sulla posizione temporale, hit-test riallineato, overview ingrandita (56px) con label date e opacità migliorata
+- **DiffViewer**: tutti i testi UI e commenti tradotti in inglese (pannelli Before/After, selettori, stati vuoti, navigazione diff)
+- **useSSE hook**: fix parsing response API — gestisce sia array diretti che risposte wrappate `{ data, next_cursor, has_more }`
+
+### Removed
+
+- Funzionalità rinomina progetto dalla sidebar (avatar, ricerca inline, edit in-place)
+- Prop `onRenameProject` da Sidebar e App
+
 ## [3.0.0] - 2026-02-27
 
 ### Added

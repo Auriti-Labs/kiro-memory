@@ -45,12 +45,19 @@ export function useSSE(): SSEState {
     const MAX_RETRY_DELAY = 30000;
 
     /* ── Fetch helpers ── */
+    /** Estrae l'array dati dalla risposta (supporta sia array che { data: [...] }) */
+    const extractData = (json: any): any[] => {
+      if (Array.isArray(json)) return json;
+      if (json && Array.isArray(json.data)) return json.data;
+      return [];
+    };
+
     const fetchObservations = async () => {
       try {
         const res = await fetch('/api/observations?limit=50');
         if (res.ok && mountedRef.current) {
-          const observations = await res.json();
-          setState(prev => ({ ...prev, observations, lastEventTime: Date.now() }));
+          const json = await res.json();
+          setState(prev => ({ ...prev, observations: extractData(json), lastEventTime: Date.now() }));
         }
       } catch (err) {
         console.error('Failed to fetch observations:', err);
@@ -61,8 +68,8 @@ export function useSSE(): SSEState {
       try {
         const res = await fetch('/api/summaries?limit=20');
         if (res.ok && mountedRef.current) {
-          const summaries = await res.json();
-          setState(prev => ({ ...prev, summaries }));
+          const json = await res.json();
+          setState(prev => ({ ...prev, summaries: extractData(json) }));
         }
       } catch (err) {
         console.error('Failed to fetch summaries:', err);
@@ -73,8 +80,8 @@ export function useSSE(): SSEState {
       try {
         const res = await fetch('/api/prompts?limit=50');
         if (res.ok && mountedRef.current) {
-          const prompts = await res.json();
-          setState(prev => ({ ...prev, prompts }));
+          const json = await res.json();
+          setState(prev => ({ ...prev, prompts: extractData(json) }));
         }
       } catch (err) {
         console.error('Failed to fetch prompts:', err);

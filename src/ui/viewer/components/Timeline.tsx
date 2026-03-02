@@ -10,10 +10,10 @@ import { useTimeline } from '../hooks/useTimeline';
 import type { HeatmapDayEntry, TimelineZoomLevel } from '../types';
 
 // ============================================================================
-// Costanti colori — coerenti con il tema dark dell'UI
+// Color constants — consistent with the dark UI theme
 // ============================================================================
 
-/** Colori canvas per tipo osservazione */
+/** Canvas colors per observation type */
 const TYPE_COLORS: Record<string, string> = {
   'file-write':  '#10B981', // emerald-500
   'file-read':   '#06B6D4', // cyan-500
@@ -27,7 +27,7 @@ const TYPE_COLORS: Record<string, string> = {
   'rejected':    '#64748B', // slate-500
 };
 
-/** Colori di sfondo del canvas */
+/** Canvas background colors */
 const COLORS = {
   surface0: '#0a0b10',     // bg-surface-0
   surface1: '#12131a',     // bg-surface-1
@@ -42,42 +42,42 @@ const COLORS = {
 };
 
 // ============================================================================
-// Tipi interni
+// Internal types
 // ============================================================================
 
-/** Punto dati per il rendering canvas */
+/** Data point for canvas rendering */
 interface CanvasMarker {
-  /** Data ISO YYYY-MM-DD */
+  /** ISO date YYYY-MM-DD */
   date: string;
-  /** Numero di osservazioni */
+  /** Number of observations */
   count: number;
-  /** Progetti attivi quel giorno */
+  /** Active projects for this day */
   projects: string[];
-  /** Timestamp epoch ms (calcolato una sola volta) */
+  /** Timestamp epoch ms (computed once) */
   epochMs: number;
 }
 
-/** Viewport della timeline (offset in pixel, scala px/ms) */
+/** Timeline viewport (pixel offset, px/ms scale) */
 interface Viewport {
   offsetPx: number;   // scroll orizzontale
   pxPerMs: number;    // pixel per millisecondo
 }
 
-/** Rettangolo hit-test per la mini-overview */
+/** Hit-test rectangle for the mini-overview */
 interface OverviewRect {
   x: number; y: number; w: number; h: number;
 }
 
 // ============================================================================
-// Utilità
+// Utilities
 // ============================================================================
 
-/** Converte una data ISO YYYY-MM-DD in epoch ms (UTC mezzogiorno) */
+/** Converts an ISO YYYY-MM-DD date to epoch ms (UTC noon) */
 function isoToEpoch(dateStr: string): number {
   return new Date(dateStr + 'T12:00:00Z').getTime();
 }
 
-/** Formatta una data in etichetta asse X secondo il livello di zoom */
+/** Formats a date as an X-axis label based on zoom level */
 function formatAxisLabel(epochMs: number, zoom: TimelineZoomLevel): string {
   const d = new Date(epochMs);
   if (zoom === 'month') {
@@ -90,14 +90,14 @@ function formatAxisLabel(epochMs: number, zoom: TimelineZoomLevel): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
-/** Formatta la data per il tooltip */
+/** Formats the date for the tooltip */
 function formatTooltipDate(epochMs: number): string {
   return new Date(epochMs).toLocaleDateString('en-US', {
     weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC'
   });
 }
 
-/** Calcola il livello di zoom in base alla scala px/ms */
+/** Computes zoom level based on px/ms scale */
 function computeZoomLevel(pxPerMs: number): TimelineZoomLevel {
   const pxPerDay = pxPerMs * 86_400_000;
   if (pxPerDay >= 40) return 'day';
@@ -105,35 +105,35 @@ function computeZoomLevel(pxPerMs: number): TimelineZoomLevel {
   return 'month';
 }
 
-/** Scala px/ms per ogni livello di zoom */
+/** Px/ms scale for each zoom level */
 const ZOOM_PRESETS: Record<TimelineZoomLevel, number> = {
   day:   40  / 86_400_000,
   week:  14  / 86_400_000,
   month: 4   / 86_400_000,
 };
 
-/** Incremento/decremento zoom con scroll wheel */
+/** Scroll-wheel zoom increment/decrement factor */
 const ZOOM_FACTOR = 1.25;
 
 // ============================================================================
-// Props componente principale
+// Main component props
 // ============================================================================
 
 interface TimelineProps {
-  /** Filtro progetto corrente */
+  /** Current project filter */
   currentFilter: string;
-  /** Callback per navigare a un'osservazione nel feed */
+  /** Callback to navigate to an observation in the feed */
   onNavigate: (project: string, obsId: number) => void;
 }
 
 // ============================================================================
-// Componente principale Timeline
+// Main Timeline component
 // ============================================================================
 
 export function Timeline({ currentFilter, onNavigate }: TimelineProps) {
   const { days, isLoading, error } = useTimeline(currentFilter, 6);
 
-  // Converti le entry in CanvasMarker (calcola epochMs una sola volta)
+  // Convert entries to CanvasMarker (compute epochMs once)
   const markers = useMemo<CanvasMarker[]>(() =>
     days.map(d => ({ ...d, epochMs: isoToEpoch(d.date) })),
   [days]);
@@ -142,7 +142,7 @@ export function Timeline({ currentFilter, onNavigate }: TimelineProps) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <div className="w-6 h-6 border-2 border-accent-violet/30 border-t-accent-violet rounded-full animate-spin mb-4" />
-        <p className="text-sm text-zinc-500">Caricamento timeline...</p>
+        <p className="text-sm text-zinc-500">Loading timeline...</p>
       </div>
     );
   }
@@ -155,7 +155,7 @@ export function Timeline({ currentFilter, onNavigate }: TimelineProps) {
             <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
         </div>
-        <p className="text-sm text-zinc-400 mb-1">Errore caricamento timeline</p>
+        <p className="text-sm text-zinc-400 mb-1">Failed to load timeline</p>
         <p className="text-xs text-zinc-600">{error}</p>
       </div>
     );
@@ -169,9 +169,9 @@ export function Timeline({ currentFilter, onNavigate }: TimelineProps) {
             <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
           </svg>
         </div>
-        <p className="text-base font-semibold text-zinc-300 mb-2">Nessun dato disponibile</p>
+        <p className="text-base font-semibold text-zinc-300 mb-2">No data available</p>
         <p className="text-sm text-zinc-500 max-w-xs leading-relaxed">
-          Avvia una sessione di coding per raccogliere dati sulla timeline.
+          Start a coding session to collect timeline data.
         </p>
       </div>
     );
@@ -181,7 +181,7 @@ export function Timeline({ currentFilter, onNavigate }: TimelineProps) {
 }
 
 // ============================================================================
-// Canvas interattivo — rendering Canvas 2D con RAF
+// Interactive canvas — Canvas 2D rendering with RAF
 // ============================================================================
 
 interface TimelineCanvasProps {
@@ -191,23 +191,23 @@ interface TimelineCanvasProps {
 }
 
 function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
-  // Refs canvas e contenitore
+  // Canvas and container refs
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const overviewRef  = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Dimensioni canvas (aggiornate al resize)
+  // Canvas dimensions (updated on resize)
   const [canvasSize, setCanvasSize] = useState({ w: 800, h: 260 });
 
-  // Viewport corrente
+  // Current viewport
   const viewportRef = useRef<Viewport>({ offsetPx: 0, pxPerMs: ZOOM_PRESETS.week });
 
-  // Stato interazione
+  // Interaction state
   const isDraggingRef    = useRef(false);
   const dragStartXRef    = useRef(0);
   const dragOffsetRef    = useRef(0);
 
-  // Selezione intervallo
+  // Range selection
   const isSelectingRef   = useRef(false);
   const selectStartXRef  = useRef(0);
   const [selectedRange, setSelectedRange] = useState<{ fromMs: number; toMs: number } | null>(null);
@@ -217,17 +217,17 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
     x: number; y: number; marker: CanvasMarker;
   } | null>(null);
 
-  // Livello di zoom derivato dalla scala corrente
+  // Zoom level derived from current scale
   const [zoomLevel, setZoomLevel] = useState<TimelineZoomLevel>('week');
 
-  // Controllo RAF
+  // RAF control
   const rafRef = useRef<number>(0);
   const needsRedrawRef = useRef(true);
 
   // Debounce timer per zoom/pan
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Range temporale dei dati ──
+  // ── Data time range ──
   const timeRange = useMemo(() => {
     if (markers.length === 0) return { minMs: Date.now() - 7 * 86_400_000, maxMs: Date.now() };
     const minMs = markers[0].epochMs;
@@ -235,11 +235,11 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
     return { minMs, maxMs };
   }, [markers]);
 
-  // ── Massimo conteggio (per altezza delle barre) ──
+  // ── Max count (for bar height) ──
   const maxCount = useMemo(() => Math.max(...markers.map(m => m.count), 1), [markers]);
 
   // ============================================================================
-  // Utility: converti pixel X in timestamp e viceversa
+  // Utility: convert pixel X to timestamp and vice versa
   // ============================================================================
 
   const epochToX = useCallback((epochMs: number): number => {
@@ -253,14 +253,14 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
   }, [timeRange.minMs]);
 
   // ============================================================================
-  // Disegno principale canvas
+  // Main canvas drawing
   // ============================================================================
 
   const MARGIN_LEFT   = 0;
   const MARGIN_RIGHT  = 0;
   const MARGIN_TOP    = 20;
   const AXIS_HEIGHT   = 28;
-  const OVERVIEW_H    = 40;
+  const OVERVIEW_H    = 56;
   const CHART_PADDING = 10;
 
   const drawCanvas = useCallback(() => {
@@ -272,7 +272,7 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
     const { w, h } = canvasSize;
     const chartH = h - AXIS_HEIGHT;
 
-    // Cancella
+    // Clear
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = COLORS.surface1;
     ctx.fillRect(0, 0, w, h);
@@ -283,11 +283,11 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
     const pxPerDay = vp.pxPerMs * 86_400_000;
     const barW = Math.max(2, pxPerDay * 0.7);
 
-    // ── Griglia verticale (asse tempo) ──
+    // ── Vertical grid (time axis) ──
     ctx.strokeStyle = COLORS.axisLine;
     ctx.lineWidth = 1;
 
-    // Calcola intervallo etichette asse X in base al livello di zoom
+    // Compute X-axis label interval based on zoom level
     const zoom = computeZoomLevel(vp.pxPerMs);
     const labelIntervalMs = zoom === 'month'
       ? 30 * 86_400_000
@@ -295,7 +295,7 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
         ? 7 * 86_400_000
         : 86_400_000;
 
-    // Trova il primo tick visibile
+    // Find the first visible tick
     const visibleStartMs = xToEpoch(MARGIN_LEFT);
     const firstTickMs = Math.ceil(visibleStartMs / labelIntervalMs) * labelIntervalMs;
 
@@ -307,18 +307,18 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
       const x = epochToX(tickMs);
       if (x < MARGIN_LEFT - 60 || x > w + 60) continue;
 
-      // Linea griglia
+      // Grid line
       ctx.beginPath();
       ctx.moveTo(x, MARGIN_TOP);
       ctx.lineTo(x, chartH - CHART_PADDING);
       ctx.stroke();
 
-      // Etichetta asse X
+      // X-axis label
       ctx.fillStyle = COLORS.textMuted;
       ctx.fillText(formatAxisLabel(tickMs, zoom), x, h - 8);
     }
 
-    // ── Linea base asse X ──
+    // ── X-axis baseline ──
     ctx.strokeStyle = COLORS.axisLine;
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -326,58 +326,57 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
     ctx.lineTo(w - MARGIN_RIGHT, chartH - CHART_PADDING);
     ctx.stroke();
 
-    // ── Barre / markers ──
+    // ── Bars / markers ──
     const availableH = chartH - MARGIN_TOP - CHART_PADDING;
 
     for (const marker of markers) {
       const x = epochToX(marker.epochMs);
+      // Center the bar on the epoch position
+      const barX = x - barW / 2;
 
-      // Salta i marker fuori schermo
-      if (x + barW < MARGIN_LEFT || x > w + MARGIN_RIGHT) continue;
+      // Skip off-screen markers
+      if (barX + barW < MARGIN_LEFT || barX > w + MARGIN_RIGHT) continue;
 
       const heightPct = marker.count / maxCount;
       const barH = Math.max(3, availableH * heightPct);
       const barY = chartH - CHART_PADDING - barH;
 
-      // Colore: se più progetti usano il marker primo; altrimenti colore per progetto
-      // Usa un gradiente viola default per visualizzazioni multi-progetto
       const isHighlighted = selectedRange
         ? marker.epochMs >= selectedRange.fromMs && marker.epochMs <= selectedRange.toMs
         : true;
 
-      // Usa violet di default per giornate multi-progetto, altrimenti il colore neutro
       const baseColor = COLORS.violet;
-      ctx.fillStyle = isHighlighted ? baseColor : baseColor + '33'; // opacità ridotta fuori selezione
+      ctx.fillStyle = isHighlighted ? baseColor : baseColor + '33';
 
-      // Barra principale
-      const rx = 2; // border-radius
+      // Main bar (centered on epoch position)
+      const rx = 2;
       ctx.beginPath();
       if (barH > rx * 2) {
-        ctx.moveTo(x + rx, barY);
-        ctx.lineTo(x + barW - rx, barY);
-        ctx.quadraticCurveTo(x + barW, barY, x + barW, barY + rx);
-        ctx.lineTo(x + barW, barY + barH);
-        ctx.lineTo(x, barY + barH);
-        ctx.lineTo(x, barY + rx);
-        ctx.quadraticCurveTo(x, barY, x + rx, barY);
+        ctx.moveTo(barX + rx, barY);
+        ctx.lineTo(barX + barW - rx, barY);
+        ctx.quadraticCurveTo(barX + barW, barY, barX + barW, barY + rx);
+        ctx.lineTo(barX + barW, barY + barH);
+        ctx.lineTo(barX, barY + barH);
+        ctx.lineTo(barX, barY + rx);
+        ctx.quadraticCurveTo(barX, barY, barX + rx, barY);
       } else {
-        ctx.rect(x, barY, barW, barH);
+        ctx.rect(barX, barY, barW, barH);
       }
       ctx.closePath();
       ctx.fill();
 
-      // Numero sopra la barra se c'è spazio
+      // Count label above bar (centered)
       if (pxPerDay >= 20 && barH > 20 && marker.count > 0) {
         ctx.fillStyle = isHighlighted ? COLORS.textBold : COLORS.textMuted;
         ctx.font = '10px Inter, system-ui, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(String(marker.count), x + barW / 2, barY - 4);
+        ctx.fillText(String(marker.count), x, barY - 4);
       }
     }
 
-    // ── Selezione range (drag) ──
+    // ── Range selection (drag) ──
     if (isSelectingRef.current && selectStartXRef.current !== 0) {
-      // Disegna solo la selezione in corso
+      // Draw in-progress selection only
     }
 
     if (selectedRange) {
@@ -392,7 +391,7 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
   }, [canvasSize, markers, maxCount, epochToX, xToEpoch, timeRange, selectedRange]);
 
   // ============================================================================
-  // Disegno overview (mini-mappa in fondo)
+  // Overview drawing (minimap at the bottom)
   // ============================================================================
 
   const drawOverview = useCallback(() => {
@@ -410,18 +409,20 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
     ctx.fillStyle = COLORS.surface2;
     ctx.fillRect(0, 0, w, h);
 
-    // Barre mini proporali
+    // Mini proportional bars (centered on epoch position)
+    const padding = 6;
     const overviewPxPerMs = w / totalMs;
     for (const marker of markers) {
       const x = (marker.epochMs - timeRange.minMs) * overviewPxPerMs;
-      const barW = Math.max(1, overviewPxPerMs * 86_400_000 * 0.7);
+      const barW = Math.max(2, overviewPxPerMs * 86_400_000 * 0.7);
+      const barX = x - barW / 2;
       const heightPct = marker.count / maxCount;
-      const barH = Math.max(1, (h - 4) * heightPct);
-      ctx.fillStyle = COLORS.violet + '88';
-      ctx.fillRect(x, h - barH - 2, barW, barH);
+      const barH = Math.max(2, (h - padding * 2) * heightPct);
+      ctx.fillStyle = COLORS.violet + 'AA';
+      ctx.fillRect(barX, h - barH - padding, barW, barH);
     }
 
-    // Indicatore viewport (riquadro bianco)
+    // Viewport indicator
     const vp = viewportRef.current;
     const visibleMs = canvasSize.w / vp.pxPerMs;
     const viewStartMs = timeRange.minMs + vp.offsetPx / vp.pxPerMs;
@@ -431,10 +432,18 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
     ctx.strokeStyle = COLORS.violet;
     ctx.lineWidth = 1.5;
     ctx.strokeRect(Math.max(0, vx), 1, Math.min(vw, w - vx), h - 2);
-    ctx.fillStyle = COLORS.violet + '18';
+    ctx.fillStyle = COLORS.violet + '22';
     ctx.fillRect(Math.max(0, vx), 1, Math.min(vw, w - vx), h - 2);
 
-    // Bordo overview
+    // Date labels at start and end
+    ctx.font = '10px Inter, system-ui, sans-serif';
+    ctx.fillStyle = COLORS.textMuted;
+    ctx.textAlign = 'left';
+    ctx.fillText(formatAxisLabel(timeRange.minMs, 'week'), 4, 12);
+    ctx.textAlign = 'right';
+    ctx.fillText(formatAxisLabel(timeRange.maxMs, 'week'), w - 4, 12);
+
+    // Border
     ctx.strokeStyle = COLORS.border;
     ctx.lineWidth = 1;
     ctx.strokeRect(0, 0, w, h);
@@ -453,7 +462,7 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
     rafRef.current = requestAnimationFrame(renderLoop);
   }, [drawCanvas, drawOverview]);
 
-  /** Segna il canvas come da ridisegnare (debounced) */
+  /** Mark canvas for redraw (debounced) */
   const scheduleRedraw = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -461,7 +470,7 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
     }, 16); // ~1 frame di debounce
   }, []);
 
-  // ── Avvio RAF loop ──
+  // ── Start RAF loop ──
   useEffect(() => {
     rafRef.current = requestAnimationFrame(renderLoop);
     return () => {
@@ -469,23 +478,23 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
     };
   }, [renderLoop]);
 
-  // ── Ridisegna quando cambiano marker o selezione ──
+  // ── Redraw when markers or selection change ──
   useEffect(() => {
     needsRedrawRef.current = true;
   }, [markers, selectedRange, canvasSize]);
 
   // ============================================================================
-  // Inizializza viewport al caricamento dati
+  // Initialize viewport on data load
   // ============================================================================
 
   useEffect(() => {
     if (markers.length === 0) return;
     const totalMs = timeRange.maxMs - timeRange.minMs + 86_400_000;
-    // Imposta il livello "week" di default e mostra gli ultimi ~90 giorni
+    // Default to "week" zoom level showing the latest ~90 days
     const targetPxPerMs = ZOOM_PRESETS.week;
     viewportRef.current = {
       pxPerMs: targetPxPerMs,
-      // Allinea la vista sulla fine dei dati
+      // Align viewport to the end of data
       offsetPx: Math.max(0, totalMs * targetPxPerMs - canvasSize.w + 40),
     };
     setZoomLevel('week');
@@ -493,7 +502,7 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
   }, [markers, timeRange]);
 
   // ============================================================================
-  // Gestione resize del contenitore (ResizeObserver)
+  // Container resize handling (ResizeObserver)
   // ============================================================================
 
   useLayoutEffect(() => {
@@ -515,19 +524,21 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
   }, []);
 
   // ============================================================================
-  // Hit test: trova il marker più vicino a una posizione X
+  // Hit test: find the closest marker to an X position
   // ============================================================================
 
   const hitTestMarker = useCallback((mouseX: number): CanvasMarker | null => {
     const vp = viewportRef.current;
     const pxPerDay = vp.pxPerMs * 86_400_000;
-    const tolerance = Math.max(pxPerDay * 0.6, 4);
+    const barW = Math.max(2, pxPerDay * 0.7);
+    const tolerance = Math.max(barW / 2 + 2, 6);
 
     let best: CanvasMarker | null = null;
     let bestDist = Infinity;
 
     for (const marker of markers) {
-      const cx = epochToX(marker.epochMs) + pxPerDay / 2;
+      // Bar is centered on epoch position
+      const cx = epochToX(marker.epochMs);
       const dist = Math.abs(mouseX - cx);
       if (dist < tolerance && dist < bestDist) {
         best = marker;
@@ -538,7 +549,7 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
   }, [markers, epochToX]);
 
   // ============================================================================
-  // Gestori eventi mouse (canvas principale)
+  // Mouse event handlers (main canvas)
   // ============================================================================
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -547,7 +558,7 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
     const mouseY = e.clientY - rect.top;
 
     if (isDraggingRef.current) {
-      // Pan orizzontale
+      // Horizontal pan
       const delta = dragStartXRef.current - mouseX;
       viewportRef.current.offsetPx = Math.max(0, dragOffsetRef.current + delta);
       needsRedrawRef.current = true;
@@ -555,7 +566,7 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
     }
 
     if (isSelectingRef.current) {
-      // Selezione range (Shift + drag)
+      // Range selection (Shift + drag)
       const fromEpoch = xToEpoch(selectStartXRef.current);
       const toEpoch   = xToEpoch(mouseX);
       setSelectedRange({
@@ -580,12 +591,12 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
     const mouseX = e.clientX - rect.left;
 
     if (e.shiftKey) {
-      // Inizio selezione range
+      // Start range selection
       isSelectingRef.current = true;
       selectStartXRef.current = mouseX;
       setSelectedRange(null);
     } else {
-      // Inizio pan
+      // Start pan
       isDraggingRef.current = true;
       dragStartXRef.current = mouseX;
       dragOffsetRef.current = viewportRef.current.offsetPx;
@@ -596,7 +607,7 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isSelectingRef.current) {
       isSelectingRef.current = false;
-      // Mantieni la selezione se abbastanza larga (>10px)
+      // Keep selection only if wide enough (>10px)
       const rect = canvasRef.current!.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       if (Math.abs(mouseX - selectStartXRef.current) < 10) {
@@ -620,13 +631,13 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
     const hit = hitTestMarker(mouseX);
 
     if (hit && hit.projects.length > 0) {
-      // Naviga nel feed usando il primo progetto del marker
+      // Navigate to the feed using the marker's first project
       onNavigate(hit.projects[0], 0);
     }
   }, [hitTestMarker, onNavigate]);
 
   // ============================================================================
-  // Scroll wheel: zoom centrato sul cursore
+  // Scroll wheel: cursor-centered zoom
   // ============================================================================
 
   const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
@@ -642,7 +653,7 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
       Math.min(ZOOM_PRESETS.day * 4, vp.pxPerMs * factor)
     );
 
-    // Mantieni il mouse ancorato durante lo zoom
+    // Keep mouse anchored during zoom
     vp.offsetPx = (mouseEpoch - timeRange.minMs) * newPxPerMs - mouseX;
     vp.pxPerMs  = newPxPerMs;
     vp.offsetPx = Math.max(0, vp.offsetPx);
@@ -653,7 +664,7 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
   }, [xToEpoch, timeRange.minMs, scheduleRedraw]);
 
   // ============================================================================
-  // Pulsanti zoom
+  // Zoom buttons
   // ============================================================================
 
   const zoomIn = useCallback(() => {
@@ -689,14 +700,14 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
     needsRedrawRef.current = true;
   }, [xToEpoch, canvasSize.w, timeRange.minMs]);
 
-  /** Cancella la selezione del range */
+  /** Clear the range selection */
   const clearSelection = useCallback(() => {
     setSelectedRange(null);
     needsRedrawRef.current = true;
   }, []);
 
   // ============================================================================
-  // Click sulla overview: salta al punto corrispondente
+  // Overview click: jump to the corresponding point
   // ============================================================================
 
   const handleOverviewClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -707,7 +718,7 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
 
     const clickedMs = timeRange.minMs + (mouseX / canvasSize.w) * totalMs;
     const vp = viewportRef.current;
-    // Centra la viewport sul punto cliccato
+    // Center viewport on the clicked point
     vp.offsetPx = Math.max(0, (clickedMs - timeRange.minMs) * vp.pxPerMs - canvasSize.w / 2);
     needsRedrawRef.current = true;
   }, [timeRange, canvasSize.w]);
@@ -722,9 +733,9 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
       <div className="flex items-center gap-3 flex-wrap">
         {/* Titolo e range dati */}
         <div className="flex-1 min-w-0">
-          <h2 className="text-sm font-semibold text-zinc-200">Timeline Interattiva</h2>
+          <h2 className="text-sm font-semibold text-zinc-200">Interactive Timeline</h2>
           <p className="text-[11px] text-zinc-500 mt-0.5">
-            {markers.length} giorni con attività
+            {markers.length} days with activity
             {' · '}
             {formatTooltipDate(timeRange.minMs)} – {formatTooltipDate(timeRange.maxMs)}
           </p>
@@ -743,7 +754,7 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
               }`}
               aria-label={`Zoom ${level}`}
             >
-              {level === 'day' ? 'Giorno' : level === 'week' ? 'Settimana' : 'Mese'}
+              {level === 'day' ? 'Day' : level === 'week' ? 'Week' : 'Month'}
             </button>
           ))}
         </div>
@@ -753,8 +764,8 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
           <button
             onClick={zoomOut}
             className="w-7 h-7 rounded-md bg-surface-2 border border-border text-zinc-400 hover:text-zinc-100 hover:bg-surface-3 transition-all flex items-center justify-center"
-            aria-label="Riduci zoom"
-            title="Riduci zoom (o scroll verso il basso)"
+            aria-label="Zoom out"
+            title="Zoom out (or scroll down)"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <line x1="5" y1="12" x2="19" y2="12" />
@@ -763,8 +774,8 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
           <button
             onClick={zoomIn}
             className="w-7 h-7 rounded-md bg-surface-2 border border-border text-zinc-400 hover:text-zinc-100 hover:bg-surface-3 transition-all flex items-center justify-center"
-            aria-label="Aumenta zoom"
-            title="Aumenta zoom (o scroll verso l'alto)"
+            aria-label="Zoom in"
+            title="Zoom in (or scroll up)"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -777,19 +788,19 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
           <button
             onClick={clearSelection}
             className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 px-2.5 py-1.5 rounded-lg hover:bg-surface-2 border border-border transition-all"
-            aria-label="Cancella selezione"
+            aria-label="Clear selection"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
-            Cancella selezione
+            Clear selection
           </button>
         )}
       </div>
 
-      {/* Istruzioni uso */}
+      {/* Usage instructions */}
       <p className="text-[10px] text-zinc-600">
-        Trascina per navigare · Scroll per zoom · Shift+trascina per selezionare un intervallo · Click su una barra per navigare al feed
+        Drag to pan · Scroll to zoom · Shift+drag to select a range · Click a bar to navigate to the feed
       </p>
 
       {/* Canvas principale */}
@@ -809,7 +820,7 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
           onMouseLeave={handleMouseLeave}
           onClick={handleClick}
           onWheel={handleWheel}
-          aria-label="Timeline interattiva delle osservazioni"
+          aria-label="Interactive observation timeline"
           role="img"
         />
 
@@ -833,29 +844,29 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
           height={OVERVIEW_H}
           style={{ display: 'block', width: '100%', height: '100%', cursor: 'pointer' }}
           onClick={handleOverviewClick}
-          title="Clicca per spostarti nella timeline"
-          aria-label="Mini-mappa della timeline (clicca per navigare)"
+          title="Click to jump to that point"
+          aria-label="Timeline minimap — click to navigate"
         />
         <div className="absolute top-1 right-2 text-[9px] text-zinc-700 pointer-events-none select-none">
-          panoramica
+          overview
         </div>
       </div>
 
-      {/* Legenda range selezionato */}
+      {/* Selected range legend */}
       {selectedRange && (
         <div className="flex items-center gap-2 px-3 py-2 bg-accent-violet/10 border border-accent-violet/20 rounded-lg">
           <div className="w-2 h-2 rounded-full bg-accent-violet" />
           <span className="text-xs text-zinc-300">
-            Selezione: {formatTooltipDate(selectedRange.fromMs)} – {formatTooltipDate(selectedRange.toMs)}
+            Selection: {formatTooltipDate(selectedRange.fromMs)} – {formatTooltipDate(selectedRange.toMs)}
           </span>
           <span className="text-xs text-zinc-500 ml-auto">
             {markers.filter(m => m.epochMs >= selectedRange.fromMs && m.epochMs <= selectedRange.toMs)
-              .reduce((sum, m) => sum + m.count, 0)} osservazioni
+              .reduce((sum, m) => sum + m.count, 0)} observations
           </span>
         </div>
       )}
 
-      {/* Legenda tipi (se zoom granulare) */}
+      {/* Type legend (visible at day zoom) */}
       {zoomLevel === 'day' && (
         <TypeLegend />
       )}
@@ -864,7 +875,7 @@ function TimelineCanvas({ markers, onNavigate }: TimelineCanvasProps) {
 }
 
 // ============================================================================
-// Tooltip componente
+// Tooltip component
 // ============================================================================
 
 interface TooltipOverlayProps {
@@ -876,7 +887,7 @@ interface TooltipOverlayProps {
 }
 
 function TooltipOverlay({ x, y, marker, canvasW, canvasH }: TooltipOverlayProps) {
-  // Posiziona il tooltip evitando overflow dei bordi
+  // Position tooltip avoiding edge overflow
   const TIP_W = 200;
   const TIP_H = 80;
   const offsetX = x + TIP_W + 12 > canvasW ? x - TIP_W - 8 : x + 12;
@@ -893,7 +904,7 @@ function TooltipOverlay({ x, y, marker, canvasW, canvasH }: TooltipOverlayProps)
         })}
       </div>
       <div className="text-sm font-bold text-accent-violet tabular-nums">
-        {marker.count} <span className="text-xs font-normal text-zinc-400">osservazioni</span>
+        {marker.count} <span className="text-xs font-normal text-zinc-400">observations</span>
       </div>
       {marker.projects.length > 0 && (
         <div className="text-[10px] text-zinc-600 mt-1 truncate">
@@ -906,17 +917,17 @@ function TooltipOverlay({ x, y, marker, canvasW, canvasH }: TooltipOverlayProps)
 }
 
 // ============================================================================
-// Legenda tipi (visibile solo a zoom giornaliero)
+// Type legend (visible at day zoom level only)
 // ============================================================================
 
 function TypeLegend() {
   const entries = [
-    { type: 'file-write', label: 'Scrittura' },
-    { type: 'file-read',  label: 'Lettura' },
-    { type: 'command',    label: 'Comando' },
-    { type: 'research',   label: 'Ricerca' },
-    { type: 'delegation', label: 'Delega' },
-    { type: 'tool-use',   label: 'Tool' },
+    { type: 'file-write', label: 'Changes' },
+    { type: 'file-read',  label: 'Reads' },
+    { type: 'command',    label: 'Commands' },
+    { type: 'research',   label: 'Research' },
+    { type: 'delegation', label: 'Delegations' },
+    { type: 'tool-use',   label: 'Tools' },
   ];
 
   return (

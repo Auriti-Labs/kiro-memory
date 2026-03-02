@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { formatTokenCount } from '../utils/format';
 import type { FilterState, FilterAction, SavedFilter, DatePreset, ConceptEntry } from '../types';
 
@@ -11,23 +11,6 @@ const TYPE_CONFIG: Record<string, { color: string; label: string }> = {
   'delegation': { color: 'bg-accent-violet', label: 'Delegations' },
   'tool-use': { color: 'bg-zinc-400', label: 'Tools' },
 };
-
-/* Colori deterministici per i progetti (hash del nome) */
-const PROJECT_COLORS = [
-  { bg: 'bg-accent-violet/15', text: 'text-accent-violet', ring: 'ring-accent-violet/30' },
-  { bg: 'bg-accent-blue/15', text: 'text-accent-blue', ring: 'ring-accent-blue/30' },
-  { bg: 'bg-accent-green/15', text: 'text-accent-green', ring: 'ring-accent-green/30' },
-  { bg: 'bg-accent-amber/15', text: 'text-accent-amber', ring: 'ring-accent-amber/30' },
-  { bg: 'bg-accent-rose/15', text: 'text-accent-rose', ring: 'ring-accent-rose/30' },
-  { bg: 'bg-accent-cyan/15', text: 'text-accent-cyan', ring: 'ring-accent-cyan/30' },
-  { bg: 'bg-accent-orange/15', text: 'text-accent-orange', ring: 'ring-accent-orange/30' },
-];
-
-function getProjectColorByName(name: string) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash) + name.charCodeAt(i) | 0;
-  return PROJECT_COLORS[Math.abs(hash) % PROJECT_COLORS.length];
-}
 
 /* Preset rapidi per il filtro data */
 const DATE_PRESETS: Array<{ id: DatePreset; label: string }> = [
@@ -57,7 +40,6 @@ interface SidebarProps {
     tokenEconomics: { discoveryTokens: number; readTokens: number; savings: number };
   };
   getDisplayName: (project: string) => string;
-  onRenameProject: (project: string, displayName: string) => Promise<void>;
 }
 
 export function Sidebar({
@@ -70,34 +52,10 @@ export function Sidebar({
   onDeleteSavedFilter,
   stats,
   getDisplayName,
-  onRenameProject,
 }: SidebarProps) {
-  /* Stato locale per la rinomina progetto */
-  const [editingProject, setEditingProject] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
-  const [renameFeedback, setRenameFeedback] = useState<{ project: string; success: boolean } | null>(null);
-  const [projectSearch, setProjectSearch] = useState('');
-  const editInputRef = useRef<HTMLInputElement>(null);
-
   /* Concepts disponibili per il progetto corrente */
   const [concepts, setConcepts] = useState<ConceptEntry[]>([]);
   const [conceptsLoading, setConceptsLoading] = useState(false);
-
-  /* Filtro progetti per ricerca locale */
-  const filteredProjects = projectSearch
-    ? projects.filter(p =>
-        getDisplayName(p).toLowerCase().includes(projectSearch.toLowerCase()) ||
-        p.toLowerCase().includes(projectSearch.toLowerCase())
-      )
-    : projects;
-
-  /* Focus automatico sull'input di rinomina */
-  useEffect(() => {
-    if (editingProject && editInputRef.current) {
-      editInputRef.current.focus();
-      editInputRef.current.select();
-    }
-  }, [editingProject]);
 
   /* Carica i concepts quando cambia il progetto selezionato */
   useEffect(() => {
@@ -112,33 +70,6 @@ export function Sidebar({
       .catch(() => setConcepts([]))
       .finally(() => setConceptsLoading(false));
   }, [filters.project]);
-
-  /* Gestione rinomina progetto */
-  const startEditing = (project: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingProject(project);
-    setEditValue(getDisplayName(project));
-  };
-
-  const confirmEdit = async () => {
-    if (editingProject && editValue.trim()) {
-      try {
-        await onRenameProject(editingProject, editValue.trim());
-        setRenameFeedback({ project: editingProject, success: true });
-      } catch {
-        setRenameFeedback({ project: editingProject, success: false });
-      }
-      setTimeout(() => setRenameFeedback(null), 2000);
-    }
-    setEditingProject(null);
-  };
-
-  const cancelEdit = () => { setEditingProject(null); setEditValue(''); };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') confirmEdit();
-    if (e.key === 'Escape') cancelEdit();
-  };
 
   /* Determina il preset attivo in base al date range corrente */
   function getActivePreset(): DatePreset | null {
@@ -233,116 +164,22 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* ── Sezione: Progetti ── */}
+      {/* ── Sezione: Progetti (select dropdown) ── */}
       <div className="px-4 pb-4">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-3 px-2">Projects</h3>
-
-        {/* Tutti i progetti */}
-        <button
-          onClick={() => dispatch({ type: 'SET_PROJECT', payload: '' })}
-          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all text-left mb-0.5 ${
-            filters.project === ''
-              ? 'bg-accent-violet/10 text-accent-violet font-semibold'
-              : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface-2'
-          }`}
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-2 px-2">Project</h3>
+        <select
+          value={filters.project}
+          onChange={e => dispatch({ type: 'SET_PROJECT', payload: e.target.value })}
+          className="w-full bg-surface-2 border border-border rounded-md text-xs text-zinc-300 px-2.5 py-1.5 outline-none focus:border-accent-violet/50 transition-colors appearance-none cursor-pointer"
+          aria-label="Filter by project"
         >
-          <div className="w-7 h-7 rounded-md bg-accent-violet/15 flex items-center justify-center flex-shrink-0">
-            <svg className="w-3.5 h-3.5 text-accent-violet" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-              <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
-            </svg>
-          </div>
-          <span className="flex-1">All projects</span>
-          <span className="text-xs text-zinc-600 font-mono tabular-nums">{projects.length}</span>
-        </button>
-
-        {/* Ricerca progetti (visibile con 6+ progetti) */}
-        {projects.length >= 6 && (
-          <div className="relative mt-1 mb-2">
-            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-            </svg>
-            <input
-              type="text"
-              value={projectSearch}
-              onChange={e => setProjectSearch(e.target.value)}
-              placeholder="Filter projects..."
-              className="w-full bg-surface-2 border border-border rounded-md text-xs text-zinc-300 placeholder-zinc-600 pl-7 pr-2 py-1.5 outline-none focus:border-accent-violet/50 transition-colors"
-            />
-          </div>
-        )}
-
-        {/* Lista progetti (scrollabile con altezza massima) */}
-        <div className="flex flex-col gap-0.5 mt-1 max-h-[32vh] overflow-y-auto">
-          {filteredProjects.map(project => {
-            const pc = getProjectColorByName(project);
-            const isEditing = editingProject === project;
-            const isActive = filters.project === project;
-            const initials = getDisplayName(project).substring(0, 2).toUpperCase();
-
-            return (
-              <div key={project} className="group">
-                {isEditing ? (
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-3 border border-border">
-                    <input
-                      ref={editInputRef}
-                      type="text"
-                      value={editValue}
-                      onChange={e => setEditValue(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      onBlur={confirmEdit}
-                      className="flex-1 min-w-0 bg-transparent border-none outline-none text-sm text-zinc-200"
-                    />
-                    <button onClick={confirmEdit} className="text-accent-green hover:text-accent-green/80 p-0.5">
-                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
-                    </button>
-                    <button onClick={cancelEdit} className="text-zinc-500 hover:text-zinc-300 p-0.5">
-                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12" /></svg>
-                    </button>
-                  </div>
-                ) : (
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => dispatch({ type: 'SET_PROJECT', payload: project })}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        dispatch({ type: 'SET_PROJECT', payload: project });
-                      }
-                    }}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all text-left cursor-pointer ${
-                      isActive
-                        ? 'bg-surface-3 text-zinc-100 font-medium'
-                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-surface-2'
-                    }`}
-                  >
-                    <div className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 text-[11px] font-bold ${pc.bg} ${pc.text}`}>
-                      {initials}
-                    </div>
-                    <span className="flex-1 truncate">{getDisplayName(project)}</span>
-                    {/* Feedback rinomina */}
-                    {renameFeedback?.project === project && (
-                      <span className={`text-[10px] font-medium animate-fade-in ${renameFeedback.success ? 'text-accent-green' : 'text-accent-rose'}`}>
-                        {renameFeedback.success ? 'Saved' : 'Error'}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={e => startEditing(project, e)}
-                      className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-zinc-300 transition-all p-0.5"
-                      title="Rename"
-                    >
-                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+          <option value="">All projects ({projects.length})</option>
+          {projects.map(project => (
+            <option key={project} value={project}>
+              {getDisplayName(project)}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="mx-4 h-px bg-border" />
@@ -634,7 +471,7 @@ export function Sidebar({
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg>
           </a>
         </div>
-        <div className="text-[10px] text-zinc-700 font-mono text-center">Kiro Memory v1.9.0</div>
+        <div className="text-[10px] text-zinc-700 font-mono text-center">Kiro Memory v3.1.0</div>
       </div>
     </aside>
   );

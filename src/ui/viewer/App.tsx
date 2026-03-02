@@ -33,7 +33,7 @@ export function App() {
 
   const { observations, summaries, prompts, projects, isConnected, lastEventTime } = useSSE();
   const { preference: themePreference, resolvedTheme, setThemePreference } = useTheme();
-  const { getDisplayName, updateAlias } = useProjectAliases();
+  const { getDisplayName } = useProjectAliases();
 
   // Hook centralizzato per la gestione dei filtri avanzati
   const { state: filters, dispatch: dispatchFilter, debouncedSearchText, hasActiveFilters, savedFilters, saveCurrentFilter, deleteSavedFilter } = useFilters();
@@ -317,7 +317,6 @@ export function App() {
           onDeleteSavedFilter={deleteSavedFilter}
           stats={stats}
           getDisplayName={getDisplayName}
-          onRenameProject={updateAlias}
         />
       </div>
 
@@ -339,7 +338,6 @@ export function App() {
               onDeleteSavedFilter={deleteSavedFilter}
               stats={stats}
               getDisplayName={getDisplayName}
-              onRenameProject={async (p, name) => { await updateAlias(p, name); setIsMobileMenuOpen(false); }}
             />
           </div>
         </>

@@ -1,13 +1,13 @@
 /**
- * DiffViewer — Componente side-by-side per confronto osservazioni e sommari (issue #22)
+ * DiffViewer — Side-by-side comparison component for observations and summaries (issue #22)
  *
- * Funzionalita:
- * - Visualizzazione side-by-side con scorrimento sincronizzato
- * - Evidenziazione colorata: verde aggiunte, rosso rimozioni, grigio invariate
- * - Numerazione riga su entrambi i pannelli
- * - Navigazione "Modifica precedente" / "Prossima modifica"
- * - Syntax highlighting base per JS/TS, Python, CSS (solo span, niente librerie)
- * - Selettore comparazione con ricerca
+ * Features:
+ * - Side-by-side view with synchronized scrolling
+ * - Color-coded highlighting: green for additions, red for removals, grey for unchanged
+ * - Line numbering on both panels
+ * - "Previous change" / "Next change" navigation
+ * - Basic syntax highlighting for JS/TS, Python, CSS (spans only, no libraries)
+ * - Comparison selector with search
  */
 
 import React, {
@@ -21,10 +21,10 @@ import { computeDiff, countDiffStats, getChangeIndices } from '../utils/diff';
 import { timeAgo } from '../utils/format';
 
 // ============================================================================
-// Syntax highlighting — nessuna dipendenza esterna
+// Syntax highlighting — no external dependencies
 // ============================================================================
 
-/** Parole chiave JS/TS supportate per l'highlighting */
+/** Supported JS/TS keywords for highlighting */
 const JS_KEYWORDS = new Set([
   'function', 'const', 'let', 'var', 'if', 'else', 'return',
   'import', 'export', 'class', 'for', 'while', 'do', 'switch',
@@ -33,7 +33,7 @@ const JS_KEYWORDS = new Set([
   'default', 'extends', 'interface', 'type', 'enum',
 ]);
 
-/** Parole chiave Python supportate per l'highlighting */
+/** Supported Python keywords for highlighting */
 const PY_KEYWORDS = new Set([
   'def', 'class', 'import', 'from', 'if', 'else', 'elif', 'return',
   'for', 'while', 'in', 'not', 'and', 'or', 'True', 'False', 'None',
@@ -42,8 +42,8 @@ const PY_KEYWORDS = new Set([
 ]);
 
 /**
- * Applica syntax highlighting base a una singola riga di testo.
- * Restituisce un array di elementi React con classi colore appropriate.
+ * Applies basic syntax highlighting to a single line of text.
+ * Returns an array of React elements with appropriate color classes.
  */
 function highlightLine(line: string): React.ReactNode[] {
   if (!line.trim()) return [<span key="empty">{line}</span>];
@@ -51,7 +51,7 @@ function highlightLine(line: string): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
   let keyIdx = 0;
 
-  // Commento di riga: // o # (tutto il resto della riga)
+  // Line comment: // or # (rest of line)
   const commentMatch = line.match(/^(.*?)(\/\/.*|#.*)$/);
   if (commentMatch) {
     const before = commentMatch[1];
@@ -70,11 +70,11 @@ function highlightLine(line: string): React.ReactNode[] {
 }
 
 /**
- * Tokenizza una stringa e applica colori a keywords e stringhe.
+ * Tokenizes a string and applies colors to keywords and strings.
  */
 function highlightTokens(text: string, baseKey: number): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
-  // Regex che separa: stringhe quotate, parole, caratteri rimanenti
+  // Regex that separates: quoted strings, words, remaining characters
   const tokenRegex = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`|\b\w+\b|[^\w"'`]+)/g;
   let match: RegExpExecArray | null;
   let idx = baseKey;
@@ -83,13 +83,13 @@ function highlightTokens(text: string, baseKey: number): React.ReactNode[] {
     const token = match[0];
     idx++;
 
-    // Stringa quotata (singola, doppia, backtick)
+    // Quoted string (single, double, backtick)
     if (/^["'`]/.test(token)) {
       nodes.push(<span key={`str-${idx}`} className="text-amber-400/90">{token}</span>);
       continue;
     }
 
-    // Numero intero o decimale
+    // Integer or decimal number
     if (/^\d+(\.\d+)?$/.test(token)) {
       nodes.push(<span key={`num-${idx}`} className="text-cyan-400/80">{token}</span>);
       continue;
@@ -107,7 +107,7 @@ function highlightTokens(text: string, baseKey: number): React.ReactNode[] {
       continue;
     }
 
-    // Testo normale
+    // Plain text
     nodes.push(<span key={`tok-${idx}`}>{token}</span>);
   }
 
@@ -115,22 +115,22 @@ function highlightTokens(text: string, baseKey: number): React.ReactNode[] {
 }
 
 // ============================================================================
-// DiffLine — singola riga nei pannelli
+// DiffLine — single line in the panels
 // ============================================================================
 
 interface DiffLineProps {
-  /** Testo della riga */
+  /** Line text */
   line: string;
-  /** Numero di riga da mostrare (null = riga placeholder vuota) */
+  /** Line number to display (null = empty placeholder line) */
   lineNumber: number | null;
-  /** Tipo del blocco cui appartiene la riga */
+  /** Type of the chunk this line belongs to */
   type: DiffChunk['type'];
-  /** Se abilitare syntax highlighting */
+  /** Whether to enable syntax highlighting */
   highlight: boolean;
 }
 
 function DiffLine({ line, lineNumber, type, highlight }: DiffLineProps) {
-  // Classi colore per sfondo e bordo sinistro in base al tipo operazione
+  // Color classes for background and left border based on operation type
   const bgClass =
     type === 'add'    ? 'bg-emerald-500/10 border-l-2 border-emerald-500/60' :
     type === 'remove' ? 'bg-rose-500/10 border-l-2 border-rose-500/60' :
@@ -149,15 +149,15 @@ function DiffLine({ line, lineNumber, type, highlight }: DiffLineProps) {
 
   return (
     <div className={`flex items-stretch min-h-[22px] font-mono text-[12px] leading-relaxed ${bgClass}`}>
-      {/* Numero di riga */}
+      {/* Line number */}
       <div className={`w-10 flex-shrink-0 text-right pr-2 pt-px select-none text-[11px] tabular-nums ${numBgClass}`}>
         {lineNumber !== null ? lineNumber : ''}
       </div>
-      {/* Carattere prefisso +/- */}
+      {/* Prefix character +/- */}
       <div className={`w-4 flex-shrink-0 text-center pt-px ${prefixClass}`}>
         {prefixChar}
       </div>
-      {/* Contenuto riga con highlighting opzionale */}
+      {/* Line content with optional highlighting */}
       <div className="flex-1 pl-1 pr-2 pt-px overflow-x-hidden whitespace-pre-wrap break-all">
         {highlight ? highlightLine(line) : <span>{line}</span>}
       </div>
@@ -166,11 +166,11 @@ function DiffLine({ line, lineNumber, type, highlight }: DiffLineProps) {
 }
 
 // ============================================================================
-// ItemSelector — modal per scegliere quale osservazione/sommario confrontare
+// ItemSelector — modal for choosing which observation/summary to compare
 // ============================================================================
 
 interface SelectorProps {
-  /** Etichetta del pannello ("Prima" | "Dopo") */
+  /** Panel label ("Before" | "After") */
   label: string;
   observations: Observation[];
   summaries: Summary[];
@@ -201,26 +201,26 @@ function ItemSelector({ label, observations, summaries, selected, onSelect, getD
     );
   }, [summaries, search]);
 
-  /** Estrae il testo confrontabile da un'osservazione */
+  /** Extracts comparable text from an observation */
   function obsToContent(o: Observation): string {
     return [o.narrative, o.text, o.title].filter(Boolean).join('\n\n');
   }
 
-  /** Estrae il testo confrontabile da un sommario */
+  /** Extracts comparable text from a summary */
   function sumToContent(s: Summary): string {
     return [
-      s.request       && `Richiesta: ${s.request}`,
-      s.investigated  && `Analizzato: ${s.investigated}`,
-      s.learned       && `Imparato: ${s.learned}`,
-      s.completed     && `Completato: ${s.completed}`,
-      s.next_steps    && `Prossimi passi: ${s.next_steps}`,
-      s.notes         && `Note: ${s.notes}`,
+      s.request       && `Request: ${s.request}`,
+      s.investigated  && `Investigated: ${s.investigated}`,
+      s.learned       && `Learned: ${s.learned}`,
+      s.completed     && `Completed: ${s.completed}`,
+      s.next_steps    && `Next steps: ${s.next_steps}`,
+      s.notes         && `Notes: ${s.notes}`,
     ].filter(Boolean).join('\n\n');
   }
 
   return (
     <div className="flex-1 min-w-0">
-      {/* Bottone apertura selettore */}
+      {/* Selector open button */}
       <button
         onClick={() => setOpen(true)}
         className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-2 border border-border hover:border-border-hover hover:bg-surface-3 transition-all text-left"
@@ -229,14 +229,14 @@ function ItemSelector({ label, observations, summaries, selected, onSelect, getD
         {selected ? (
           <span className="flex-1 min-w-0 text-xs text-zinc-200 truncate">{selected.title}</span>
         ) : (
-          <span className="flex-1 text-xs text-zinc-500 italic">Seleziona elemento...</span>
+          <span className="flex-1 text-xs text-zinc-500 italic">Select item...</span>
         )}
         <svg className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="m6 9 6 6 6-6" />
         </svg>
       </button>
 
-      {/* Modal di selezione */}
+      {/* Selection modal */}
       {open && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
@@ -246,21 +246,21 @@ function ItemSelector({ label, observations, summaries, selected, onSelect, getD
             className="bg-surface-1 border border-border rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
-            {/* Header modal */}
+            {/* Modal header */}
             <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-              <span className="text-sm font-semibold text-zinc-200">Seleziona {label}</span>
+              <span className="text-sm font-semibold text-zinc-200">Select {label}</span>
               <div className="ml-auto flex items-center gap-1 rounded-lg bg-surface-2 border border-border p-0.5">
                 <button
                   onClick={() => setKind('observation')}
                   className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${kind === 'observation' ? 'bg-surface-3 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
                 >
-                  Osservazioni
+                  Observations
                 </button>
                 <button
                   onClick={() => setKind('summary')}
                   className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${kind === 'summary' ? 'bg-surface-3 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
                 >
-                  Sommari
+                  Summaries
                 </button>
               </div>
               <button onClick={() => setOpen(false)} className="text-zinc-500 hover:text-zinc-200 transition-colors ml-1">
@@ -270,23 +270,23 @@ function ItemSelector({ label, observations, summaries, selected, onSelect, getD
               </button>
             </div>
 
-            {/* Campo ricerca */}
+            {/* Search field */}
             <div className="px-4 py-2 border-b border-border">
               <input
                 type="text"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Cerca per titolo o progetto..."
+                placeholder="Search by title or project..."
                 className="w-full px-3 py-1.5 rounded-lg bg-surface-0 border border-border text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-accent-violet transition-colors"
                 autoFocus
               />
             </div>
 
-            {/* Lista elementi filtrati */}
+            {/* Filtered item list */}
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
               {kind === 'observation' ? (
                 filteredObs.length === 0
-                  ? <p className="text-center text-sm text-zinc-500 py-8">Nessuna osservazione trovata</p>
+                  ? <p className="text-center text-sm text-zinc-500 py-8">No observations found</p>
                   : filteredObs.map(obs => (
                     <button
                       key={obs.id}
@@ -294,7 +294,7 @@ function ItemSelector({ label, observations, summaries, selected, onSelect, getD
                         onSelect({
                           kind: 'observation',
                           id: obs.id,
-                          title: obs.title || `Osservazione #${obs.id}`,
+                          title: obs.title || `Observation #${obs.id}`,
                           date: obs.created_at,
                           project: obs.project,
                           content: obsToContent(obs),
@@ -304,7 +304,7 @@ function ItemSelector({ label, observations, summaries, selected, onSelect, getD
                       className="w-full flex items-start gap-3 px-3 py-2 rounded-lg hover:bg-surface-2 transition-colors text-left"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-zinc-300 truncate">{obs.title || `Osservazione #${obs.id}`}</p>
+                        <p className="text-xs font-medium text-zinc-300 truncate">{obs.title || `Observation #${obs.id}`}</p>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-[11px] text-accent-violet">{getDisplayName(obs.project)}</span>
                           <span className="text-[11px] text-zinc-600">{timeAgo(obs.created_at_epoch)}</span>
@@ -315,7 +315,7 @@ function ItemSelector({ label, observations, summaries, selected, onSelect, getD
                   ))
               ) : (
                 filteredSum.length === 0
-                  ? <p className="text-center text-sm text-zinc-500 py-8">Nessun sommario trovato</p>
+                  ? <p className="text-center text-sm text-zinc-500 py-8">No summaries found</p>
                   : filteredSum.map(sum => (
                     <button
                       key={sum.id}
@@ -323,7 +323,7 @@ function ItemSelector({ label, observations, summaries, selected, onSelect, getD
                         onSelect({
                           kind: 'summary',
                           id: sum.id,
-                          title: sum.request || `Sommario #${sum.id}`,
+                          title: sum.request || `Summary #${sum.id}`,
                           date: sum.created_at,
                           project: sum.project,
                           content: sumToContent(sum),
@@ -333,7 +333,7 @@ function ItemSelector({ label, observations, summaries, selected, onSelect, getD
                       className="w-full flex items-start gap-3 px-3 py-2 rounded-lg hover:bg-surface-2 transition-colors text-left"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-zinc-300 truncate">{sum.request || `Sommario #${sum.id}`}</p>
+                        <p className="text-xs font-medium text-zinc-300 truncate">{sum.request || `Summary #${sum.id}`}</p>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-[11px] text-accent-violet">{getDisplayName(sum.project)}</span>
                           <span className="text-[11px] text-zinc-600">{timeAgo(sum.created_at_epoch)}</span>
@@ -351,42 +351,42 @@ function ItemSelector({ label, observations, summaries, selected, onSelect, getD
 }
 
 // ============================================================================
-// DiffViewer — componente principale esportato
+// DiffViewer — main exported component
 // ============================================================================
 
 export interface DiffViewerProps {
-  /** Lista osservazioni disponibili per la selezione */
+  /** Available observations for selection */
   observations: Observation[];
-  /** Lista sommari disponibili per la selezione */
+  /** Available summaries for selection */
   summaries: Summary[];
-  /** Funzione display name progetto */
+  /** Project display name function */
   getDisplayName: (p: string) => string;
-  /** Selezione iniziale pannello sinistro (opzionale, pre-popola dal Feed) */
+  /** Initial left panel selection (optional, pre-populated from Feed) */
   initialLeft?: DiffSelection;
-  /** Selezione iniziale pannello destro (opzionale) */
+  /** Initial right panel selection (optional) */
   initialRight?: DiffSelection;
 }
 
 export function DiffViewer({ observations, summaries, getDisplayName, initialLeft, initialRight }: DiffViewerProps) {
-  // Elementi selezionati per il confronto
+  // Selected items for comparison
   const [leftSel,  setLeftSel]  = useState<DiffSelection | null>(initialLeft  ?? null);
   const [rightSel, setRightSel] = useState<DiffSelection | null>(initialRight ?? null);
 
   // Toggle syntax highlighting
   const [syntaxHighlight, setSyntaxHighlight] = useState(true);
 
-  // Indice modifica corrente per la navigazione
+  // Current change index for navigation
   const [currentChangeIdx, setCurrentChangeIdx] = useState(0);
 
-  // Ref pannelli per lo scroll sincronizzato
+  // Panel refs for synchronized scrolling
   const leftPaneRef   = useRef<HTMLDivElement>(null);
   const rightPaneRef  = useRef<HTMLDivElement>(null);
-  const isSyncingRef  = useRef(false); // flag anti-loop scorrimento
+  const isSyncingRef  = useRef(false); // anti-loop scroll flag
 
-  // Ref per le righe marcate come inizio di una modifica (navigazione)
+  // Refs for rows marked as start of a change (navigation)
   const changeRowRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // ── Calcola il diff ──
+  // ── Compute the diff ──
   const chunks = useMemo<DiffChunk[]>(() => {
     if (!leftSel || !rightSel) return [];
     return computeDiff(leftSel.content, rightSel.content);
@@ -395,7 +395,7 @@ export function DiffViewer({ observations, summaries, getDisplayName, initialLef
   const stats         = useMemo(() => countDiffStats(chunks), [chunks]);
   const changeIndices = useMemo(() => getChangeIndices(chunks), [chunks]);
 
-  // ── Scroll sincronizzato tra i due pannelli ──
+  // ── Synchronized scroll between the two panels ──
   const syncScroll = useCallback((source: 'left' | 'right') => {
     if (isSyncingRef.current) return;
     isSyncingRef.current = true;
@@ -408,7 +408,7 @@ export function DiffViewer({ observations, summaries, getDisplayName, initialLef
     requestAnimationFrame(() => { isSyncingRef.current = false; });
   }, []);
 
-  // ── Navigazione tra le modifiche ──
+  // ── Navigate between changes ──
   const navigateToChange = useCallback((direction: 'prev' | 'next') => {
     if (changeIndices.length === 0) return;
     const newIdx = direction === 'next'
@@ -419,14 +419,14 @@ export function DiffViewer({ observations, summaries, getDisplayName, initialLef
     if (rowEl) rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [currentChangeIdx, changeIndices.length]);
 
-  // ── Struttura righe per i pannelli ──
+  // ── Row structure for panels ──
   interface PanelLine {
     line: string;
     lineNumber: number | null;
     type: DiffChunk['type'];
-    /** true = prima riga di un blocco non-equal (usata come ancora navigazione) */
+    /** true = first row of a non-equal block (used as navigation anchor) */
     isChangeAnchor: boolean;
-    changeAnchorIdx: number; // indice in changeIndices (-1 se non ancora)
+    changeAnchorIdx: number; // index in changeIndices (-1 if not an anchor)
   }
 
   const { leftLines, rightLines } = useMemo(() => {
@@ -462,11 +462,11 @@ export function DiffViewer({ observations, summaries, getDisplayName, initialLef
     return { leftLines: left, rightLines: right };
   }, [chunks, changeIndices]);
 
-  // Badge per tipo elemento
+  // Badge for item type
   function kindBadge(kind: DiffItemKind) {
     return kind === 'observation'
-      ? <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">Osservazione</span>
-      : <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400">Sommario</span>;
+      ? <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">Observation</span>
+      : <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400">Summary</span>;
   }
 
   // ============================================================================
@@ -475,10 +475,10 @@ export function DiffViewer({ observations, summaries, getDisplayName, initialLef
   return (
     <div className="flex flex-col h-full gap-4">
 
-      {/* ── Riga selezione elementi ── */}
+      {/* ── Item selection row ── */}
       <div className="flex items-center gap-3">
         <ItemSelector
-          label="Prima"
+          label="Before"
           observations={observations}
           summaries={summaries}
           selected={leftSel}
@@ -491,7 +491,7 @@ export function DiffViewer({ observations, summaries, getDisplayName, initialLef
           </svg>
         </div>
         <ItemSelector
-          label="Dopo"
+          label="After"
           observations={observations}
           summaries={summaries}
           selected={rightSel}
@@ -500,7 +500,7 @@ export function DiffViewer({ observations, summaries, getDisplayName, initialLef
         />
       </div>
 
-      {/* ── Stato iniziale: nessuna selezione ── */}
+      {/* ── Initial state: no selection ── */}
       {(!leftSel || !rightSel) && (
         <div className="flex-1 flex flex-col items-center justify-center py-20 text-center">
           <div className="w-16 h-16 rounded-2xl bg-surface-2 border border-border flex items-center justify-center mb-5">
@@ -509,20 +509,20 @@ export function DiffViewer({ observations, summaries, getDisplayName, initialLef
               <path d="M9 12h6" />
             </svg>
           </div>
-          <p className="text-base font-semibold text-zinc-300 mb-2">Seleziona due elementi</p>
+          <p className="text-base font-semibold text-zinc-300 mb-2">Select two items</p>
           <p className="text-sm text-zinc-500 max-w-xs leading-relaxed">
-            Usa i selettori in alto per scegliere un'osservazione o un sommario da confrontare.
+            Use the selectors above to choose an observation or summary to compare.
           </p>
         </div>
       )}
 
-      {/* ── Pannello diff vero e proprio ── */}
+      {/* ── Actual diff panel ── */}
       {leftSel && rightSel && (
         <div className="flex flex-col flex-1 min-h-0 bg-surface-1 border border-border rounded-xl overflow-hidden">
 
-          {/* Header: metadati + controlli */}
+          {/* Header: metadata + controls */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-surface-2 flex-wrap">
-            {/* Info sinistra */}
+            {/* Left info */}
             <div className="flex items-center gap-2 min-w-0">
               {kindBadge(leftSel.kind)}
               <span className="text-xs text-zinc-300 truncate max-w-[160px]" title={leftSel.title}>{leftSel.title}</span>
@@ -534,7 +534,7 @@ export function DiffViewer({ observations, summaries, getDisplayName, initialLef
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
 
-            {/* Info destra */}
+            {/* Right info */}
             <div className="flex items-center gap-2 min-w-0">
               {kindBadge(rightSel.kind)}
               <span className="text-xs text-zinc-300 truncate max-w-[160px]" title={rightSel.title}>{rightSel.title}</span>
@@ -544,22 +544,22 @@ export function DiffViewer({ observations, summaries, getDisplayName, initialLef
 
             <div className="flex-1" />
 
-            {/* Statistiche diff */}
+            {/* Diff stats */}
             <div className="flex items-center gap-2 text-[12px] font-mono">
               {stats.added   > 0 && <span className="text-emerald-400">+{stats.added}</span>}
               {stats.removed > 0 && <span className="text-rose-400">-{stats.removed}</span>}
-              {stats.unchanged > 0 && <span className="text-zinc-500">{stats.unchanged} invariate</span>}
+              {stats.unchanged > 0 && <span className="text-zinc-500">{stats.unchanged} unchanged</span>}
             </div>
 
-            {/* Navigazione tra modifiche */}
+            {/* Change navigation */}
             {changeIndices.length > 0 && (
               <div className="flex items-center gap-1.5">
                 <span className="text-[11px] text-zinc-500">{currentChangeIdx + 1}/{changeIndices.length}</span>
                 <button
                   onClick={() => navigateToChange('prev')}
                   className="w-7 h-7 rounded-md bg-surface-0 border border-border text-zinc-400 hover:text-zinc-200 hover:border-border-hover transition-all flex items-center justify-center"
-                  title="Modifica precedente"
-                  aria-label="Vai alla modifica precedente"
+                  title="Previous change"
+                  aria-label="Go to previous change"
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <path d="m15 18-6-6 6-6" />
@@ -568,8 +568,8 @@ export function DiffViewer({ observations, summaries, getDisplayName, initialLef
                 <button
                   onClick={() => navigateToChange('next')}
                   className="w-7 h-7 rounded-md bg-surface-0 border border-border text-zinc-400 hover:text-zinc-200 hover:border-border-hover transition-all flex items-center justify-center"
-                  title="Prossima modifica"
-                  aria-label="Vai alla prossima modifica"
+                  title="Next change"
+                  aria-label="Go to next change"
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <path d="m9 18 6-6-6-6" />
@@ -586,7 +586,7 @@ export function DiffViewer({ observations, summaries, getDisplayName, initialLef
                   ? 'bg-accent-violet/15 border-accent-violet/30 text-accent-violet'
                   : 'bg-surface-0 border-border text-zinc-500 hover:text-zinc-300'
               }`}
-              title="Attiva/disattiva syntax highlighting"
+              title="Toggle syntax highlighting"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" />
@@ -595,7 +595,7 @@ export function DiffViewer({ observations, summaries, getDisplayName, initialLef
             </button>
           </div>
 
-          {/* Contenuto diff — nessuna differenza */}
+          {/* Diff content — no differences */}
           {leftLines.length === 0 ? (
             <div className="flex items-center justify-center py-16">
               <div className="text-center">
@@ -604,24 +604,24 @@ export function DiffViewer({ observations, summaries, getDisplayName, initialLef
                     <path d="M20 6 9 17l-5-5" />
                   </svg>
                 </div>
-                <p className="text-sm font-semibold text-zinc-300">Nessuna differenza</p>
-                <p className="text-xs text-zinc-500 mt-1">I due elementi hanno lo stesso contenuto.</p>
+                <p className="text-sm font-semibold text-zinc-300">No differences</p>
+                <p className="text-xs text-zinc-500 mt-1">Both items have identical content.</p>
               </div>
             </div>
           ) : (
-            /* Pannelli side-by-side */
+            /* Side-by-side panels */
             <div className="flex flex-1 min-h-0 overflow-hidden">
 
-              {/* Pannello SINISTRO (before) */}
+              {/* LEFT panel (before) */}
               <div
                 ref={leftPaneRef}
                 className="flex-1 min-w-0 overflow-y-auto overflow-x-auto border-r border-border"
                 onScroll={() => syncScroll('left')}
-                aria-label="Versione originale"
+                aria-label="Original version"
               >
                 <div className="sticky top-0 z-10 px-3 py-1.5 text-[11px] font-semibold text-zinc-400 bg-surface-2 border-b border-border flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-rose-500" />
-                  Prima
+                  Before
                 </div>
                 {leftLines.map((row, rowIdx) => (
                   <div
@@ -642,23 +642,23 @@ export function DiffViewer({ observations, summaries, getDisplayName, initialLef
                 ))}
               </div>
 
-              {/* Pannello DESTRO (after) */}
+              {/* RIGHT panel (after) */}
               <div
                 ref={rightPaneRef}
                 className="flex-1 min-w-0 overflow-y-auto overflow-x-auto"
                 onScroll={() => syncScroll('right')}
-                aria-label="Versione aggiornata"
+                aria-label="Updated version"
               >
                 <div className="sticky top-0 z-10 px-3 py-1.5 text-[11px] font-semibold text-zinc-400 bg-surface-2 border-b border-border flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  Dopo
+                  After
                 </div>
                 {rightLines.map((row, rowIdx) => (
                   <div
                     key={rowIdx}
                     ref={el => {
                       if (row.isChangeAnchor && row.changeAnchorIdx !== -1) {
-                        // Solo per righe add, l'ancora e' sul pannello destro
+                        // For add rows, the anchor is on the right panel
                         if (!changeRowRefs.current[row.changeAnchorIdx]) {
                           changeRowRefs.current[row.changeAnchorIdx] = el;
                         }

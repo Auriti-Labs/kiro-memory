@@ -958,22 +958,46 @@ var BunQueryCompat = class {
     this._stmt = db.prepare(sql);
   }
   /**
+   * Adatta parametri named da formato bun:sqlite a better-sqlite3.
+   * bun:sqlite: chiavi CON prefisso (es. { $todayStart: 123 })
+   * better-sqlite3: chiavi SENZA prefisso (es. { todayStart: 123 })
+   */
+  _adaptParams(params) {
+    if (params.length !== 1 || typeof params[0] !== "object" || params[0] === null || Array.isArray(params[0])) {
+      return params;
+    }
+    const obj = params[0];
+    const keys = Object.keys(obj);
+    if (keys.length === 0) return params;
+    if (!keys[0].startsWith("$") && !keys[0].startsWith("@") && !keys[0].startsWith(":")) {
+      return params;
+    }
+    const adapted = {};
+    for (const key of keys) {
+      adapted[key.slice(1)] = obj[key];
+    }
+    return [adapted];
+  }
+  /**
    * Returns all rows
    */
   all(...params) {
-    return params.length > 0 ? this._stmt.all(...params) : this._stmt.all();
+    if (params.length === 0) return this._stmt.all();
+    return this._stmt.all(...this._adaptParams(params));
   }
   /**
    * Returns the first row or null
    */
   get(...params) {
-    return params.length > 0 ? this._stmt.get(...params) : this._stmt.get();
+    if (params.length === 0) return this._stmt.get();
+    return this._stmt.get(...this._adaptParams(params));
   }
   /**
    * Execute without results
    */
   run(...params) {
-    return params.length > 0 ? this._stmt.run(...params) : this._stmt.run();
+    if (params.length === 0) return this._stmt.run();
+    return this._stmt.run(...this._adaptParams(params));
   }
 };
 
