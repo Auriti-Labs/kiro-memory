@@ -22,9 +22,18 @@ export class Database {
   }
 
   /**
-   * Execute a SQL query without results
+   * Execute a SQL query without results.
+   * PRAGMA statements are handled via better-sqlite3's native pragma() method.
    */
   run(sql: string, params?: any[]): { lastInsertRowid: number | bigint; changes: number } {
+    // better-sqlite3 handles PRAGMA via .pragma(), not .prepare().run()
+    const trimmed = sql.trim();
+    if (/^PRAGMA\s+/i.test(trimmed)) {
+      // Extract "key = value" from "PRAGMA key = value"
+      const pragmaBody = trimmed.replace(/^PRAGMA\s+/i, '').replace(/;$/, '');
+      this._db.pragma(pragmaBody);
+      return { lastInsertRowid: 0, changes: 0 };
+    }
     const stmt = this._db.prepare(sql);
     const result = params ? stmt.run(...params) : stmt.run();
     return result;
