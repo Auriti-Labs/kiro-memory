@@ -95,6 +95,24 @@ npm run install:kiro
 
 Once installed, the worker auto-starts and the web dashboard is available at `http://localhost:3001`.
 
+## Updating
+
+```bash
+# Update to the latest version
+npm update -g kiro-memory
+
+# Verify the installed version
+kiro-memory --version
+```
+
+The worker will automatically use the new version at the next session start. To apply the update immediately:
+
+```bash
+npm run worker:restart
+# or manually:
+pkill -f "worker-service" && kiro-memory install
+```
+
 ## Editor Integration
 
 ### Claude Code
