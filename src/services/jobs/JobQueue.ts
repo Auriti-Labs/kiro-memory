@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import { Database } from '../../db/index.js';
 import { logger } from '../../utils/logger.js';
 
 // Job status lifecycle: pending → running → completed | dead

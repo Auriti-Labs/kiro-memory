@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import { Database } from '../../db/index.js';
 import type { Summary } from '../../types/worker-types.js';
 
 /**

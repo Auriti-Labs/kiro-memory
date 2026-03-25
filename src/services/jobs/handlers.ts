@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import { Database } from '../../db/index.js';
 import type { IJobHandler } from './JobQueue.js';
 import { consolidateObservations } from '../sqlite/Observations.js';
 import { logger } from '../../utils/logger.js';

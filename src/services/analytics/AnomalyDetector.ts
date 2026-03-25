@@ -1,4 +1,4 @@
-import type { Database } from 'bun:sqlite';
+import type { Database } from '../../db/types.js';
 import { logger } from '../../utils/logger.js';
 
 /**
