@@ -1,75 +1,75 @@
 {
-  "name": "kiro-memory",
-  "displayName": "Kiro Memory",
+  "name": "totalrecall",
+  "displayName": "Total Recall",
   "description": "Persistent cross-session memory for AI coding assistants",
   "version": "0.1.0",
   "publisher": "auriti-labs",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Auriti-Labs/kiro-memory"
+    "url": "https://github.com/Auriti-Labs/totalrecall"
   },
   "bugs": {
-    "url": "https://github.com/Auriti-Labs/kiro-memory/issues"
+    "url": "https://github.com/Auriti-Labs/totalrecall/issues"
   },
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": ["Other"],
   "keywords": ["kiro", "memory", "ai", "context", "coding-assistant"],
-  "icon": "resources/icons/kiro-memory.png",
+  "icon": "resources/icons/totalrecall.png",
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "kiro-memory-sidebar",
-          "title": "Kiro Memory",
-          "icon": "resources/icons/kiro-memory.svg"
+          "id": "totalrecall-sidebar",
+          "title": "Total Recall",
+          "icon": "resources/icons/totalrecall.svg"
         }
       ]
     },
     "views": {
-      "kiro-memory-sidebar": [
+      "totalrecall-sidebar": [
         {
           "id": "kiroMemory.projects",
           "name": "Projects",
-          "icon": "resources/icons/kiro-memory.svg",
-          "contextualTitle": "Kiro Memory — Projects"
+          "icon": "resources/icons/totalrecall.svg",
+          "contextualTitle": "Total Recall — Projects"
         },
         {
           "id": "kiroMemory.observations",
           "name": "Observations",
           "icon": "resources/icons/observation.svg",
-          "contextualTitle": "Kiro Memory — Observations"
+          "contextualTitle": "Total Recall — Observations"
         },
         {
           "id": "kiroMemory.sessions",
           "name": "Sessions",
-          "contextualTitle": "Kiro Memory — Sessions"
+          "contextualTitle": "Total Recall — Sessions"
         }
       ]
     },
     "commands": [
       {
         "command": "kiroMemory.search",
-        "title": "Kiro Memory: Search",
+        "title": "Total Recall: Search",
         "icon": "$(search)"
       },
       {
         "command": "kiroMemory.showDashboard",
-        "title": "Kiro Memory: Open Dashboard",
+        "title": "Total Recall: Open Dashboard",
         "icon": "$(browser)"
       },
       {
         "command": "kiroMemory.showContext",
-        "title": "Kiro Memory: Show Context for Current Project",
+        "title": "Total Recall: Show Context for Current Project",
         "icon": "$(info)"
       },
       {
         "command": "kiroMemory.refresh",
-        "title": "Kiro Memory: Refresh",
+        "title": "Total Recall: Refresh",
         "icon": "$(refresh)"
       }
     ],
@@ -117,19 +117,19 @@
       ]
     },
     "configuration": {
-      "title": "Kiro Memory",
+      "title": "Total Recall",
       "properties": {
         "kiroMemory.workerHost": {
           "type": "string",
           "default": "127.0.0.1",
-          "description": "Host del worker Kiro Memory (default: 127.0.0.1)"
+          "description": "Host del worker Total Recall (default: 127.0.0.1)"
         },
         "kiroMemory.workerPort": {
           "type": "number",
           "default": 3001,
           "minimum": 1024,
           "maximum": 65535,
-          "description": "Porta del worker Kiro Memory (default: 3001)"
+          "description": "Porta del worker Total Recall (default: 3001)"
         },
         "kiroMemory.refreshInterval": {
           "type": "number",

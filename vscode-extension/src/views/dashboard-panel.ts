@@ -1,5 +1,5 @@
 /**
- * DashboardPanel — WebviewPanel che ospita la dashboard Kiro Memory.
+ * DashboardPanel — WebviewPanel che ospita la dashboard Total Recall.
  *
  * Carica la dashboard React del worker (http://127.0.0.1:3001) via iframe
  * all'interno di un pannello WebView VS Code. Gestisce il ciclo di vita
@@ -10,7 +10,7 @@ import * as vscode from 'vscode';
 
 // ── Costanti ───────────────────────────────────────────────────────────────
 
-const PANEL_TITLE = 'Kiro Memory Dashboard';
+const PANEL_TITLE = 'Total Recall Dashboard';
 const VIEW_TYPE   = 'kiroMemoryDashboard';
 
 // ── Classe panel ───────────────────────────────────────────────────────────
@@ -51,7 +51,7 @@ export class DashboardPanel {
       context.extensionUri,
       'resources',
       'icons',
-      'kiro-memory.svg'
+      'totalrecall.svg'
     );
 
     // Render HTML iniziale
@@ -228,7 +228,7 @@ export class DashboardPanel {
     <div class="error-icon">⚡</div>
     <div class="error-title">Worker non raggiungibile</div>
     <div class="error-msg">
-      Il worker Kiro Memory non sembra attivo. Avvialo dal terminale con:
+      Il worker Total Recall non sembra attivo. Avvialo dal terminale con:
     </div>
     <code class="error-url">npm run dev</code>
     <div class="error-msg">
@@ -240,7 +240,7 @@ export class DashboardPanel {
   <iframe
     id="dashFrame"
     src="${frameUrl}"
-    title="Kiro Memory Dashboard"
+    title="Total Recall Dashboard"
     sandbox="allow-scripts allow-same-origin allow-forms"
     referrerpolicy="no-referrer"
   ></iframe>

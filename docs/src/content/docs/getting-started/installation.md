@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: How to install Kiro Memory — global or project-local, prerequisites, and the setup wizard.
+description: How to install Total Recall — global or project-local, prerequisites, and the setup wizard.
 ---
 
 ## Prerequisites
@@ -15,13 +15,13 @@ description: How to install Kiro Memory — global or project-local, prerequisit
 Install once and use in every project:
 
 ```bash
-npm install -g kiro-memory
+npm install -g totalrecall
 ```
 
 Verify the installation:
 
 ```bash
-kiro-memory --version
+totalrecall --version
 # 2.1.0
 ```
 
@@ -30,21 +30,21 @@ kiro-memory --version
 If you prefer to keep the dependency scoped to a single project:
 
 ```bash
-npm install kiro-memory
+npm install totalrecall
 # or
-pnpm add kiro-memory
+pnpm add totalrecall
 # or
-bun add kiro-memory
+bun add totalrecall
 ```
 
-With a project-local install, use `npx kiro-memory` instead of `kiro-memory` in all CLI commands.
+With a project-local install, use `npx totalrecall` instead of `totalrecall` in all CLI commands.
 
 ## Running the Setup Wizard
 
 After installing, run the interactive setup wizard:
 
 ```bash
-kiro-memory setup
+totalrecall setup
 ```
 
 The wizard will:
@@ -56,10 +56,10 @@ The wizard will:
 
 ### What the Setup Creates
 
-**For Kiro CLI**, hooks are installed in `~/.kiro/plugins/kiro-memory/`:
+**For Kiro CLI**, hooks are installed in `~/.kiro/plugins/totalrecall/`:
 
 ```
-~/.kiro/plugins/kiro-memory/
+~/.kiro/plugins/totalrecall/
 ├── agentSpawn.js          # Context injection at session start
 ├── userPromptSubmit.js    # Prompt recording
 ├── postToolUse.js         # Tool usage capture
@@ -75,10 +75,10 @@ If you prefer to install hooks manually without the wizard:
 
 ```bash
 # Copy the plugin files
-cp -r node_modules/kiro-memory/plugin/* ~/.kiro/plugins/kiro-memory/
+cp -r node_modules/totalrecall/plugin/* ~/.kiro/plugins/totalrecall/
 
 # Start the worker
-kiro-memory worker:start
+totalrecall worker:start
 ```
 
 Or use the npm script included in the package:
@@ -92,7 +92,7 @@ npm run install:kiro
 Run the doctor command to check everything is working:
 
 ```bash
-kiro-memory doctor
+totalrecall doctor
 ```
 
 This checks:
@@ -106,14 +106,14 @@ A healthy installation looks like:
 ```
 [OK] Worker running at http://127.0.0.1:3001
 [OK] Database found at ~/.contextkit/contextkit.db
-[OK] Hooks installed in ~/.kiro/plugins/kiro-memory/
+[OK] Hooks installed in ~/.kiro/plugins/totalrecall/
 [OK] Schema version: 11
 [--] Embedding service: not available (optional)
 ```
 
 ## Optional: Semantic Search Dependencies
 
-Kiro Memory supports local vector embeddings for semantic search. These are optional — the system works without them using FTS5 keyword search only.
+Total Recall supports local vector embeddings for semantic search. These are optional — the system works without them using FTS5 keyword search only.
 
 To enable embeddings, install one of the optional backends:
 
@@ -131,14 +131,14 @@ After installing, the embedding service will initialize automatically on next wo
 
 ```bash
 # Stop the worker
-kiro-memory worker:stop
+totalrecall worker:stop
 
 # Remove hooks (Kiro CLI)
-rm -rf ~/.kiro/plugins/kiro-memory/
+rm -rf ~/.kiro/plugins/totalrecall/
 
 # Remove data (optional — this deletes your memory database)
 rm -rf ~/.contextkit/
 
 # Uninstall the package
-npm uninstall -g kiro-memory
+npm uninstall -g totalrecall
 ```

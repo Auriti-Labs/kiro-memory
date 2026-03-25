@@ -2,7 +2,7 @@ import { Database } from '../../db/index.js';
 import type { UserPrompt } from '../../types/worker-types.js';
 
 /**
- * Prompt operations for Kiro Memory database
+ * Prompt operations for Total Recall database
  */
 
 export function createPrompt(

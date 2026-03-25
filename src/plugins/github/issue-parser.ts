@@ -16,7 +16,7 @@ export interface IssueReference {
   number: number;
   /** Owner del repository, se specificato (es. "Auriti-Labs") */
   owner?: string;
-  /** Nome del repository, se specificato (es. "kiro-memory") */
+  /** Nome del repository, se specificato (es. "totalrecall") */
   repo?: string;
   /** Keyword associata, se presente (es. "closes", "fixes", "resolves") */
   keyword?: string;

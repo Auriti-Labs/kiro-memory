@@ -1,9 +1,9 @@
 ---
 title: Search
-description: How Kiro Memory search works — FTS5 keyword search, vector embeddings, hybrid search, and scoring.
+description: How Total Recall search works — FTS5 keyword search, vector embeddings, hybrid search, and scoring.
 ---
 
-Kiro Memory provides three search modes: FTS5 keyword search, vector semantic search, and hybrid search that combines both.
+Total Recall provides three search modes: FTS5 keyword search, vector semantic search, and hybrid search that combines both.
 
 ## Search Architecture
 
@@ -109,7 +109,7 @@ If you enable embeddings after already collecting data, backfill:
 
 ```bash
 # Via CLI (planned)
-kiro-memory backfill-embeddings
+totalrecall backfill-embeddings
 
 # Via API
 curl -X POST http://localhost:3001/api/embeddings/backfill \

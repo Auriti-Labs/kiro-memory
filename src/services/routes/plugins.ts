@@ -13,7 +13,7 @@
 
 import { Router } from 'express';
 import { PluginRegistry, createPluginLogger } from '../plugins/PluginRegistry.js';
-import { KiroMemorySDK } from '../../sdk/index.js';
+import { TotalRecallSDK } from '../../sdk/index.js';
 import type { WorkerContext } from '../worker-context.js';
 import { logger } from '../../utils/logger.js';
 
@@ -22,7 +22,7 @@ export function createPluginsRouter(ctx: WorkerContext): Router {
   const registry = PluginRegistry.getInstance();
 
   // SDK condiviso per il PluginContext (creato una sola volta per il router)
-  const sdk = new KiroMemorySDK({ skipMigrations: true });
+  const sdk = new TotalRecallSDK({ skipMigrations: true });
 
   // ── GET /api/plugins ──────────────────────────────────────────────────────
 

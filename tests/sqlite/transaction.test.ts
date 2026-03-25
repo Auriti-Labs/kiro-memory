@@ -3,14 +3,14 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
+import { TotalRecallDatabase } from '../../src/services/sqlite/Database.js';
 import { createObservation } from '../../src/services/sqlite/Observations.js';
 
 describe('withTransaction', () => {
-  let dbInstance: KiroMemoryDatabase;
+  let dbInstance: TotalRecallDatabase;
 
   beforeEach(() => {
-    dbInstance = new KiroMemoryDatabase(':memory:');
+    dbInstance = new TotalRecallDatabase(':memory:');
   });
 
   afterEach(() => {

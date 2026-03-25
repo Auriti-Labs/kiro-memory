@@ -135,24 +135,24 @@ describe('normalizeFTS5Rank', () => {
 
 describe('projectMatchScore', () => {
   it('returns 1 when projects match exactly', () => {
-    expect(projectMatchScore('kiro-memory', 'kiro-memory')).toBe(1);
+    expect(projectMatchScore('totalrecall', 'totalrecall')).toBe(1);
   });
 
   it('returns 1 when projects match case-insensitively', () => {
-    expect(projectMatchScore('Kiro-Memory', 'kiro-memory')).toBe(1);
-    expect(projectMatchScore('kiro-memory', 'KIRO-MEMORY')).toBe(1);
+    expect(projectMatchScore('Kiro-Memory', 'totalrecall')).toBe(1);
+    expect(projectMatchScore('totalrecall', 'KIRO-MEMORY')).toBe(1);
   });
 
   it('returns 0 when projects differ', () => {
-    expect(projectMatchScore('kiro-memory', 'other-project')).toBe(0);
+    expect(projectMatchScore('totalrecall', 'other-project')).toBe(0);
   });
 
   it('returns 0 when item project is empty string', () => {
-    expect(projectMatchScore('', 'kiro-memory')).toBe(0);
+    expect(projectMatchScore('', 'totalrecall')).toBe(0);
   });
 
   it('returns 0 when target project is empty string', () => {
-    expect(projectMatchScore('kiro-memory', '')).toBe(0);
+    expect(projectMatchScore('totalrecall', '')).toBe(0);
   });
 
   it('returns 0 when both projects are empty strings', () => {

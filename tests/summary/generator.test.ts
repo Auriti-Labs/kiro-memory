@@ -361,10 +361,10 @@ describe('LLMSummaryGenerator', () => {
 
 describe('createSummaryGenerator', () => {
   afterEach(() => {
-    delete process.env.KIRO_MEMORY_SUMMARY_PROVIDER;
-    delete process.env.KIRO_MEMORY_SUMMARY_MODEL;
-    delete process.env.KIRO_MEMORY_SUMMARY_API_KEY;
-    delete process.env.KIRO_MEMORY_SUMMARY_BASE_URL;
+    delete process.env.TOTALRECALL_SUMMARY_PROVIDER;
+    delete process.env.TOTALRECALL_SUMMARY_MODEL;
+    delete process.env.TOTALRECALL_SUMMARY_API_KEY;
+    delete process.env.TOTALRECALL_SUMMARY_BASE_URL;
   });
 
   it('returns TemplateSummaryGenerator by default (no env var set)', () => {
@@ -374,53 +374,53 @@ describe('createSummaryGenerator', () => {
   });
 
   it('returns TemplateSummaryGenerator for explicit "template" provider', () => {
-    process.env.KIRO_MEMORY_SUMMARY_PROVIDER = 'template';
+    process.env.TOTALRECALL_SUMMARY_PROVIDER = 'template';
     const gen = createSummaryGenerator();
     expect(gen).toBeInstanceOf(TemplateSummaryGenerator);
   });
 
   it('returns LLMSummaryGenerator for "openai" provider', () => {
-    process.env.KIRO_MEMORY_SUMMARY_PROVIDER = 'openai';
-    process.env.KIRO_MEMORY_SUMMARY_API_KEY = 'sk-test';
+    process.env.TOTALRECALL_SUMMARY_PROVIDER = 'openai';
+    process.env.TOTALRECALL_SUMMARY_API_KEY = 'sk-test';
     const gen = createSummaryGenerator();
     expect(gen).toBeInstanceOf(LLMSummaryGenerator);
     expect(gen.name).toBe('llm-openai');
   });
 
   it('returns LLMSummaryGenerator for "anthropic" provider', () => {
-    process.env.KIRO_MEMORY_SUMMARY_PROVIDER = 'anthropic';
-    process.env.KIRO_MEMORY_SUMMARY_API_KEY = 'sk-ant-test';
+    process.env.TOTALRECALL_SUMMARY_PROVIDER = 'anthropic';
+    process.env.TOTALRECALL_SUMMARY_API_KEY = 'sk-ant-test';
     const gen = createSummaryGenerator();
     expect(gen).toBeInstanceOf(LLMSummaryGenerator);
     expect(gen.name).toBe('llm-anthropic');
   });
 
   it('returns LLMSummaryGenerator for "ollama" provider', () => {
-    process.env.KIRO_MEMORY_SUMMARY_PROVIDER = 'ollama';
+    process.env.TOTALRECALL_SUMMARY_PROVIDER = 'ollama';
     const gen = createSummaryGenerator();
     expect(gen).toBeInstanceOf(LLMSummaryGenerator);
     expect(gen.name).toBe('llm-ollama');
   });
 
   it('falls back to template for unknown provider', () => {
-    process.env.KIRO_MEMORY_SUMMARY_PROVIDER = 'unknown-llm';
+    process.env.TOTALRECALL_SUMMARY_PROVIDER = 'unknown-llm';
     const gen = createSummaryGenerator();
     expect(gen).toBeInstanceOf(TemplateSummaryGenerator);
   });
 
   it('reads model from env var for LLM providers', () => {
-    process.env.KIRO_MEMORY_SUMMARY_PROVIDER = 'openai';
-    process.env.KIRO_MEMORY_SUMMARY_MODEL = 'gpt-4o';
-    process.env.KIRO_MEMORY_SUMMARY_API_KEY = 'sk-test';
+    process.env.TOTALRECALL_SUMMARY_PROVIDER = 'openai';
+    process.env.TOTALRECALL_SUMMARY_MODEL = 'gpt-4o';
+    process.env.TOTALRECALL_SUMMARY_API_KEY = 'sk-test';
     const gen = createSummaryGenerator();
     // Name is derived from provider, not model — just verify it's an LLM generator
     expect(gen).toBeInstanceOf(LLMSummaryGenerator);
   });
 
   it('uses default model "gpt-4o-mini" when model env var not set', () => {
-    process.env.KIRO_MEMORY_SUMMARY_PROVIDER = 'openai';
-    process.env.KIRO_MEMORY_SUMMARY_API_KEY = 'sk-test';
-    // No KIRO_MEMORY_SUMMARY_MODEL set
+    process.env.TOTALRECALL_SUMMARY_PROVIDER = 'openai';
+    process.env.TOTALRECALL_SUMMARY_API_KEY = 'sk-test';
+    // No TOTALRECALL_SUMMARY_MODEL set
     const gen = createSummaryGenerator();
     expect(gen).toBeInstanceOf(LLMSummaryGenerator);
     // We can verify via the name which only contains provider
@@ -428,15 +428,15 @@ describe('createSummaryGenerator', () => {
   });
 
   it('passes API key from env var to LLM generator', () => {
-    process.env.KIRO_MEMORY_SUMMARY_PROVIDER = 'anthropic';
-    process.env.KIRO_MEMORY_SUMMARY_API_KEY = 'sk-ant-12345';
+    process.env.TOTALRECALL_SUMMARY_PROVIDER = 'anthropic';
+    process.env.TOTALRECALL_SUMMARY_API_KEY = 'sk-ant-12345';
     const gen = createSummaryGenerator();
     expect(gen).toBeInstanceOf(LLMSummaryGenerator);
   });
 
   it('passes custom base URL from env var to LLM generator', () => {
-    process.env.KIRO_MEMORY_SUMMARY_PROVIDER = 'ollama';
-    process.env.KIRO_MEMORY_SUMMARY_BASE_URL = 'http://remote-server:11434';
+    process.env.TOTALRECALL_SUMMARY_PROVIDER = 'ollama';
+    process.env.TOTALRECALL_SUMMARY_BASE_URL = 'http://remote-server:11434';
     const gen = createSummaryGenerator();
     expect(gen).toBeInstanceOf(LLMSummaryGenerator);
   });

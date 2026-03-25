@@ -2,7 +2,7 @@ import { Database } from '../../db/index.js';
 import type { ReportData } from '../../types/worker-types.js';
 
 /**
- * Report module for Kiro Memory.
+ * Report module for Total Recall.
  * Aggregates metrics for a specific time range.
  */
 

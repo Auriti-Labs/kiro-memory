@@ -1,9 +1,9 @@
 ---
 title: MCP Tools Reference
-description: Detailed reference for the 4 MCP tools exposed by the Kiro Memory MCP server.
+description: Detailed reference for the 4 MCP tools exposed by the Total Recall MCP server.
 ---
 
-The Kiro Memory MCP server exposes 4 tools via the Model Context Protocol stdio transport. These tools are available to any MCP-compatible AI editor.
+The Total Recall MCP server exposes 4 tools via the Model Context Protocol stdio transport. These tools are available to any MCP-compatible AI editor.
 
 ## Tool Overview
 

@@ -1,5 +1,5 @@
 /**
- * Extension entry point — Kiro Memory VS Code Extension.
+ * Extension entry point — Total Recall VS Code Extension.
  *
  * Questo modulo gestisce il ciclo di vita completo dell'estensione:
  * - Attivazione (activate): registra comandi, provider TreeView, status bar
@@ -7,7 +7,7 @@
  *
  * Architettura:
  *   extension.ts
- *     ├── KiroMemoryClient      (HTTP client verso worker:3001)
+ *     ├── TotalRecallClient      (HTTP client verso worker:3001)
  *     ├── ProjectsProvider      (TreeView sidebar — Projects)
  *     ├── ObservationsProvider  (TreeView sidebar — Observations)
  *     ├── SessionsProvider      (TreeView sidebar — Sessions)
@@ -25,7 +25,7 @@ import { ObservationsProvider }  from './providers/observations-provider';
 import { SessionsProvider }      from './providers/sessions-provider';
 
 // Client API worker
-import { KiroMemoryClient }      from './api-client';
+import { TotalRecallClient }      from './api-client';
 
 // Comandi
 import { searchCommand, openObservationInEditor } from './commands/search';
@@ -62,7 +62,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const workerUrl = `http://${host}:${port}`;
 
   // Client API
-  const client = new KiroMemoryClient(host, port);
+  const client = new TotalRecallClient(host, port);
 
   // ── Providers TreeView ───────────────────────────────────────────────────
 
@@ -70,7 +70,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const observationsProvider = new ObservationsProvider(client, maxObs);
   const sessionsProvider     = new SessionsProvider(client);
 
-  // Registra le TreeView nel sidebar Kiro Memory
+  // Registra le TreeView nel sidebar Total Recall
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider('kiroMemory.projects',     projectsProvider),
     vscode.window.registerTreeDataProvider('kiroMemory.observations', observationsProvider),
@@ -84,7 +84,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     STATUS_BAR_PRIORITY
   );
   statusBarItem.command = 'kiroMemory.showDashboard';
-  statusBarItem.tooltip = 'Kiro Memory — Clicca per aprire la dashboard';
+  statusBarItem.tooltip = 'Total Recall — Clicca per aprire la dashboard';
   context.subscriptions.push(statusBarItem);
 
   // Aggiorna status bar in base allo stato connessione
@@ -143,7 +143,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       // Mostra notifica contestuale
       vscode.window.setStatusBarMessage(
-        `Kiro Memory: filtro attivo per "${projectName}"`,
+        `Total Recall: filtro attivo per "${projectName}"`,
         3000
       );
     })
@@ -161,7 +161,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('kiroMemory.clearFilter', () => {
       observationsProvider.setProjectFilter(undefined);
       sessionsProvider.setProjectFilter(undefined);
-      vscode.window.setStatusBarMessage('Kiro Memory: filtro rimosso', 2000);
+      vscode.window.setStatusBarMessage('Total Recall: filtro rimosso', 2000);
     })
   );
 
@@ -196,7 +196,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   );
 
   // Log attivazione
-  console.log('Kiro Memory: estensione attivata su', workerUrl);
+  console.log('Total Recall: estensione attivata su', workerUrl);
 }
 
 // ── Funzione di deattivazione ──────────────────────────────────────────────
@@ -209,7 +209,7 @@ export function deactivate(): void {
   stopAutoRefresh();
   statusBarItem?.dispose();
   statusBarItem = undefined;
-  console.log('Kiro Memory: estensione deattivata');
+  console.log('Total Recall: estensione deattivata');
 }
 
 // ── Helper: status bar ─────────────────────────────────────────────────────
@@ -219,15 +219,15 @@ export function deactivate(): void {
  * di connessione al worker.
  */
 async function updateStatusBar(
-  client: KiroMemoryClient,
+  client: TotalRecallClient,
   item: vscode.StatusBarItem
 ): Promise<void> {
   try {
     const health = await client.getHealth();
     if (health.status === 'ok') {
-      item.text     = '$(brain) Kiro Memory';
+      item.text     = '$(brain) Total Recall';
       item.color    = undefined; // Colore default VS Code
-      item.tooltip  = `Kiro Memory v${health.version} — Worker attivo`;
+      item.tooltip  = `Total Recall v${health.version} — Worker attivo`;
       item.backgroundColor = undefined;
     } else {
       setStatusBarOffline(item);
@@ -238,10 +238,10 @@ async function updateStatusBar(
 }
 
 function setStatusBarOffline(item: vscode.StatusBarItem): void {
-  item.text            = '$(warning) Kiro Memory';
+  item.text            = '$(warning) Total Recall';
   item.color           = new vscode.ThemeColor('statusBarItem.warningForeground');
   item.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
-  item.tooltip         = 'Kiro Memory — Worker non raggiungibile (porta 3001)';
+  item.tooltip         = 'Total Recall — Worker non raggiungibile (porta 3001)';
 }
 
 // ── Helper: auto-refresh ───────────────────────────────────────────────────
@@ -250,7 +250,7 @@ type Refreshable = { refresh(): void };
 
 function startAutoRefresh(
   intervalSec: number,
-  client: KiroMemoryClient,
+  client: TotalRecallClient,
   item: vscode.StatusBarItem,
   providers: Refreshable[]
 ): void {

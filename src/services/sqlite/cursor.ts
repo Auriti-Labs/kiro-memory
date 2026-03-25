@@ -1,5 +1,5 @@
 /**
- * Keyset pagination cursor per Kiro Memory.
+ * Keyset pagination cursor per Total Recall.
  *
  * Il cursor codifica in base64 la coppia (created_at_epoch, id) che identifica
  * univocamente l'ultima riga restituita dalla pagina precedente.

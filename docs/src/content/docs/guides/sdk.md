@@ -1,32 +1,32 @@
 ---
 title: SDK
-description: Using the KiroMemorySDK class for programmatic access to the memory system.
+description: Using the TotalRecallSDK class for programmatic access to the memory system.
 ---
 
-The Kiro Memory SDK provides programmatic access to all memory operations. Use it to build integrations, custom scripts, or extend the default hook behavior.
+The Total Recall SDK provides programmatic access to all memory operations. Use it to build integrations, custom scripts, or extend the default hook behavior.
 
 ## Installation
 
 ```bash
-npm install kiro-memory
+npm install totalrecall
 ```
 
 ## Import
 
 ```typescript
-import { createKiroMemory } from 'kiro-memory/sdk';
+import { createTotalRecall } from 'totalrecall/sdk';
 // or
-import { KiroMemorySDK } from 'kiro-memory/sdk';
+import { TotalRecallSDK } from 'totalrecall/sdk';
 ```
 
 ## Factory Function
 
-### `createKiroMemory(config?)`
+### `createTotalRecall(config?)`
 
-Creates a new `KiroMemorySDK` instance.
+Creates a new `TotalRecallSDK` instance.
 
 ```typescript
-const sdk = createKiroMemory({
+const sdk = createTotalRecall({
   dataDir: '/path/to/data',   // default: ~/.contextkit
   project: 'my-project',      // default: auto-detected from git
   skipMigrations: false        // default: false (set true for high-frequency hooks)
@@ -373,9 +373,9 @@ if (!available) {
 ## Complete Example
 
 ```typescript
-import { createKiroMemory } from 'kiro-memory/sdk';
+import { createTotalRecall } from 'totalrecall/sdk';
 
-const sdk = createKiroMemory({ project: 'my-project' });
+const sdk = createTotalRecall({ project: 'my-project' });
 
 try {
   // Store an architectural decision

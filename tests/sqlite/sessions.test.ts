@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
+import { TotalRecallDatabase } from '../../src/services/sqlite/Database.js';
 import {
   createSession,
   getSessionByContentId,
@@ -20,7 +20,7 @@ describe('Sessions Module', () => {
   let db: Database;
 
   beforeEach(() => {
-    db = new KiroMemoryDatabase(':memory:').db;
+    db = new TotalRecallDatabase(':memory:').db;
   });
 
   afterEach(() => {

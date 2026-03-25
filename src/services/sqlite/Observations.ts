@@ -4,7 +4,7 @@ import { redactSecrets } from '../../utils/secrets.js';
 import { categorize } from '../../utils/categorizer.js';
 
 /**
- * Observation operations for Kiro Memory database
+ * Observation operations for Total Recall database
  */
 
 /** Escape LIKE wildcard characters to prevent pattern injection */

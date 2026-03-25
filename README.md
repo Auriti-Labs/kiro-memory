@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="Kiro Memory" width="480" />
+  <img src="assets/banner.svg" alt="Total Recall" width="480" />
 </p>
 
 <p align="center">
@@ -8,27 +8,27 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/kiro-memory"><img src="https://img.shields.io/npm/v/kiro-memory" alt="npm" /></a>
+  <a href="https://www.npmjs.com/package/totalrecall"><img src="https://img.shields.io/npm/v/totalrecall" alt="npm" /></a>
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License" />
   <img src="https://img.shields.io/badge/node-%3E%3D18-green" alt="Node" />
-  <a href="https://auritidesign.it/docs/kiro-memory/"><img src="https://img.shields.io/badge/docs-auritidesign.it-00b4d8" alt="Docs" /></a>
+  <a href="https://auritidesign.it/docs/totalrecall/"><img src="https://img.shields.io/badge/docs-auritidesign.it-00b4d8" alt="Docs" /></a>
 </p>
 
 ---
 
-Kiro Memory gives your AI coding assistant memory that persists across sessions. It automatically captures what happened -- files changed, tools used, decisions made -- and feeds relevant context back at the start of the next session. No manual bookkeeping. Your agent picks up exactly where it left off.
+Total Recall gives your AI coding assistant memory that persists across sessions. It automatically captures what happened -- files changed, tools used, decisions made -- and feeds relevant context back at the start of the next session. No manual bookkeeping. Your agent picks up exactly where it left off.
 
 
-**[Read the full documentation →](https://auritidesign.it/docs/kiro-memory/)**
+**[Read the full documentation →](https://auritidesign.it/docs/totalrecall/)**
 
 Works with **Claude Code** (hooks), **Cursor** (rules + MCP), **Windsurf** (rules + MCP), **Cline** (custom instructions + MCP), and any editor that supports the **Model Context Protocol**.
 
 ## What Your Agent Sees
 
-When a new session starts, Kiro Memory automatically injects previous session context:
+When a new session starts, Total Recall automatically injects previous session context:
 
 ```
-# Kiro Memory: Previous Session Context
+# Total Recall: Previous Session Context
 
 ## Previous Sessions
 
@@ -74,21 +74,21 @@ When a new session starts, Kiro Memory automatically injects previous session co
 
 ```bash
 # Install globally
-npm install -g kiro-memory
+npm install -g totalrecall
 
 # Install for your editor
-kiro-memory install              # Auto-detects your editor
-kiro-memory install --claude-code  # Claude Code (hooks + MCP)
-kiro-memory install --cursor       # Cursor (rules + MCP)
-kiro-memory install --windsurf     # Windsurf (rules + MCP)
-kiro-memory install --cline        # Cline (instructions + MCP)
+totalrecall install              # Auto-detects your editor
+totalrecall install --claude-code  # Claude Code (hooks + MCP)
+totalrecall install --cursor       # Cursor (rules + MCP)
+totalrecall install --windsurf     # Windsurf (rules + MCP)
+totalrecall install --cline        # Cline (instructions + MCP)
 ```
 
 Or from source:
 
 ```bash
-git clone https://github.com/Auriti-Labs/kiro-memory.git
-cd kiro-memory
+git clone https://github.com/Auriti-Labs/totalrecall.git
+cd totalrecall
 npm install && npm run build
 npm run install:kiro
 ```
@@ -99,10 +99,10 @@ Once installed, the worker auto-starts and the web dashboard is available at `ht
 
 ```bash
 # Update to the latest version
-npm update -g kiro-memory
+npm update -g totalrecall
 
 # Verify the installed version
-kiro-memory --version
+totalrecall --version
 ```
 
 The worker will automatically use the new version at the next session start. To apply the update immediately:
@@ -110,14 +110,14 @@ The worker will automatically use the new version at the next session start. To 
 ```bash
 npm run worker:restart
 # or manually:
-pkill -f "worker-service" && kiro-memory install
+pkill -f "worker-service" && totalrecall install
 ```
 
 ## Editor Integration
 
 ### Claude Code
 
-Registers **4 hooks** and an **MCP server** automatically via `kiro-memory install --claude-code`:
+Registers **4 hooks** and an **MCP server** automatically via `totalrecall install --claude-code`:
 
 | Hook | Trigger | Purpose |
 |------|---------|---------|
@@ -128,9 +128,9 @@ Registers **4 hooks** and an **MCP server** automatically via `kiro-memory insta
 
 ### Cursor / Windsurf / Cline
 
-For editors without hook support, Kiro Memory uses **rules files** + **MCP server**:
+For editors without hook support, Total Recall uses **rules files** + **MCP server**:
 
-- **Cursor**: `.cursor/rules/kiro-memory.mdc` + MCP config in `.cursor/mcp.json`
+- **Cursor**: `.cursor/rules/totalrecall.mdc` + MCP config in `.cursor/mcp.json`
 - **Windsurf**: `.windsurfrules` + MCP config in `~/.codeium/windsurf/mcp_config.json`
 - **Cline**: `.clinerules` + MCP config in Cline settings
 
@@ -157,7 +157,7 @@ The MCP server exposes 11 tools that your AI assistant can use directly.
                  +------+-----+
                         |
               SQLite + FTS5 + Embeddings
-             (~/.kiro-memory/kiro-memory.db)
+             (~/.totalrecall/totalrecall.db)
 ```
 
 > The worker auto-starts when a session begins. No manual setup required.
@@ -182,19 +182,19 @@ The MCP server exposes 11 tools that your AI assistant can use directly.
 
 | Component | Location |
 |-----------|----------|
-| Database | `~/.kiro-memory/kiro-memory.db` |
-| Logs | `~/.kiro-memory/logs/` |
-| Archives | `~/.kiro-memory/archives/` |
-| Backups | `~/.kiro-memory/backups/` |
+| Database | `~/.totalrecall/totalrecall.db` |
+| Logs | `~/.totalrecall/logs/` |
+| Archives | `~/.totalrecall/archives/` |
+| Backups | `~/.totalrecall/backups/` |
 
 ## SDK
 
 The TypeScript SDK provides full programmatic access to the memory system.
 
 ```typescript
-import { createKiroMemory } from 'kiro-memory';
+import { createTotalRecall } from 'totalrecall';
 
-const ctx = createKiroMemory({ project: 'my-project' });
+const ctx = createTotalRecall({ project: 'my-project' });
 
 // Retrieve context for the current project
 const context = await ctx.getContext();
@@ -253,46 +253,46 @@ ctx.close();
 ## CLI Reference
 
 ```bash
-kiro-memory <command> [options]
+totalrecall <command> [options]
 ```
 
 | Command | Alias | Description |
 |---------|-------|-------------|
-| `kiro-memory install` | -- | Install hooks + MCP for your editor |
-| `kiro-memory context` | `ctx` | Display current project context |
-| `kiro-memory search <query>` | -- | Search across all stored context |
-| `kiro-memory semantic-search <query>` | `ss` | Vector similarity search |
-| `kiro-memory observations [limit]` | `obs` | Show recent observations |
-| `kiro-memory summaries [limit]` | `sum` | Show recent summaries |
-| `kiro-memory add-observation <title> <content>` | `add-obs` | Manually add an observation |
-| `kiro-memory add-summary <content>` | `add-sum` | Manually add a summary |
-| `kiro-memory add-knowledge <type> <title> <content>` | -- | Store structured knowledge |
-| `kiro-memory resume [sessionId]` | -- | Resume from last checkpoint |
-| `kiro-memory report` | -- | Generate activity report |
-| `kiro-memory decay` | -- | Run memory decay detection |
-| `kiro-memory embeddings` | -- | Build/rebuild vector index |
-| `kiro-memory doctor` | -- | Run environment diagnostics |
+| `totalrecall install` | -- | Install hooks + MCP for your editor |
+| `totalrecall context` | `ctx` | Display current project context |
+| `totalrecall search <query>` | -- | Search across all stored context |
+| `totalrecall semantic-search <query>` | `ss` | Vector similarity search |
+| `totalrecall observations [limit]` | `obs` | Show recent observations |
+| `totalrecall summaries [limit]` | `sum` | Show recent summaries |
+| `totalrecall add-observation <title> <content>` | `add-obs` | Manually add an observation |
+| `totalrecall add-summary <content>` | `add-sum` | Manually add a summary |
+| `totalrecall add-knowledge <type> <title> <content>` | -- | Store structured knowledge |
+| `totalrecall resume [sessionId]` | -- | Resume from last checkpoint |
+| `totalrecall report` | -- | Generate activity report |
+| `totalrecall decay` | -- | Run memory decay detection |
+| `totalrecall embeddings` | -- | Build/rebuild vector index |
+| `totalrecall doctor` | -- | Run environment diagnostics |
 
 ### Examples
 
 ```bash
 # Install for Claude Code
-kiro-memory install --claude-code
+totalrecall install --claude-code
 
 # Search with vector similarity
-kiro-memory semantic-search "authentication flow"
+totalrecall semantic-search "authentication flow"
 
 # Generate a weekly report in Markdown
-kiro-memory report --period=weekly --format=md --output=report.md
+totalrecall report --period=weekly --format=md --output=report.md
 
 # Store an architectural decision
-kiro-memory add-knowledge decision "Use PostgreSQL" "ACID compliance for transactions"
+totalrecall add-knowledge decision "Use PostgreSQL" "ACID compliance for transactions"
 
 # Resume a previous session
-kiro-memory resume
+totalrecall resume
 
 # Run memory decay to clean stale observations
-kiro-memory decay --days=30
+totalrecall decay --days=30
 ```
 
 ## Configuration
@@ -301,10 +301,10 @@ kiro-memory decay --days=30
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `KIRO_MEMORY_DATA_DIR` | `~/.kiro-memory` | Base directory for all Kiro Memory data |
-| `KIRO_MEMORY_WORKER_HOST` | `127.0.0.1` | Worker service bind address |
-| `KIRO_MEMORY_WORKER_PORT` | `3001` | Worker service port |
-| `KIRO_MEMORY_LOG_LEVEL` | `INFO` | Log verbosity: `DEBUG`, `INFO`, `WARN`, `ERROR` |
+| `TOTALRECALL_DATA_DIR` | `~/.totalrecall` | Base directory for all Total Recall data |
+| `TOTALRECALL_WORKER_HOST` | `127.0.0.1` | Worker service bind address |
+| `TOTALRECALL_WORKER_PORT` | `3001` | Worker service port |
+| `TOTALRECALL_LOG_LEVEL` | `INFO` | Log verbosity: `DEBUG`, `INFO`, `WARN`, `ERROR` |
 | `KIRO_CONFIG_DIR` | `~/.kiro` | Kiro CLI configuration directory |
 
 ### Worker & Web Dashboard
@@ -382,7 +382,7 @@ nvm install 22
 which node  # Should be /home/... or /root/.nvm/...
 
 # Reinstall
-npm install -g kiro-memory
+npm install -g totalrecall
 ```
 
 ### `npm prefix` pointing to Windows (WSL)
@@ -398,7 +398,7 @@ echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 
 # Reinstall
-npm install -g kiro-memory
+npm install -g totalrecall
 ```
 
 ### Missing build tools (Linux/WSL)
@@ -414,21 +414,21 @@ Native modules like `better-sqlite3` need compilation tools.
 
 ```bash
 sudo apt-get update && sudo apt-get install -y build-essential python3
-npm install -g kiro-memory --build-from-source
+npm install -g totalrecall --build-from-source
 ```
 
-### `no agent with name kiro-memory found`
+### `no agent with name totalrecall found`
 
 The agent configuration was not installed. Run the install command:
 
 ```bash
-kiro-memory install
+totalrecall install
 ```
 
-This creates the agent config at `~/.kiro/agents/kiro-memory.json`. Then start Kiro with:
+This creates the agent config at `~/.kiro/agents/totalrecall.json`. Then start Kiro with:
 
 ```bash
-kiro-cli --agent kiro-memory
+kiro-cli --agent totalrecall
 ```
 
 ### Port 3001 already in use
@@ -441,7 +441,7 @@ lsof -i :3001
 kill -9 <PID>
 
 # Or use a different port
-export KIRO_MEMORY_WORKER_PORT=3002
+export TOTALRECALL_WORKER_PORT=3002
 ```
 
 ### Quick diagnostics
@@ -449,21 +449,21 @@ export KIRO_MEMORY_WORKER_PORT=3002
 Run the built-in doctor command to check your environment:
 
 ```bash
-kiro-memory doctor
+totalrecall doctor
 ```
 
 ## Security
 
-Kiro Memory runs **locally only** on `127.0.0.1` and implements multiple layers of protection:
+Total Recall runs **locally only** on `127.0.0.1` and implements multiple layers of protection:
 
-- **Token Authentication** on the notify endpoint (shared secret via `~/.kiro-memory/worker.token`)
+- **Token Authentication** on the notify endpoint (shared secret via `~/.totalrecall/worker.token`)
 - **Rate Limiting** on all API endpoints (200 req/min global, 60 req/min for notifications)
 - **Helmet** security headers with Content Security Policy
 - **CORS** restricted to localhost origins
 - **Input Validation** on all POST endpoints (type checking, length limits, safe character patterns)
 - **SSE Connection Limit** (max 50 concurrent clients)
 
-To report a security vulnerability, please open a [private security advisory](https://github.com/Auriti-Labs/kiro-memory/security/advisories/new).
+To report a security vulnerability, please open a [private security advisory](https://github.com/Auriti-Labs/totalrecall/security/advisories/new).
 
 ## Contributing
 

@@ -1,5 +1,5 @@
 /**
- * Provider TreeView per i progetti Kiro Memory.
+ * Provider TreeView per i progetti Total Recall.
  *
  * Mostra la lista dei progetti distinti nel database, con il numero
  * di osservazioni per ognuno. Ogni nodo è cliccabile per filtrare
@@ -7,7 +7,7 @@
  */
 
 import * as vscode from 'vscode';
-import type { KiroMemoryClient, ProjectStats } from '../api-client';
+import type { TotalRecallClient, ProjectStats } from '../api-client';
 
 // ── Nodo TreeView progetto ─────────────────────────────────────────────────
 
@@ -77,7 +77,7 @@ export class ProjectsProvider implements vscode.TreeDataProvider<ProjectTreeItem
   /** Cache locale dei progetti per ridurre le chiamate API */
   private cachedProjects: ProjectTreeItem[] = [];
 
-  constructor(private readonly client: KiroMemoryClient) {}
+  constructor(private readonly client: TotalRecallClient) {}
 
   /**
    * Aggiorna la tree view ricaricando i dati dal worker.
@@ -137,7 +137,7 @@ export class ProjectsProvider implements vscode.TreeDataProvider<ProjectTreeItem
       return items;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Errore sconosciuto';
-      vscode.window.showErrorMessage(`Kiro Memory: impossibile caricare i progetti — ${msg}`);
+      vscode.window.showErrorMessage(`Total Recall: impossibile caricare i progetti — ${msg}`);
       return this.cachedProjects.length > 0 ? this.cachedProjects : [this.buildOfflineItem()];
     }
   }

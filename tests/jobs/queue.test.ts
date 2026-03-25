@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
+import { TotalRecallDatabase } from '../../src/services/sqlite/Database.js';
 import { JobQueue } from '../../src/services/jobs/JobQueue.js';
 import type { IJobHandler, JobRecord } from '../../src/services/jobs/JobQueue.js';
 import type { Database } from 'bun:sqlite';
@@ -47,12 +47,12 @@ function createQueue(db: Database, concurrency = 2): JobQueue {
 // --- Tests ---
 
 describe('JobQueue', () => {
-  let kdb: KiroMemoryDatabase;
+  let kdb: TotalRecallDatabase;
   let db: Database;
   let queue: JobQueue;
 
   beforeEach(() => {
-    kdb = new KiroMemoryDatabase(':memory:');
+    kdb = new TotalRecallDatabase(':memory:');
     db = kdb.db;
     queue = createQueue(db);
   });

@@ -26,7 +26,7 @@ async function createTestPair(registerTools: (server: McpServer) => void): Promi
   client: Client;
   cleanup: () => Promise<void>;
 }> {
-  const server = new McpServer({ name: 'kiro-memory-test', version: '1.0.0' });
+  const server = new McpServer({ name: 'totalrecall-test', version: '1.0.0' });
   registerTools(server);
 
   const client = new Client({ name: 'test-client', version: '1.0.0' });
@@ -55,7 +55,7 @@ import { z } from 'zod';
 function registerAllTools(server: McpServer): void {
   // Tool: search
   server.registerTool('search', {
-    description: 'Cerca in Kiro Memory.',
+    description: 'Cerca in Total Recall.',
     inputSchema: {
       query: z.string(),
       project: z.string().optional(),
@@ -331,7 +331,7 @@ describe('MCP Server API v2 — McpServer + registerTool', () => {
     it('tool get_context risponde con content di tipo text', async () => {
       const result = await client.callTool({
         name: 'get_context',
-        arguments: { project: 'kiro-memory' }
+        arguments: { project: 'totalrecall' }
       });
       expect(result.content[0]).toHaveProperty('type', 'text');
     });

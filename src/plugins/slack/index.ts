@@ -1,9 +1,9 @@
 /**
- * Plugin Slack per Kiro Memory.
+ * Plugin Slack per Total Recall.
  *
  * Invia notifiche Slack alla fine di ogni sessione usando un webhook.
  *
- * Configurazione (in config.json, chiave plugins.kiro-memory-plugin-slack):
+ * Configurazione (in config.json, chiave plugins.totalrecall-plugin-slack):
  *   - webhookUrl: URL del webhook Slack (obbligatorio)
  *   - channel: canale destinazione (opzionale, sovrascrive quello del webhook)
  *   - events: array di hook da notificare (default: ["onSessionEnd"])
@@ -177,7 +177,7 @@ export function sleep(ms: number): Promise<void> {
 // ── Plugin Slack ─────────────────────────────────────────────────────────────
 
 /**
- * Crea un'istanza del plugin Slack per Kiro Memory.
+ * Crea un'istanza del plugin Slack per Total Recall.
  *
  * Il plugin è implementato come factory function che restituisce un oggetto IPlugin.
  * Lo stato interno (config, logger, sessioni notificate) è incapsulato nella closure.
@@ -244,9 +244,9 @@ export function createSlackPlugin(): IPlugin {
   // ── Oggetto IPlugin ──────────────────────────────────────────────────────────
 
   const plugin: IPlugin = {
-    name: 'kiro-memory-plugin-slack',
+    name: 'totalrecall-plugin-slack',
     version: '1.0.0',
-    description: 'Notifiche Slack per sessioni Kiro Memory',
+    description: 'Notifiche Slack per sessioni Total Recall',
     minKiroVersion: '2.0.0',
 
     async init(context: PluginContext): Promise<void> {

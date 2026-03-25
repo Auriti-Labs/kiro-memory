@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'bun:test';
 import { categorize, getCategories, type ObservationCategory } from '../../src/utils/categorizer.js';
-import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
+import { TotalRecallDatabase } from '../../src/services/sqlite/Database.js';
 import { createObservation, getObservationsByProject } from '../../src/services/sqlite/Observations.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -314,7 +314,7 @@ describe('getCategories', () => {
 
 describe('createObservation — auto_category integration', () => {
   it('should persist auto_category when creating an observation', () => {
-    const kmDb = new KiroMemoryDatabase(':memory:');
+    const kmDb = new TotalRecallDatabase(':memory:');
     const db = kmDb.db;
 
     try {
@@ -349,7 +349,7 @@ describe('createObservation — auto_category integration', () => {
   });
 
   it('should store "general" for observations with no matching keywords', () => {
-    const kmDb = new KiroMemoryDatabase(':memory:');
+    const kmDb = new TotalRecallDatabase(':memory:');
     const db = kmDb.db;
 
     try {
@@ -380,7 +380,7 @@ describe('createObservation — auto_category integration', () => {
   });
 
   it('should store "testing" for a test-type observation with test file', () => {
-    const kmDb = new KiroMemoryDatabase(':memory:');
+    const kmDb = new TotalRecallDatabase(':memory:');
     const db = kmDb.db;
 
     try {

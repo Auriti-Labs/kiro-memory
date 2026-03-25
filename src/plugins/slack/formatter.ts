@@ -1,5 +1,5 @@
 /**
- * Formatter Slack Block Kit per il plugin Slack di Kiro Memory.
+ * Formatter Slack Block Kit per il plugin Slack di Total Recall.
  *
  * Genera blocchi compatibili con l'API Slack Block Kit:
  * - Header con titolo sessione
@@ -148,7 +148,7 @@ export function buildContextBlock(): ContextBlock {
     elements: [
       {
         type: 'mrkdwn',
-        text: `Kiro Memory | ${timestamp}`,
+        text: `Total Recall | ${timestamp}`,
       },
     ],
   };

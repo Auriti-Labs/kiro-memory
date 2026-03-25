@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import crypto from 'crypto';
-import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
+import { TotalRecallDatabase } from '../../src/services/sqlite/Database.js';
 import { createObservation } from '../../src/services/sqlite/Observations.js';
 import {
   createGithubLink,
@@ -72,11 +72,11 @@ function insertObservation(db: Database, project = 'test-proj'): number {
 // ── Suite principale ──────────────────────────────────────────────────────────
 
 describe('GitHub Webhooks Integration', () => {
-  let kdb: KiroMemoryDatabase;
+  let kdb: TotalRecallDatabase;
   let db: Database;
 
   beforeEach(() => {
-    kdb = new KiroMemoryDatabase(':memory:');
+    kdb = new TotalRecallDatabase(':memory:');
     db = kdb.db;
   });
 
@@ -379,18 +379,18 @@ describe('GitHub Webhooks Integration', () => {
   describe('Scenario: evento issues aperto', () => {
     it('crea un link quando una issue viene aperta', () => {
       const id = createGithubLink(db, {
-        repo: 'org/kiro-memory',
+        repo: 'org/totalrecall',
         issue_number: 18,
         event_type: 'issues',
         action: 'opened',
         title: 'GitHub webhooks integration',
-        url: 'https://github.com/org/kiro-memory/issues/18',
+        url: 'https://github.com/org/totalrecall/issues/18',
         author: 'juan-camilo',
       });
 
       expect(id).toBeGreaterThan(0);
 
-      const links = getGithubLinksByIssue(db, 'org/kiro-memory', 18);
+      const links = getGithubLinksByIssue(db, 'org/totalrecall', 18);
       expect(links).toHaveLength(1);
       expect(links[0].action).toBe('opened');
       expect(links[0].author).toBe('juan-camilo');
@@ -400,7 +400,7 @@ describe('GitHub Webhooks Integration', () => {
   describe('Scenario: evento pull_request', () => {
     it('crea un link per apertura PR', () => {
       createGithubLink(db, {
-        repo: 'org/kiro-memory',
+        repo: 'org/totalrecall',
         pr_number: 42,
         event_type: 'pull_request',
         action: 'opened',
@@ -408,21 +408,21 @@ describe('GitHub Webhooks Integration', () => {
         author: 'contributor',
       });
 
-      const links = getGithubLinksByPR(db, 'org/kiro-memory', 42);
+      const links = getGithubLinksByPR(db, 'org/totalrecall', 42);
       expect(links).toHaveLength(1);
       expect(links[0].action).toBe('opened');
     });
 
     it('crea un link con action merged per PR unita', () => {
       createGithubLink(db, {
-        repo: 'org/kiro-memory',
+        repo: 'org/totalrecall',
         pr_number: 42,
         event_type: 'pull_request',
         action: 'merged',
         title: 'feat: aggiunge webhook support',
       });
 
-      const links = getGithubLinksByPR(db, 'org/kiro-memory', 42);
+      const links = getGithubLinksByPR(db, 'org/totalrecall', 42);
       expect(links).toHaveLength(1);
       expect(links[0].action).toBe('merged');
     });

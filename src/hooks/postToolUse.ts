@@ -7,7 +7,7 @@
  */
 
 import { runHook, detectProject, notifyWorker } from './utils.js';
-import { createKiroMemory } from '../sdk/index.js';
+import { createTotalRecall } from '../sdk/index.js';
 import { redactSecrets } from '../utils/secrets.js';
 
 runHook('postToolUse', async (input) => {
@@ -32,7 +32,7 @@ runHook('postToolUse', async (input) => {
   const readOnlyTools = ['glob', 'grep', 'fs_read', 'read', 'Read', 'Glob', 'Grep'];
   if (readOnlyTools.includes(input.tool_name)) {
     const project = detectProject(input.cwd);
-    const sdk = createKiroMemory({ project, skipMigrations: true });
+    const sdk = createTotalRecall({ project, skipMigrations: true });
     try {
       const files = extractFiles(input.tool_input, input.tool_response);
       const { title, narrative } = buildReadObservation(input.tool_name, input.tool_input, files);
@@ -57,7 +57,7 @@ runHook('postToolUse', async (input) => {
   }
 
   const project = detectProject(input.cwd);
-  const sdk = createKiroMemory({ project, skipMigrations: true });
+  const sdk = createTotalRecall({ project, skipMigrations: true });
 
   try {
     const type = categorizeToolUse(input.tool_name);

@@ -55,7 +55,7 @@ function getWebhookSecret(ctx: WorkerContext): string | null {
   } catch {
     // getConfig non disponibile in tutti i contesti, ignora
   }
-  return process.env.KIRO_MEMORY_GITHUB_WEBHOOK_SECRET || null;
+  return process.env.TOTALRECALL_GITHUB_WEBHOOK_SECRET || null;
 }
 
 /**

@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
+import { TotalRecallDatabase } from '../../src/services/sqlite/Database.js';
 import {
   encodeCursor,
   decodeCursor,
@@ -139,7 +139,7 @@ describe('Keyset pagination SQL (in-memory)', () => {
   let db: Database;
 
   beforeEach(() => {
-    db = new KiroMemoryDatabase(':memory:').db;
+    db = new TotalRecallDatabase(':memory:').db;
     // Inserisce 15 osservazioni con timestamp decrescenti
     seedObservations(db, 15);
   });

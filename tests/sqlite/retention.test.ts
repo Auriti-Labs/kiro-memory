@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
+import { TotalRecallDatabase } from '../../src/services/sqlite/Database.js';
 import {
   getRetentionStats,
   applyRetention,
@@ -88,7 +88,7 @@ describe('Modulo Retention', () => {
 
   beforeEach(() => {
     // Ogni test parte da un DB in-memory pulito con lo schema completo
-    db = new KiroMemoryDatabase(':memory:').db;
+    db = new TotalRecallDatabase(':memory:').db;
   });
 
   afterEach(() => {

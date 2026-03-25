@@ -1,16 +1,16 @@
 /**
- * Test suite per il SDK KiroMemory
+ * Test suite per il SDK TotalRecall
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { KiroMemorySDK, createKiroMemory } from '../../src/sdk/index.js';
+import { TotalRecallSDK, createTotalRecall } from '../../src/sdk/index.js';
 
-describe('KiroMemory SDK', () => {
-  let sdk: KiroMemorySDK;
+describe('TotalRecall SDK', () => {
+  let sdk: TotalRecallSDK;
 
   beforeEach(() => {
     // Usa DB in-memory per i test, project esplicito
-    sdk = createKiroMemory({ dataDir: ':memory:', project: 'test-project' });
+    sdk = createTotalRecall({ dataDir: ':memory:', project: 'test-project' });
   });
 
   afterEach(() => {

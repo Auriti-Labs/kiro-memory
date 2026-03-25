@@ -1,5 +1,5 @@
 /**
- * Import/Export JSONL per Kiro Memory.
+ * Import/Export JSONL per Total Recall.
  *
  * Implementa:
  * - Export streaming senza caricare tutto in memoria

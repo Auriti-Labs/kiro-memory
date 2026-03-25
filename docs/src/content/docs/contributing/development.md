@@ -1,6 +1,6 @@
 ---
 title: Development
-description: How to set up a development environment, build the project, and contribute to Kiro Memory.
+description: How to set up a development environment, build the project, and contribute to Total Recall.
 ---
 
 ## Prerequisites
@@ -12,15 +12,15 @@ description: How to set up a development environment, build the project, and con
 ## Cloning the Repository
 
 ```bash
-git clone https://github.com/Auriti-Labs/kiro-memory.git
-cd kiro-memory
+git clone https://github.com/Auriti-Labs/totalrecall.git
+cd totalrecall
 npm install
 ```
 
 ## Project Structure
 
 ```
-kiro-memory/
+totalrecall/
 ├── src/
 │   ├── cli/                    # CLI entry point (contextkit.ts)
 │   ├── hooks/                  # The 4 lifecycle hooks
@@ -78,7 +78,7 @@ After building, sync to the local Kiro CLI installation:
 npm run sync-kiro
 ```
 
-This copies `plugin/*` to `~/.kiro/plugins/kiro-memory/`.
+This copies `plugin/*` to `~/.kiro/plugins/totalrecall/`.
 
 ## TypeScript
 
@@ -202,7 +202,7 @@ npm run worker:status
 1. Fork the repository on GitHub
 2. Create a branch: `git checkout -b feat/my-feature`
 3. Make your changes following the conventions in `CLAUDE.md`
-4. Write tests (see [Testing guide](/kiro-memory/contributing/testing))
+4. Write tests (see [Testing guide](/totalrecall/contributing/testing))
 5. Build and verify: `npm run build && bun test`
 6. Submit a pull request
 

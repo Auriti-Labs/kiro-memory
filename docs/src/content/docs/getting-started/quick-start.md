@@ -5,16 +5,16 @@ description: From install to your first session with persistent memory in under 
 
 This guide walks you through a complete setup from zero to your first session with persistent memory.
 
-## Step 1: Install Kiro Memory
+## Step 1: Install Total Recall
 
 ```bash
-npm install -g kiro-memory
+npm install -g totalrecall
 ```
 
 ## Step 2: Run the Setup Wizard
 
 ```bash
-kiro-memory setup
+totalrecall setup
 ```
 
 Follow the interactive prompts. The wizard detects your editor and installs hooks automatically.
@@ -22,7 +22,7 @@ Follow the interactive prompts. The wizard detects your editor and installs hook
 ## Step 3: Verify the Worker is Running
 
 ```bash
-kiro-memory doctor
+totalrecall doctor
 ```
 
 You should see:
@@ -37,7 +37,7 @@ You can also open the dashboard in your browser: [http://localhost:3001](http://
 
 ## Step 4: Start Your First Session
 
-Open your AI coding assistant in a project directory. Kiro Memory automatically:
+Open your AI coding assistant in a project directory. Total Recall automatically:
 
 1. Injects any previous context from that project at session start
 2. Starts recording your prompts, file reads, and file writes
@@ -50,7 +50,7 @@ On the very first session there is nothing to inject — this is expected. After
 After a few sessions, try the search command:
 
 ```bash
-kiro-memory search "authentication"
+totalrecall search "authentication"
 ```
 
 This returns relevant observations from all your sessions that match the query.
@@ -104,7 +104,7 @@ When you start a new session after working on a project, the `agentSpawn` hook i
 
 ## Next Steps
 
-- Read the [Configuration guide](/kiro-memory/getting-started/configuration) to customize behavior
-- Learn about [Hooks](/kiro-memory/guides/hooks) to understand what gets captured
-- Explore the [SDK](/kiro-memory/guides/sdk) if you want programmatic access
-- Set up the [MCP Server](/kiro-memory/guides/mcp-server) for non-Kiro editors
+- Read the [Configuration guide](/totalrecall/getting-started/configuration) to customize behavior
+- Learn about [Hooks](/totalrecall/guides/hooks) to understand what gets captured
+- Explore the [SDK](/totalrecall/guides/sdk) if you want programmatic access
+- Set up the [MCP Server](/totalrecall/guides/mcp-server) for non-Kiro editors

@@ -1,13 +1,13 @@
 /**
- * Local embedding service for Kiro Memory
+ * Local embedding service for Total Recall
  *
  * Provider: fastembed (primary, only for compatible models) → @huggingface/transformers (fallback) → null (FTS5 only)
  * Generates vector embeddings for semantic search.
  * Lazy loading: the model is loaded only on first use.
  *
  * Configurable via environment variables:
- *   KIRO_MEMORY_EMBEDDING_MODEL       — model name or full HuggingFace ID (default: 'all-MiniLM-L6-v2')
- *   KIRO_MEMORY_EMBEDDING_DIMENSIONS  — fallback dimensions for unknown custom models (default: 384)
+ *   TOTALRECALL_EMBEDDING_MODEL       — model name or full HuggingFace ID (default: 'all-MiniLM-L6-v2')
+ *   TOTALRECALL_EMBEDDING_DIMENSIONS  — fallback dimensions for unknown custom models (default: 384)
  */
 
 import { logger } from '../../utils/logger.js';
@@ -53,7 +53,7 @@ export class EmbeddingService {
   private configName: string;
 
   constructor() {
-    const envModel = process.env.KIRO_MEMORY_EMBEDDING_MODEL || 'all-MiniLM-L6-v2';
+    const envModel = process.env.TOTALRECALL_EMBEDDING_MODEL || 'all-MiniLM-L6-v2';
     this.configName = envModel;
 
     if (MODEL_CONFIGS[envModel]) {
@@ -61,7 +61,7 @@ export class EmbeddingService {
       this.config = MODEL_CONFIGS[envModel];
     } else if (envModel.includes('/')) {
       // Full HuggingFace model ID (e.g., 'custom/my-model') — use directly
-      const dimensions = parseInt(process.env.KIRO_MEMORY_EMBEDDING_DIMENSIONS || '384', 10);
+      const dimensions = parseInt(process.env.TOTALRECALL_EMBEDDING_DIMENSIONS || '384', 10);
       this.config = {
         modelId: envModel,
         dimensions: isNaN(dimensions) ? 384 : dimensions,

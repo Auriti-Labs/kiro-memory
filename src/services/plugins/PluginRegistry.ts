@@ -1,5 +1,5 @@
 /**
- * PluginRegistry — registro singleton dei plugin di Kiro Memory.
+ * PluginRegistry — registro singleton dei plugin di Total Recall.
  *
  * Responsabilità:
  *   - Registrare / deregistrare plugin

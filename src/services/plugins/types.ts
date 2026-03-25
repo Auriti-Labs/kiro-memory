@@ -1,5 +1,5 @@
 /**
- * Tipi pubblici del sistema plugin di Kiro Memory.
+ * Tipi pubblici del sistema plugin di Total Recall.
  *
  * IPlugin — contratto che ogni plugin deve rispettare.
  * PluginContext — dipendenze iniettate dal registry al momento dell'init.
@@ -9,7 +9,7 @@
  * PluginInfo — snapshot serializzabile dello stato di un plugin registrato.
  */
 
-import type { KiroMemorySDK } from '../../sdk/index.js';
+import type { TotalRecallSDK } from '../../sdk/index.js';
 
 // ── Contratto plugin ──────────────────────────────────────────────────────────
 
@@ -20,7 +20,7 @@ export interface IPlugin {
   /** Versione semver del plugin (es. "1.0.0") */
   version: string;
 
-  /** Versione minima di kiro-memory richiesta (semver range) */
+  /** Versione minima di totalrecall richiesta (semver range) */
   minKiroVersion?: string;
 
   /** Descrizione leggibile per l'interfaccia utente */
@@ -49,7 +49,7 @@ export interface PluginContext {
    * Accesso al SDK pubblico (non al DB diretto).
    * Il plugin interagisce solo attraverso l'interfaccia pubblica del SDK.
    */
-  sdk: KiroMemorySDK;
+  sdk: TotalRecallSDK;
 
   /** Logger dedicato con prefisso automatico [PLUGIN:<nome>] */
   logger: PluginLogger;

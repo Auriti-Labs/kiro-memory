@@ -16,20 +16,33 @@ function getDirname(): string {
 const _dirname = getDirname();
 
 /**
- * Simple path configuration for Kiro Memory
+ * Simple path configuration for Total Recall
  */
 
-// Base directory - Kiro Memory data in home directory
-// Backward compat: if ~/.contextkit (old name) exists, use it; otherwise ~/.kiro-memory
-const _legacyDir = join(homedir(), '.contextkit');
-const _defaultDir = existsSync(_legacyDir) ? _legacyDir : join(homedir(), '.kiro-memory');
-export const DATA_DIR = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || _defaultDir;
+// Base directory - Total Recall data in home directory
+// Backward compat chain: ~/.totalrecall (new) → ~/.totalrecall (v3) → ~/.contextkit (v1-v2)
+const _legacyV1Dir = join(homedir(), '.contextkit');
+const _legacyV3Dir = join(homedir(), '.totalrecall');
+const _newDir = join(homedir(), '.totalrecall');
 
-// Kiro config directory
+function resolveDataDir(): string {
+  // Prefer new name if it exists
+  if (existsSync(_newDir)) return _newDir;
+  // Fall back to v3 name
+  if (existsSync(_legacyV3Dir)) return _legacyV3Dir;
+  // Fall back to v1 name
+  if (existsSync(_legacyV1Dir)) return _legacyV1Dir;
+  // Default to new name for fresh installs
+  return _newDir;
+}
+
+export const DATA_DIR = process.env.TOTALRECALL_DATA_DIR || process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || resolveDataDir();
+
+// Kiro config directory (still needed for Claude Code / Kiro CLI integration)
 export const KIRO_CONFIG_DIR = process.env.KIRO_CONFIG_DIR || join(homedir(), '.kiro');
 
 // Plugin installation directory
-export const PLUGIN_ROOT = join(KIRO_CONFIG_DIR, 'plugins', 'kiro-memory');
+export const PLUGIN_ROOT = join(KIRO_CONFIG_DIR, 'plugins', 'totalrecall');
 
 // Data subdirectories
 export const ARCHIVES_DIR = join(DATA_DIR, 'archives');
@@ -38,9 +51,16 @@ export const TRASH_DIR = join(DATA_DIR, 'trash');
 export const BACKUPS_DIR = join(DATA_DIR, 'backups');
 export const MODES_DIR = join(DATA_DIR, 'modes');
 export const USER_SETTINGS_PATH = join(DATA_DIR, 'settings.json');
-// Backward compat: if the DB with the old name exists, use it
-const _legacyDb = join(DATA_DIR, 'contextkit.db');
-export const DB_PATH = existsSync(_legacyDb) ? _legacyDb : join(DATA_DIR, 'kiro-memory.db');
+// Backward compat: use existing DB if found under old names
+const _legacyDbV1 = join(DATA_DIR, 'contextkit.db');
+const _legacyDbV3 = join(DATA_DIR, 'totalrecall.db');
+function resolveDbPath(): string {
+  if (existsSync(join(DATA_DIR, 'totalrecall.db'))) return join(DATA_DIR, 'totalrecall.db');
+  if (existsSync(_legacyDbV3)) return _legacyDbV3;
+  if (existsSync(_legacyDbV1)) return _legacyDbV1;
+  return join(DATA_DIR, 'totalrecall.db');
+}
+export const DB_PATH = resolveDbPath();
 export const VECTOR_DB_DIR = join(DATA_DIR, 'vector-db');
 
 // Observer sessions directory

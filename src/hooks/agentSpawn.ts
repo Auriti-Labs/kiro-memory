@@ -7,7 +7,7 @@
  */
 
 import { runHook, detectProject, formatSmartContext } from './utils.js';
-import { createKiroMemory } from '../sdk/index.js';
+import { createTotalRecall } from '../sdk/index.js';
 import { spawn } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -19,8 +19,8 @@ const __dirname_hook = dirname(__filename_hook);
  * Start the worker in background if not already running
  */
 async function ensureWorkerRunning(): Promise<void> {
-  const host = process.env.KIRO_MEMORY_WORKER_HOST || '127.0.0.1';
-  const port = process.env.KIRO_MEMORY_WORKER_PORT || '3001';
+  const host = process.env.TOTALRECALL_WORKER_HOST || '127.0.0.1';
+  const port = process.env.TOTALRECALL_WORKER_PORT || '3001';
   const healthUrl = `http://${host}:${port}/health`;
 
   // Check if worker is already running
@@ -66,7 +66,7 @@ runHook('agentSpawn', async (input) => {
   await ensureWorkerRunning().catch(() => {});
 
   const project = detectProject(input.cwd);
-  const sdk = createKiroMemory({ project });
+  const sdk = createTotalRecall({ project });
 
   try {
     const smartCtx = await sdk.getSmartContext();
@@ -82,7 +82,7 @@ runHook('agentSpawn', async (input) => {
       project
     });
 
-    output += `> UI available at http://127.0.0.1:${process.env.KIRO_MEMORY_WORKER_PORT || '3001'}\n`;
+    output += `> UI available at http://127.0.0.1:${process.env.TOTALRECALL_WORKER_PORT || '3001'}\n`;
 
     // Stdout gets injected into the Kiro agent context
     process.stdout.write(output);

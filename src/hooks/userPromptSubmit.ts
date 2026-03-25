@@ -7,7 +7,7 @@
  */
 
 import { runHook, detectProject, notifyWorker } from './utils.js';
-import { createKiroMemory } from '../sdk/index.js';
+import { createTotalRecall } from '../sdk/index.js';
 import { redactSecrets } from '../utils/secrets.js';
 
 runHook('userPromptSubmit', async (input) => {
@@ -20,7 +20,7 @@ runHook('userPromptSubmit', async (input) => {
   if (!promptText || typeof promptText !== 'string' || promptText.trim().length === 0) return;
 
   const project = detectProject(input.cwd);
-  const sdk = createKiroMemory({ project, skipMigrations: true });
+  const sdk = createTotalRecall({ project, skipMigrations: true });
 
   try {
     // Use session_id from Kiro if available, otherwise generate one

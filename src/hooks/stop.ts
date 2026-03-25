@@ -7,11 +7,11 @@
  */
 
 import { runHook, detectProject, notifyWorker } from './utils.js';
-import { createKiroMemory } from '../sdk/index.js';
+import { createTotalRecall } from '../sdk/index.js';
 
 runHook('stop', async (input) => {
   const project = detectProject(input.cwd);
-  const sdk = createKiroMemory({ project, skipMigrations: true });
+  const sdk = createTotalRecall({ project, skipMigrations: true });
 
   try {
     // Get or create DB session for this content_session_id

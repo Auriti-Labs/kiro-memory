@@ -180,7 +180,7 @@ export function createDataRouter(ctx: WorkerContext, workerToken?: string): Rout
 
       if (fmt === 'markdown' || fmt === 'md') {
         const lines: string[] = [
-          `# Kiro Memory Export`,
+          `# Total Recall Export`,
           `> Project: ${project || 'All'} | Period: ${daysBack} days | Generated: ${new Date().toISOString()}`,
           '',
           `## Observations (${observations.length})`,

@@ -9,17 +9,17 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as child_process from 'child_process';
-import type { KiroMemoryClient, ContextResponse } from '../api-client';
+import type { TotalRecallClient, ContextResponse } from '../api-client';
 
 // ── Comando principale ─────────────────────────────────────────────────────
 
-export async function showContextCommand(client: KiroMemoryClient): Promise<void> {
+export async function showContextCommand(client: TotalRecallClient): Promise<void> {
   // Rileva il progetto dal workspace corrente
   const project = await detectCurrentProject();
 
   if (!project) {
     vscode.window.showWarningMessage(
-      'Kiro Memory: impossibile rilevare il progetto corrente. ' +
+      'Total Recall: impossibile rilevare il progetto corrente. ' +
       'Apri una cartella workspace che sia un repository git.'
     );
     return;
@@ -29,7 +29,7 @@ export async function showContextCommand(client: KiroMemoryClient): Promise<void
   await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
-      title: `Kiro Memory: caricamento contesto per "${project}"…`,
+      title: `Total Recall: caricamento contesto per "${project}"…`,
       cancellable: false
     },
     async () => {
@@ -42,12 +42,12 @@ export async function showContextCommand(client: KiroMemoryClient): Promise<void
         // Se l'errore è 404, il progetto non ha ancora osservazioni
         if (msg.includes('404') || msg.includes('not found')) {
           vscode.window.showInformationMessage(
-            `Kiro Memory: nessun contesto trovato per il progetto "${project}". ` +
+            `Total Recall: nessun contesto trovato per il progetto "${project}". ` +
             'Usa Kiro CLI per creare le prime osservazioni.'
           );
         } else {
           vscode.window.showErrorMessage(
-            `Kiro Memory: impossibile caricare il contesto — ${msg}`
+            `Total Recall: impossibile caricare il contesto — ${msg}`
           );
         }
       }
@@ -59,7 +59,7 @@ export async function showContextCommand(client: KiroMemoryClient): Promise<void
 
 /**
  * Rileva il nome del progetto corrente usando execFile con git rev-parse
- * (stesso metodo usato dagli hook Kiro Memory in agentSpawn.ts).
+ * (stesso metodo usato dagli hook Total Recall in agentSpawn.ts).
  *
  * Utilizza execFile (non exec) per prevenire shell injection.
  * Fallback: nome della cartella workspace root se git non è disponibile.
@@ -130,7 +130,7 @@ async function openContextInEditor(ctx: ContextResponse, project: string): Promi
  */
 function buildContextMarkdown(ctx: ContextResponse, project: string): string {
   const lines: string[] = [
-    `# Contesto Kiro Memory — ${project}`,
+    `# Contesto Total Recall — ${project}`,
     '',
     `_Generato il ${new Date().toLocaleString('it-IT')}_`,
     ''

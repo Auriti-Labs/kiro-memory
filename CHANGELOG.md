@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Plugin System** (#29, #30): Architettura plugin completa con `IPlugin` interface, `PluginRegistry` singleton, `PluginLoader` con auto-discovery da `~/.kiro-memory/plugins/`. Lifecycle a due fasi: register → enable/disable. REST API `/api/plugins` per gestione runtime
+- **Plugin System** (#29, #30): Architettura plugin completa con `IPlugin` interface, `PluginRegistry` singleton, `PluginLoader` con auto-discovery da `~/.totalrecall/plugins/`. Lifecycle a due fasi: register → enable/disable. REST API `/api/plugins` per gestione runtime
 - **Plugin Slack** (#31): Notifiche Slack con Block Kit formatting, rate limiting (1 req/sec), retry automatico su 429, filtri per tipo/progetto, configurazione via env vars
 - **Plugin GitHub** (#32): Auto-linking issue (`#123`, `org/repo#456`), commenti automatici su issue alla chiusura sessione, HTTP client con cache LRU e retry esponenziale, parser issue da testo naturale
 - **Keyset Pagination** (#25): Cursore base64 con indici compositi per performance costante O(1) invece di OFFSET O(n). Supporto per tutte le entità (observations, summaries, prompts, sessions)
@@ -109,7 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Dashboard Layout**: Sidebar affiancata al contenuto principale (non più sotto l'header)
-- **Sidebar Brand**: Logo network/nodi con brand "Kiro Memory" spostato nella sidebar
+- **Sidebar Brand**: Logo network/nodi con brand "Total Recall" spostato nella sidebar
 - **Scrollbar**: Più visibili (8px), colorate con accent viola al hover, supporto Firefox
 - **Dark Mode Palette**: Contrasti migliorati con CSS variables per superfici, bordi e scala zinc
 
@@ -117,7 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Repository URLs**: Aggiornati tutti i riferimenti al nuovo org GitHub (`Auriti-Labs/kiro-memory`)
+- **Repository URLs**: Aggiornati tutti i riferimenti al nuovo org GitHub (`Auriti-Labs/totalrecall`)
 - **Author**: Corretto campo author in package.json a "Auriti Labs"
 
 ## [1.8.0] - 2026-02-25
@@ -173,14 +173,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Multi-Editor Support**: One-command install for Claude Code, Cursor, Windsurf, and Cline (`kiro-memory install --claude-code|--cursor|--windsurf|--cline`)
-- **Local Vector Search (Phase 2A)**: Semantic similarity search using local embeddings (fastembed/transformers.js). No API keys required. CLI: `kiro-memory semantic-search`, `kiro-memory embeddings`
+- **Multi-Editor Support**: One-command install for Claude Code, Cursor, Windsurf, and Cline (`totalrecall install --claude-code|--cursor|--windsurf|--cline`)
+- **Local Vector Search (Phase 2A)**: Semantic similarity search using local embeddings (fastembed/transformers.js). No API keys required. CLI: `totalrecall semantic-search`, `totalrecall embeddings`
 - **Smart Ranking (Phase 2B)**: 4-signal scoring (recency, frequency, semantic similarity, decay) for relevance-ordered search results. SDK: `hybridSearch()`
-- **Memory Decay (Phase 2C)**: Automatic stale detection and consolidation of old observations. CLI: `kiro-memory decay`. SDK: `runDecay()`, `consolidateStale()`
+- **Memory Decay (Phase 2C)**: Automatic stale detection and consolidation of old observations. CLI: `totalrecall decay`. SDK: `runDecay()`, `consolidateStale()`
 - **Analytics Dashboard (Phase 4A)**: Activity timeline, type distribution, session stats, and file hotspots via worker API (`/api/analytics/*`) and web dashboard
-- **Structured Knowledge (Phase 5A)**: Store architectural decisions, constraints, heuristics, and rejected approaches. MCP tool: `store_knowledge`. CLI: `kiro-memory add-knowledge`
-- **Session Checkpoint & Resume (Phase 6A+6B)**: Save/restore session state with checkpoint data. MCP tool: `resume_session`. CLI: `kiro-memory resume`. SDK: `createCheckpoint()`, `getCheckpoint()`
-- **Activity Reports (Phase 4B)**: Weekly/monthly digests with overview, timeline, type distribution, session stats, learnings, completed tasks, next steps, and file hotspots. Three output formats: text (ANSI), Markdown, JSON. MCP tool: `generate_report`. CLI: `kiro-memory report --period=weekly|monthly --format=text|md|json`
+- **Structured Knowledge (Phase 5A)**: Store architectural decisions, constraints, heuristics, and rejected approaches. MCP tool: `store_knowledge`. CLI: `totalrecall add-knowledge`
+- **Session Checkpoint & Resume (Phase 6A+6B)**: Save/restore session state with checkpoint data. MCP tool: `resume_session`. CLI: `totalrecall resume`. SDK: `createCheckpoint()`, `getCheckpoint()`
+- **Activity Reports (Phase 4B)**: Weekly/monthly digests with overview, timeline, type distribution, session stats, learnings, completed tasks, next steps, and file hotspots. Three output formats: text (ANSI), Markdown, JSON. MCP tool: `generate_report`. CLI: `totalrecall report --period=weekly|monthly --format=text|md|json`
 - **6 New MCP Tools**: `store_observation`, `store_summary`, `store_knowledge`, `resume_session`, `generate_report`, `get_recent_context` (total: 10 tools)
 - **Database Migrations v4-v6**: New tables for embeddings, knowledge, checkpoints; new columns for decay tracking
 
@@ -210,13 +210,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Transaction Wrapper**: `KiroMemoryDatabase.withTransaction()` for atomic multi-step database operations with automatic rollback on error
+- **Transaction Wrapper**: `TotalRecallDatabase.withTransaction()` for atomic multi-step database operations with automatic rollback on error
 - **30 New Tests**: Comprehensive test suites for Search module (FTS5, LIKE fallback, timeline, stats), SDK (observations, summaries, search, context, sessions), and transaction rollback behavior
 - **Event Whitelist**: `/api/notify` only accepts known event types (`observation-created`, `summary-created`, `prompt-created`, `session-created`)
 
 ### Changed
 
-- Hook `notifyWorker()` now reads shared token from `~/.kiro-memory/worker.token` and sends it as `X-Worker-Token` header
+- Hook `notifyWorker()` now reads shared token from `~/.totalrecall/worker.token` and sends it as `X-Worker-Token` header
 - Test coverage increased from 10 to 40 tests (+300%)
 
 ### Fixed
@@ -227,9 +227,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Rebranding**: Full rename from ContextKit to Kiro Memory across SDK, CLI, services, MCP server, hooks, and build scripts
-- SDK entry point renamed: `createContextKit` → `createKiroMemory` (backward-compatible aliases preserved)
-- CLI binary renamed: `contextkit` → `kiro-memory`
+- **Rebranding**: Full rename from ContextKit to Total Recall across SDK, CLI, services, MCP server, hooks, and build scripts
+- SDK entry point renamed: `createContextKit` → `createTotalRecall` (backward-compatible aliases preserved)
+- CLI binary renamed: `contextkit` → `totalrecall`
 - MCP server references updated
 - Hook strings translated to English
 
@@ -238,9 +238,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - FTS5 query sanitization: terms wrapped in quotes to prevent parser errors from reserved operators (AND, OR, NOT, NEAR)
 - SSE keepalive heartbeat (15s interval) prevents proxy/browser disconnections
 - SSE reconnection now triggers full data re-fetch to prevent data loss
-- Agent config paths corrected from `/home/.../contextkit/` to `/home/.../kiro-memory/`
+- Agent config paths corrected from `/home/.../contextkit/` to `/home/.../totalrecall/`
 - Worker health endpoint path matched between CLI doctor and worker (`/health`)
-- Backward-compatible data directory: checks for `~/.contextkit` before falling back to `~/.kiro-memory`
+- Backward-compatible data directory: checks for `~/.contextkit` before falling back to `~/.totalrecall`
 
 ### Performance
 
@@ -259,8 +259,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Dashboard Redesign**: Complete UI overhaul with dark/light theme, project sidebar, spotlight search (Ctrl+K), live SSE feed, and type filters
 - **Project Aliases**: Rename projects in the dashboard via `project_aliases` table (migration v3)
-- **CLI Install Command**: `kiro-memory install` sets up hooks, MCP server, and agent config automatically
-- **CLI Doctor Command**: `kiro-memory doctor` runs environment diagnostics (Node version, paths, worker status, database health)
+- **CLI Install Command**: `totalrecall install` sets up hooks, MCP server, and agent config automatically
+- **CLI Doctor Command**: `totalrecall doctor` runs environment diagnostics (Node version, paths, worker status, database health)
 - **Auto-Fix on Install**: Detects and resolves common environment issues (Windows paths, npm prefix, missing build tools)
 - **Windows Compatibility**: Embedded templates, Windows path detection, English error messages
 
@@ -292,16 +292,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session Summaries**: Structured summaries generated automatically at session end
 - **Web Dashboard**: Real-time viewer at `http://localhost:3001`
 
-[3.0.0]: https://github.com/Auriti-Labs/kiro-memory/compare/v2.1.0...v3.0.0
-[2.1.0]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.9.0...v2.1.0
-[1.9.0]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.8.1...v1.9.0
-[1.8.1]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.8.0...v1.8.1
-[1.8.0]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.7.1...v1.8.0
-[1.7.1]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.7.0...v1.7.1
-[1.7.0]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.6.0...v1.7.0
-[1.6.0]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.5.0...v1.6.0
-[1.5.0]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.3.0...v1.5.0
-[1.4.1]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.3.0...v1.4.1
-[1.3.0]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.2.0...v1.3.0
-[1.2.0]: https://github.com/Auriti-Labs/kiro-memory/compare/v1.0.0...v1.2.0
-[1.0.0]: https://github.com/Auriti-Labs/kiro-memory/releases/tag/v1.0.0
+[3.0.0]: https://github.com/Auriti-Labs/totalrecall/compare/v2.1.0...v3.0.0
+[2.1.0]: https://github.com/Auriti-Labs/totalrecall/compare/v1.9.0...v2.1.0
+[1.9.0]: https://github.com/Auriti-Labs/totalrecall/compare/v1.8.1...v1.9.0
+[1.8.1]: https://github.com/Auriti-Labs/totalrecall/compare/v1.8.0...v1.8.1
+[1.8.0]: https://github.com/Auriti-Labs/totalrecall/compare/v1.7.1...v1.8.0
+[1.7.1]: https://github.com/Auriti-Labs/totalrecall/compare/v1.7.0...v1.7.1
+[1.7.0]: https://github.com/Auriti-Labs/totalrecall/compare/v1.6.0...v1.7.0
+[1.6.0]: https://github.com/Auriti-Labs/totalrecall/compare/v1.5.0...v1.6.0
+[1.5.0]: https://github.com/Auriti-Labs/totalrecall/compare/v1.3.0...v1.5.0
+[1.4.1]: https://github.com/Auriti-Labs/totalrecall/compare/v1.3.0...v1.4.1
+[1.3.0]: https://github.com/Auriti-Labs/totalrecall/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/Auriti-Labs/totalrecall/compare/v1.0.0...v1.2.0
+[1.0.0]: https://github.com/Auriti-Labs/totalrecall/releases/tag/v1.0.0

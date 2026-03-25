@@ -1,5 +1,5 @@
 /**
- * Test suite per il plugin Slack di Kiro Memory.
+ * Test suite per il plugin Slack di Total Recall.
  *
  * Copertura:
  *   - Validazione configurazione (webhookUrl obbligatorio, https, eventi default)
@@ -181,11 +181,11 @@ describe('Formatter Block Kit', () => {
 
   describe('buildHeaderBlock()', () => {
     it('crea un blocco header con il nome del progetto', () => {
-      const block = buildHeaderBlock('kiro-memory');
+      const block = buildHeaderBlock('totalrecall');
 
       expect(block.type).toBe('header');
       expect(block.text.type).toBe('plain_text');
-      expect(block.text.text).toContain('kiro-memory');
+      expect(block.text.text).toContain('totalrecall');
     });
   });
 
@@ -249,7 +249,7 @@ describe('Formatter Block Kit', () => {
 
       expect(block.type).toBe('context');
       expect(block.elements.length).toBe(1);
-      expect(block.elements[0].text).toContain('Kiro Memory');
+      expect(block.elements[0].text).toContain('Total Recall');
     });
   });
 
@@ -257,7 +257,7 @@ describe('Formatter Block Kit', () => {
     it('genera un payload completo con 6 blocchi', () => {
       const data: SlackMessageData = {
         sessionId: 'sess-001',
-        project: 'kiro-memory',
+        project: 'totalrecall',
         summary: 'Sessione di debug completata.',
       };
 
@@ -437,7 +437,7 @@ describe('Plugin Slack (createSlackPlugin)', () => {
   it('ha nome, versione e descrizione corretti', () => {
     const plugin = createSlackPlugin();
 
-    expect(plugin.name).toBe('kiro-memory-plugin-slack');
+    expect(plugin.name).toBe('totalrecall-plugin-slack');
     expect(plugin.version).toBe('1.0.0');
     expect(plugin.description).toBeDefined();
   });

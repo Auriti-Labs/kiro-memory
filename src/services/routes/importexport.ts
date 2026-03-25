@@ -71,7 +71,7 @@ export function createImportExportRouter(ctx: WorkerContext): Router {
     // Nome file per download
     const dateStr = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
     const projectSlug = project ? `_${project.replace(/[^a-z0-9]/gi, '_')}` : '';
-    const filename = `kiro-memory${projectSlug}_${dateStr}.jsonl`;
+    const filename = `totalrecall${projectSlug}_${dateStr}.jsonl`;
 
     try {
       // Imposta header per streaming

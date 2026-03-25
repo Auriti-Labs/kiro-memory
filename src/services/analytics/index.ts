@@ -1,5 +1,5 @@
 /**
- * Analytics module for Kiro Memory.
+ * Analytics module for Total Recall.
  * Exports anomaly detection and statistical helpers.
  */
 

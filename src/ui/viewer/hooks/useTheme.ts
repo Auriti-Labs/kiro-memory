@@ -11,7 +11,7 @@ export function useTheme() {
 
   // Carica preferenza salvata
   useEffect(() => {
-    const saved = localStorage.getItem('kiro-memory-theme') as ThemePreference;
+    const saved = localStorage.getItem('totalrecall-theme') as ThemePreference;
     if (saved) {
       setPreference(saved);
     }
@@ -59,7 +59,7 @@ export function useTheme() {
 
   const setThemePreference = (theme: ThemePreference) => {
     setPreference(theme);
-    localStorage.setItem('kiro-memory-theme', theme);
+    localStorage.setItem('totalrecall-theme', theme);
   };
 
   return { preference, resolvedTheme, setThemePreference };

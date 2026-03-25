@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
+import { TotalRecallDatabase } from '../../src/services/sqlite/Database.js';
 import {
   createObservation,
   getObservationsByProject,
@@ -80,11 +80,11 @@ function insertObs(
 // ---------------------------------------------------------------------------
 
 describe('API route database functions', () => {
-  let kmDb: KiroMemoryDatabase;
+  let kmDb: TotalRecallDatabase;
   let db: Database;
 
   beforeEach(() => {
-    kmDb = new KiroMemoryDatabase(':memory:');
+    kmDb = new TotalRecallDatabase(':memory:');
     db = kmDb.db;
   });
 

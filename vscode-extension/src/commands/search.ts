@@ -9,7 +9,7 @@
  */
 
 import * as vscode from 'vscode';
-import type { KiroMemoryClient, Observation, SummaryResult } from '../api-client';
+import type { TotalRecallClient, Observation, SummaryResult } from '../api-client';
 
 // ── Tipo item QuickPick ────────────────────────────────────────────────────
 
@@ -20,11 +20,11 @@ interface ObservationQuickPickItem extends vscode.QuickPickItem {
 
 // ── Comando principale ─────────────────────────────────────────────────────
 
-export async function searchCommand(client: KiroMemoryClient): Promise<void> {
+export async function searchCommand(client: TotalRecallClient): Promise<void> {
   // Step 1: input query
   const query = await vscode.window.showInputBox({
     placeHolder: 'Cerca nelle osservazioni... (es. "authentication", "bug fix")',
-    prompt: 'Kiro Memory — Ricerca FTS5',
+    prompt: 'Total Recall — Ricerca FTS5',
     ignoreFocusOut: true,
     validateInput: (value) => {
       if (!value || value.trim().length < 2) {
@@ -118,7 +118,7 @@ export async function searchCommand(client: KiroMemoryClient): Promise<void> {
   } catch (err) {
     qp.dispose();
     const msg = err instanceof Error ? err.message : 'Errore sconosciuto';
-    vscode.window.showErrorMessage(`Kiro Memory: ricerca fallita — ${msg}`);
+    vscode.window.showErrorMessage(`Total Recall: ricerca fallita — ${msg}`);
   }
 }
 

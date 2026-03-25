@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Kiro Memory MCP Server — API v2
+ * Total Recall MCP Server — API v2
  *
  * MCP (Model Context Protocol) server che espone i tool di memoria.
  * Proxy leggero: delega tutte le operazioni al Worker HTTP (porta 3001).
@@ -16,10 +16,10 @@ import { z } from 'zod';
 
 // Redirige console.log su stderr per non rompere il protocollo MCP (usa stdio)
 const originalLog = console.log;
-console.log = (...args: any[]) => console.error('[kiro-memory-mcp]', ...args);
+console.log = (...args: any[]) => console.error('[totalrecall-mcp]', ...args);
 
-const WORKER_HOST = process.env.KIRO_MEMORY_WORKER_HOST || '127.0.0.1';
-const WORKER_PORT = process.env.KIRO_MEMORY_WORKER_PORT || '3001';
+const WORKER_HOST = process.env.TOTALRECALL_WORKER_HOST || '127.0.0.1';
+const WORKER_PORT = process.env.TOTALRECALL_WORKER_PORT || '3001';
 const WORKER_BASE = `http://${WORKER_HOST}:${WORKER_PORT}`;
 
 // ============================================================================
@@ -61,7 +61,7 @@ function buildErrorResult(error: any): { content: Array<{ type: 'text'; text: st
     return {
       content: [{
         type: 'text',
-        text: `Kiro Memory worker non raggiungibile su ${WORKER_BASE}.\nAvvia il worker con: cd <kiro-memory-dir> && npm run worker:start`
+        text: `Total Recall worker non raggiungibile su ${WORKER_BASE}.\nAvvia il worker con: cd <totalrecall-dir> && npm run worker:start`
       }]
     };
   }
@@ -82,7 +82,7 @@ function buildErrorResult(error: any): { content: Array<{ type: 'text'; text: st
 
 async function main() {
   const server = new McpServer({
-    name: 'kiro-memory',
+    name: 'totalrecall',
     version: '1.0.0'
   });
 
@@ -94,7 +94,7 @@ async function main() {
   server.registerTool(
     'search',
     {
-      description: 'Cerca in Kiro Memory. Restituisce osservazioni e sommari che corrispondono alla query. Usa questo tool per trovare contesto dalle sessioni precedenti.',
+      description: 'Cerca in Total Recall. Restituisce osservazioni e sommari che corrispondono alla query. Usa questo tool per trovare contesto dalle sessioni precedenti.',
       inputSchema: {
         query: z.string().describe('Testo da cercare in osservazioni e sommari'),
         project: z.string().optional().describe('Filtra per nome progetto (opzionale)'),
@@ -355,7 +355,7 @@ async function main() {
         output += `- **Disponibile**: ${result.available ? 'sì' : 'no'}\n`;
 
         if (result.percentage < 100 && result.total > 0) {
-          output += `\n_Suggerimento: esegui \`kiro-memory embeddings backfill\` per generare gli embedding mancanti._\n`;
+          output += `\n_Suggerimento: esegui \`totalrecall embeddings backfill\` per generare gli embedding mancanti._\n`;
         }
 
         return { content: [{ type: 'text', text: output }] };
@@ -427,7 +427,7 @@ async function main() {
           checkpoint = await callWorkerGET(`/api/sessions/${args.session_id}/checkpoint`);
         } else {
           // Resume dell'ultimo checkpoint per progetto
-          const project = args.project || process.env.KIRO_MEMORY_PROJECT || '';
+          const project = args.project || process.env.TOTALRECALL_PROJECT || '';
           if (!project) {
             return {
               content: [{
@@ -522,7 +522,7 @@ async function main() {
     },
     async (args) => {
       try {
-        const project = args.project || process.env.KIRO_MEMORY_PROJECT || '';
+        const project = args.project || process.env.TOTALRECALL_PROJECT || '';
         const period = args.period === 'monthly' ? 'monthly' : 'weekly';
 
         const params: Record<string, string> = { period, format: 'markdown' };
@@ -590,7 +590,7 @@ async function main() {
   // Avvia il trasporto stdio
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.log('Kiro Memory MCP server avviato su stdio (API v2)');
+  console.log('Total Recall MCP server avviato su stdio (API v2)');
 }
 
 main().catch((err) => {

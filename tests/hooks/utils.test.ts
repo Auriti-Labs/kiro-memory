@@ -243,7 +243,7 @@ describe('formatContext', () => {
 describe('formatSmartContext', () => {
   it('includes the header line', () => {
     const output = formatSmartContext({ items: [], summaries: [], project: 'my-proj' });
-    expect(output).toContain('# Kiro Memory: Previous Sessions Context');
+    expect(output).toContain('# Total Recall: Previous Sessions Context');
   });
 
   it('includes the footer with project and item count', () => {
@@ -353,29 +353,29 @@ describe('debugLog', () => {
   let originalEnv: string | undefined;
 
   beforeEach(() => {
-    originalEnv = process.env.KIRO_MEMORY_LOG_LEVEL;
+    originalEnv = process.env.TOTALRECALL_LOG_LEVEL;
   });
 
   afterEach(() => {
     if (originalEnv === undefined) {
-      delete process.env.KIRO_MEMORY_LOG_LEVEL;
+      delete process.env.TOTALRECALL_LOG_LEVEL;
     } else {
-      process.env.KIRO_MEMORY_LOG_LEVEL = originalEnv;
+      process.env.TOTALRECALL_LOG_LEVEL = originalEnv;
     }
   });
 
   it('does not throw when debug is disabled (default)', () => {
-    delete process.env.KIRO_MEMORY_LOG_LEVEL;
+    delete process.env.TOTALRECALL_LOG_LEVEL;
     expect(() => debugLog('test-hook', 'label', { some: 'data' })).not.toThrow();
   });
 
   it('does not throw when debug is disabled with INFO level', () => {
-    process.env.KIRO_MEMORY_LOG_LEVEL = 'INFO';
+    process.env.TOTALRECALL_LOG_LEVEL = 'INFO';
     expect(() => debugLog('test-hook', 'label', { some: 'data' })).not.toThrow();
   });
 
   it('does not throw with various data types when debug is disabled', () => {
-    delete process.env.KIRO_MEMORY_LOG_LEVEL;
+    delete process.env.TOTALRECALL_LOG_LEVEL;
     expect(() => debugLog('hook', 'null-data', null)).not.toThrow();
     expect(() => debugLog('hook', 'number-data', 42)).not.toThrow();
     expect(() => debugLog('hook', 'array-data', [1, 2, 3])).not.toThrow();
@@ -383,11 +383,11 @@ describe('debugLog', () => {
   });
 
   it('does not throw when DEBUG level is set (may write to disk, but must not crash)', () => {
-    process.env.KIRO_MEMORY_LOG_LEVEL = 'DEBUG';
+    process.env.TOTALRECALL_LOG_LEVEL = 'DEBUG';
     // We cannot easily assert that the file was written without side effects,
     // but the function must never throw (it catches internally)
     expect(() => debugLog('test-hook', 'debug-event', { key: 'value' })).not.toThrow();
     // Reset so subsequent tests are not affected
-    delete process.env.KIRO_MEMORY_LOG_LEVEL;
+    delete process.env.TOTALRECALL_LOG_LEVEL;
   });
 });

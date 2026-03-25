@@ -21,8 +21,8 @@ function buildSwaggerHtml(specUrl: string): string {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kiro Memory API — Documentazione</title>
-  <meta name="description" content="Documentazione interattiva dell'API REST di Kiro Memory" />
+  <title>Total Recall API — Documentazione</title>
+  <meta name="description" content="Documentazione interattiva dell'API REST di Total Recall" />
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
   <style>
     /* Stile minimo per rimuovere il banner Swagger */
@@ -50,7 +50,7 @@ function buildSwaggerHtml(specUrl: string): string {
 </head>
 <body>
   <div id="kiro-header">
-    <h1>Kiro Memory REST API</h1>
+    <h1>Total Recall REST API</h1>
     <span class="badge">v${openApiSpec.info.version}</span>
     <span class="badge">OpenAPI 3.1</span>
   </div>
