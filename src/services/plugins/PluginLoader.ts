@@ -274,7 +274,7 @@ export class PluginLoader {
     const mod = rawModule as Record<string, unknown>;
 
     // ESM default export
-    let candidate = mod.default ?? rawModule;
+    let candidate: unknown = mod.default ?? rawModule;
 
     // Se è una funzione factory, invocala
     if (typeof candidate === 'function') {
