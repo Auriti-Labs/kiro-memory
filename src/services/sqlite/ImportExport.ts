@@ -8,7 +8,7 @@
  * - Dry-run mode per import
  */
 
-import { Database } from '../../db/index.js';
+import type { Database } from '../../db/types.js';
 import { createHash } from 'crypto';
 
 // ── Versione schema JSONL ──

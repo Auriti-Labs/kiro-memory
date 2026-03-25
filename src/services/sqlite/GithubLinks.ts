@@ -5,7 +5,7 @@
  * (stessa convenzione degli altri moduli sqlite del progetto).
  */
 
-import { Database } from '../../db/index.js';
+import type { Database } from '../../db/types.js';
 
 // ── Tipi ──
 

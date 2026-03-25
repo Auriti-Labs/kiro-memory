@@ -223,7 +223,7 @@ export class PluginLoader {
     // Usa il metodo di caricamento moduli (sovrascrivibile nei test)
     const rawModule = await this._loadModule(entryPoint);
 
-    const plugin = this.extractPlugin(rawModule);
+    const plugin = this.extractPlugin(rawModule) as IPlugin;
     this.validatePlugin(plugin);
 
     return plugin;
@@ -353,7 +353,7 @@ export class PluginLoader {
     // Ottieni il modulo grezzo (bypass loadFromPath per non richiedere il filesystem)
     const rawModule = await this._loadRawPluginByName(nameOrPath);
 
-    const plugin = this.extractPlugin(rawModule);
+    const plugin = this.extractPlugin(rawModule) as IPlugin;
     this.validatePlugin(plugin as IPlugin);
     const typedPlugin = plugin as IPlugin;
 
