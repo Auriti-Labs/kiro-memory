@@ -13,7 +13,7 @@
  *     sempre esentate, indipendentemente dalla configurazione.
  */
 
-import { Database } from '../../db/index.js';
+import type { Database } from '../../db/types.js';
 import { KNOWLEDGE_TYPES } from '../../types/worker-types.js';
 
 // ── Tipi pubblici ──────────────────────────────────────────────────────────────

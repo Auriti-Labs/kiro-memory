@@ -1,4 +1,4 @@
-import { Database } from '../../db/index.js';
+import type { Database } from '../../db/types.js';
 import type { IJobHandler } from './JobQueue.js';
 import { consolidateObservations } from '../sqlite/Observations.js';
 import { logger } from '../../utils/logger.js';

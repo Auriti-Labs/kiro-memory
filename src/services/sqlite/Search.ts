@@ -1,4 +1,4 @@
-import { Database } from '../../db/index.js';
+import type { Database } from '../../db/types.js';
 import { existsSync, statSync } from 'fs';
 import type { Observation, Summary, SearchFilters, TimelineEntry } from '../../types/worker-types.js';
 

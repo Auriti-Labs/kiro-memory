@@ -1,4 +1,4 @@
-import { Database } from '../../db/index.js';
+import type { Database } from '../../db/types.js';
 import type { DBCheckpoint } from '../../types/worker-types.js';
 
 /**
