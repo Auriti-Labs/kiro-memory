@@ -25,7 +25,7 @@ import { readConfig } from '../../cli/cli-utils.js';
 import type { IPlugin } from './types.js';
 
 // ── Versione del runtime usata per la verifica minKiroVersion ──
-const TOTALRECALL_VERSION = '3.1.1';
+const TOTALRECALL_VERSION = '4.0.0';
 
 /**
  * Interfaccia minima del registry necessaria al Loader.
@@ -223,7 +223,7 @@ export class PluginLoader {
     // Usa il metodo di caricamento moduli (sovrascrivibile nei test)
     const rawModule = await this._loadModule(entryPoint);
 
-    const plugin = this.extractPlugin(rawModule);
+    const plugin = this.extractPlugin(rawModule) as IPlugin;
     this.validatePlugin(plugin);
 
     return plugin;
@@ -353,9 +353,8 @@ export class PluginLoader {
     // Ottieni il modulo grezzo (bypass loadFromPath per non richiedere il filesystem)
     const rawModule = await this._loadRawPluginByName(nameOrPath);
 
-    const plugin = this.extractPlugin(rawModule);
-    this.validatePlugin(plugin as IPlugin);
-    const typedPlugin = plugin as IPlugin;
+    const typedPlugin = this.extractPlugin(rawModule) as IPlugin;
+    this.validatePlugin(typedPlugin);
 
     // Memorizza il percorso per il hot reload usando il nome effettivo del plugin
     this.loadedModulePaths.set(typedPlugin.name, nameOrPath);
