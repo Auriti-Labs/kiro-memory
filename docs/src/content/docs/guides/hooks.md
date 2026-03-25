@@ -1,9 +1,9 @@
 ---
 title: Hooks
-description: The four Kiro Memory hooks — what they capture, when they fire, and how they work.
+description: The four Total Recall hooks — what they capture, when they fire, and how they work.
 ---
 
-Hooks are the primary data ingestion layer of Kiro Memory. They are small Node.js scripts that the Kiro CLI (or compatible editors) invoke at specific points in the session lifecycle.
+Hooks are the primary data ingestion layer of Total Recall. They are small Node.js scripts that the Kiro CLI (or compatible editors) invoke at specific points in the session lifecycle.
 
 ## How Hooks Work
 
@@ -179,7 +179,7 @@ These tags appear in the `concepts` column and are indexed by FTS5 for fast retr
 
 ## Hook Configuration Files
 
-Hook configuration is stored in `~/.kiro/plugins/kiro-memory/` (Kiro CLI) or in the editor-specific config directory. The `kiro-memory setup` command installs these automatically.
+Hook configuration is stored in `~/.kiro/plugins/totalrecall/` (Kiro CLI) or in the editor-specific config directory. The `totalrecall setup` command installs these automatically.
 
 ## Testing Hooks Manually
 
@@ -187,11 +187,11 @@ You can test a hook by piping JSON to it:
 
 ```bash
 echo '{"session_id":"test","cwd":"/home/user/my-project"}' | \
-  node ~/.kiro/plugins/kiro-memory/agentSpawn.js
+  node ~/.kiro/plugins/totalrecall/agentSpawn.js
 ```
 
 Or using the CLI:
 
 ```bash
-kiro-memory doctor  # checks all hooks are installed and executable
+totalrecall doctor  # checks all hooks are installed and executable
 ```

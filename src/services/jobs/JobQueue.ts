@@ -30,7 +30,7 @@ export interface IJobHandler {
 }
 
 /**
- * JobQueue - Async background job processing for Kiro Memory.
+ * JobQueue - Async background job processing for Total Recall.
  *
  * Supports priority-based scheduling, automatic retries with dead-letter queue,
  * configurable concurrency, and per-type handler registration.

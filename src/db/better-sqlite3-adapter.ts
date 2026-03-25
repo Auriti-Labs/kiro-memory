@@ -1,7 +1,7 @@
 /**
  * SQLite adapter using better-sqlite3
  *
- * Default database provider for Kiro Memory.
+ * Default database provider for Total Recall.
  * Works on any Node.js >= 18 without requiring Bun.
  *
  * Implements the Database interface defined in ./types.ts.

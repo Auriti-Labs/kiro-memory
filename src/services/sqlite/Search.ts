@@ -3,7 +3,7 @@ import { existsSync, statSync } from 'fs';
 import type { Observation, Summary, SearchFilters, TimelineEntry } from '../../types/worker-types.js';
 
 /**
- * Advanced search module for Kiro Memory
+ * Advanced search module for Total Recall
  * Supports FTS5 full-text search with LIKE fallback
  */
 

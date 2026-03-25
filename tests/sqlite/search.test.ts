@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
+import { TotalRecallDatabase } from '../../src/services/sqlite/Database.js';
 import { createObservation } from '../../src/services/sqlite/Observations.js';
 import { createSummary } from '../../src/services/sqlite/Summaries.js';
 import {
@@ -17,11 +17,11 @@ import {
 import type { Database } from 'bun:sqlite';
 
 describe('Search Module', () => {
-  let dbInstance: KiroMemoryDatabase;
+  let dbInstance: TotalRecallDatabase;
   let db: Database;
 
   beforeEach(() => {
-    dbInstance = new KiroMemoryDatabase(':memory:');
+    dbInstance = new TotalRecallDatabase(':memory:');
     db = dbInstance.db;
 
     // Seed dati di test

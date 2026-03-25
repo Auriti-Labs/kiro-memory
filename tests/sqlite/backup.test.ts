@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { mkdtempSync, existsSync, writeFileSync, readFileSync, unlinkSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
+import { TotalRecallDatabase } from '../../src/services/sqlite/Database.js';
 import {
   createBackup,
   listBackups,
@@ -31,9 +31,9 @@ function createTempDir(): string {
  * Crea un file DB SQLite temporaneo in una directory specificata,
  * popolato con alcune observations per testare le statistiche.
  */
-function createTestDb(dir: string, name = 'test.db'): { dbPath: string; db: KiroMemoryDatabase } {
+function createTestDb(dir: string, name = 'test.db'): { dbPath: string; db: TotalRecallDatabase } {
   const dbPath = join(dir, name);
-  const db = new KiroMemoryDatabase(dbPath);
+  const db = new TotalRecallDatabase(dbPath);
 
   // Inserisce qualche dato per avere statistiche non nulle
   db.db.run(`
@@ -382,7 +382,7 @@ describe('Backup Module', () => {
         expect(existsSync(restorePath)).toBe(true);
 
         // Verifica che il DB ripristinato sia apribile e contenga i dati
-        const restoredDb = new KiroMemoryDatabase(restorePath, true);
+        const restoredDb = new TotalRecallDatabase(restorePath, true);
         try {
           const row = restoredDb.db.query('SELECT COUNT(*) as c FROM observations').get() as { c: number };
           expect(row.c).toBe(2);

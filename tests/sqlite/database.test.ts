@@ -1,16 +1,16 @@
 /**
- * Test suite for KiroMemory Database
+ * Test suite for TotalRecall Database
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
+import { TotalRecallDatabase } from '../../src/services/sqlite/Database.js';
 import type { Database } from 'bun:sqlite';
 
-describe('KiroMemory Database', () => {
-  let db: KiroMemoryDatabase;
+describe('TotalRecall Database', () => {
+  let db: TotalRecallDatabase;
 
   beforeEach(() => {
-    db = new KiroMemoryDatabase(':memory:');
+    db = new TotalRecallDatabase(':memory:');
   });
 
   afterEach(() => {

@@ -1,5 +1,5 @@
 /**
- * Test suite per il plugin GitHub di Kiro Memory.
+ * Test suite per il plugin GitHub di Total Recall.
  *
  * Copre:
  *   - Parsing issue references (#123, owner/repo#123, closes #123, etc.)
@@ -98,11 +98,11 @@ describe('parseIssueReferences', () => {
   });
 
   it('estrae owner/repo#N', () => {
-    const refs = parseIssueReferences('Vedi Auriti-Labs/kiro-memory#32');
+    const refs = parseIssueReferences('Vedi Auriti-Labs/totalrecall#32');
     expect(refs).toHaveLength(1);
     expect(refs[0].number).toBe(32);
     expect(refs[0].owner).toBe('Auriti-Labs');
-    expect(refs[0].repo).toBe('kiro-memory');
+    expect(refs[0].repo).toBe('totalrecall');
   });
 
   it('estrae closes #N con keyword', () => {
@@ -113,12 +113,12 @@ describe('parseIssueReferences', () => {
   });
 
   it('estrae fixes owner/repo#N con keyword', () => {
-    const refs = parseIssueReferences('fixes Auriti-Labs/kiro-memory#99');
+    const refs = parseIssueReferences('fixes Auriti-Labs/totalrecall#99');
     expect(refs).toHaveLength(1);
     expect(refs[0].number).toBe(99);
     expect(refs[0].keyword).toBe('fixes');
     expect(refs[0].owner).toBe('Auriti-Labs');
-    expect(refs[0].repo).toBe('kiro-memory');
+    expect(refs[0].repo).toBe('totalrecall');
   });
 
   it('estrae resolves #N', () => {
@@ -157,7 +157,7 @@ describe('parseIssueReferences', () => {
   });
 
   it('preferisce owner/repo#N rispetto a #N standalone', () => {
-    const refs = parseIssueReferences('Auriti-Labs/kiro-memory#5 è la stessa issue');
+    const refs = parseIssueReferences('Auriti-Labs/totalrecall#5 è la stessa issue');
     // Il full ref dovrebbe sovrascrivere lo standalone se il numero è lo stesso
     const ref5 = refs.find(r => r.number === 5);
     expect(ref5).toBeDefined();
@@ -219,14 +219,14 @@ describe('GitHubClient', () => {
       number: 32,
       title: 'Plugin GitHub',
       state: 'open',
-      html_url: 'https://github.com/Auriti-Labs/kiro-memory/issues/32',
+      html_url: 'https://github.com/Auriti-Labs/totalrecall/issues/32',
       labels: [{ name: 'enhancement' }],
     };
 
     fetchMock = mockFetch([{ status: 200, body: issueData }]);
 
     const client = new GitHubClient({ token: 'test-token' }, makeMockLogger());
-    const issue = await client.getIssue('Auriti-Labs', 'kiro-memory', 32);
+    const issue = await client.getIssue('Auriti-Labs', 'totalrecall', 32);
 
     expect(issue.number).toBe(32);
     expect(issue.title).toBe('Plugin GitHub');
@@ -375,7 +375,7 @@ describe('GitHubPlugin', () => {
 
   describe('init()', () => {
     it('inizializza con configurazione valida', async () => {
-      const ctx = makeContext({ token: 'ghp_test123', repo: 'Auriti-Labs/kiro-memory' });
+      const ctx = makeContext({ token: 'ghp_test123', repo: 'Auriti-Labs/totalrecall' });
       await plugin.init(ctx);
 
       expect(plugin._getClient()).not.toBeNull();
@@ -403,19 +403,19 @@ describe('GitHubPlugin', () => {
 
   describe('onObservation', () => {
     it('traccia issue reference nel titolo', async () => {
-      const ctx = makeContext({ token: 'ghp_test', repo: 'Auriti-Labs/kiro-memory' });
+      const ctx = makeContext({ token: 'ghp_test', repo: 'Auriti-Labs/totalrecall' });
       await plugin.init(ctx);
 
       await plugin.hooks.onObservation!({
         id: 1,
-        project: 'kiro-memory',
+        project: 'totalrecall',
         type: 'file-write',
         title: 'Implementato fix per #32',
       });
 
       const linked = plugin._getLinkedIssues();
       expect(linked.size).toBe(1);
-      expect(linked.has('Auriti-Labs/kiro-memory#32')).toBe(true);
+      expect(linked.has('Auriti-Labs/totalrecall#32')).toBe(true);
     });
 
     it('traccia issue multiple nel titolo', async () => {
@@ -658,7 +658,7 @@ describe('GitHubPlugin', () => {
 
   describe('proprietà IPlugin', () => {
     it('ha nome corretto', () => {
-      expect(plugin.name).toBe('kiro-memory-plugin-github');
+      expect(plugin.name).toBe('totalrecall-plugin-github');
     });
 
     it('ha versione semver', () => {

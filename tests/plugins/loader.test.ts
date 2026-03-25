@@ -49,7 +49,7 @@ class MockRegistry implements IPluginRegistry {
 
 function makePlugin(overrides: Partial<IPlugin> = {}): IPlugin {
   return {
-    name: 'kiro-memory-plugin-test',
+    name: 'totalrecall-plugin-test',
     version: '1.0.0',
     async init() { /* nessuna operazione */ },
     async destroy() { /* nessuna operazione */ },
@@ -85,8 +85,8 @@ class TestablePluginLoader extends PluginLoader {
 
 function makeLoader(registry: MockRegistry): TestablePluginLoader {
   return new TestablePluginLoader(registry, {
-    localPluginsDir: '/tmp/kiro-memory-test-plugins-nonexistent-' + Date.now(),
-    projectRoot: '/tmp/kiro-memory-test-nonexistent-' + Date.now()
+    localPluginsDir: '/tmp/totalrecall-test-plugins-nonexistent-' + Date.now(),
+    projectRoot: '/tmp/totalrecall-test-nonexistent-' + Date.now()
   });
 }
 
@@ -116,14 +116,14 @@ describe('PluginLoader', () => {
 
   describe('validazione plugin (via loadPlugin)', () => {
     it('accetta un plugin valido con tutti i campi obbligatori', async () => {
-      const plugin = makePlugin({ name: 'kiro-memory-plugin-valid' });
-      loader.mockModules.set('kiro-memory-plugin-valid', plugin);
+      const plugin = makePlugin({ name: 'totalrecall-plugin-valid' });
+      loader.mockModules.set('totalrecall-plugin-valid', plugin);
 
       await expect(
-        loader.loadPlugin('kiro-memory-plugin-valid')
+        loader.loadPlugin('totalrecall-plugin-valid')
       ).resolves.toBeUndefined();
 
-      expect(registry.get('kiro-memory-plugin-valid')).toBeDefined();
+      expect(registry.get('totalrecall-plugin-valid')).toBeDefined();
     });
 
     it('rifiuta un plugin senza campo name', async () => {
@@ -142,91 +142,91 @@ describe('PluginLoader', () => {
 
     it('rifiuta un plugin senza campo version', async () => {
       const invalidPlugin = {
-        name: 'kiro-memory-plugin-no-version',
+        name: 'totalrecall-plugin-no-version',
         init: async () => {},
         destroy: async () => {}
       } as unknown as IPlugin;
 
-      loader.mockModules.set('kiro-memory-plugin-no-version', invalidPlugin);
+      loader.mockModules.set('totalrecall-plugin-no-version', invalidPlugin);
 
       await expect(
-        loader.loadPlugin('kiro-memory-plugin-no-version')
+        loader.loadPlugin('totalrecall-plugin-no-version')
       ).rejects.toThrow('version');
     });
 
     it('rifiuta un plugin senza metodo init', async () => {
       const invalidPlugin = {
-        name: 'kiro-memory-plugin-no-init',
+        name: 'totalrecall-plugin-no-init',
         version: '1.0.0',
         destroy: async () => {}
       } as unknown as IPlugin;
 
-      loader.mockModules.set('kiro-memory-plugin-no-init', invalidPlugin);
+      loader.mockModules.set('totalrecall-plugin-no-init', invalidPlugin);
 
       await expect(
-        loader.loadPlugin('kiro-memory-plugin-no-init')
+        loader.loadPlugin('totalrecall-plugin-no-init')
       ).rejects.toThrow('init');
     });
 
     it('rifiuta un plugin senza metodo destroy', async () => {
       const invalidPlugin = {
-        name: 'kiro-memory-plugin-no-destroy',
+        name: 'totalrecall-plugin-no-destroy',
         version: '1.0.0',
         init: async () => {}
       } as unknown as IPlugin;
 
-      loader.mockModules.set('kiro-memory-plugin-no-destroy', invalidPlugin);
+      loader.mockModules.set('totalrecall-plugin-no-destroy', invalidPlugin);
 
       await expect(
-        loader.loadPlugin('kiro-memory-plugin-no-destroy')
+        loader.loadPlugin('totalrecall-plugin-no-destroy')
       ).rejects.toThrow('destroy');
     });
 
     it('accetta un plugin con minKiroVersion compatibile', async () => {
       const plugin = makePlugin({
-        name: 'kiro-memory-plugin-compat',
+        name: 'totalrecall-plugin-compat',
         minKiroVersion: '2.0.0'
       });
-      loader.mockModules.set('kiro-memory-plugin-compat', plugin);
+      loader.mockModules.set('totalrecall-plugin-compat', plugin);
 
       await expect(
-        loader.loadPlugin('kiro-memory-plugin-compat')
+        loader.loadPlugin('totalrecall-plugin-compat')
       ).resolves.toBeUndefined();
     });
 
     it('accetta un plugin con minKiroVersion uguale alla versione corrente', async () => {
       const plugin = makePlugin({
-        name: 'kiro-memory-plugin-exact',
+        name: 'totalrecall-plugin-exact',
         minKiroVersion: '2.1.0'
       });
-      loader.mockModules.set('kiro-memory-plugin-exact', plugin);
+      loader.mockModules.set('totalrecall-plugin-exact', plugin);
 
       await expect(
-        loader.loadPlugin('kiro-memory-plugin-exact')
+        loader.loadPlugin('totalrecall-plugin-exact')
       ).resolves.toBeUndefined();
     });
 
     it('rifiuta un plugin con minKiroVersion superiore alla versione corrente', async () => {
       const plugin = makePlugin({
-        name: 'kiro-memory-plugin-future',
+        name: 'totalrecall-plugin-future',
         minKiroVersion: '99.0.0'
       });
-      loader.mockModules.set('kiro-memory-plugin-future', plugin);
+      loader.mockModules.set('totalrecall-plugin-future', plugin);
 
       await expect(
-        loader.loadPlugin('kiro-memory-plugin-future')
+        loader.loadPlugin('totalrecall-plugin-future')
       ).rejects.toThrow('99.0.0');
     });
 
     it('rifiuta un plugin con minKiroVersion minor incompatibile', async () => {
       const plugin = makePlugin({
-        name: 'kiro-memory-plugin-minor',
+        name: 'totalrecall-plugin-minor',
         minKiroVersion: '3.5.0'
       });
-      loader.mockModules.set('kiro-memory-plugin-minor', plugin);
+      loader.mockModules.set('totalrecall-plugin-minor', plugin);
 
       await expect(
-        loader.loadPlugin('kiro-memory-plugin-minor')
+        loader.loadPlugin('totalrecall-plugin-minor')
       ).rejects.toThrow('3.5.0');
     });
   });
@@ -250,10 +250,10 @@ describe('PluginLoader', () => {
   describe('isolamento errori in loadPlugin()', () => {
     it('un errore di validazione propaga correttamente', async () => {
       // Plugin con modulo corrotto
-      loader.mockModules.set('kiro-memory-plugin-faulty', new Error('Modulo corrotto'));
+      loader.mockModules.set('totalrecall-plugin-faulty', new Error('Modulo corrotto'));
 
       await expect(
-        loader.loadPlugin('kiro-memory-plugin-faulty')
+        loader.loadPlugin('totalrecall-plugin-faulty')
       ).rejects.toThrow('Modulo corrotto');
     });
 
@@ -261,11 +261,11 @@ describe('PluginLoader', () => {
       const loaded: string[] = [];
       const failed: Array<{ name: string; error: string }> = [];
 
-      const goodPlugin = makePlugin({ name: 'kiro-memory-plugin-good' });
-      loader.mockModules.set('kiro-memory-plugin-good', goodPlugin);
-      loader.mockModules.set('kiro-memory-plugin-bad', new Error('Plugin corrotto'));
+      const goodPlugin = makePlugin({ name: 'totalrecall-plugin-good' });
+      loader.mockModules.set('totalrecall-plugin-good', goodPlugin);
+      loader.mockModules.set('totalrecall-plugin-bad', new Error('Plugin corrotto'));
 
-      const pluginNames = ['kiro-memory-plugin-good', 'kiro-memory-plugin-bad'];
+      const pluginNames = ['totalrecall-plugin-good', 'totalrecall-plugin-bad'];
 
       for (const name of pluginNames) {
         try {
@@ -277,10 +277,10 @@ describe('PluginLoader', () => {
         }
       }
 
-      expect(loaded).toContain('kiro-memory-plugin-good');
-      expect(failed.some(f => f.name === 'kiro-memory-plugin-bad')).toBe(true);
-      expect(loaded).not.toContain('kiro-memory-plugin-bad');
-      expect(registry.get('kiro-memory-plugin-good')).toBeDefined();
+      expect(loaded).toContain('totalrecall-plugin-good');
+      expect(failed.some(f => f.name === 'totalrecall-plugin-bad')).toBe(true);
+      expect(loaded).not.toContain('totalrecall-plugin-bad');
+      expect(registry.get('totalrecall-plugin-good')).toBeDefined();
     });
   });
 
@@ -297,25 +297,25 @@ describe('PluginLoader', () => {
       let destroyCalled = false;
 
       const plugin = makePlugin({
-        name: 'kiro-memory-plugin-reload',
+        name: 'totalrecall-plugin-reload',
         async destroy() { destroyCalled = true; }
       });
 
-      loader.mockModules.set('kiro-memory-plugin-reload', plugin);
-      await loader.loadPlugin('kiro-memory-plugin-reload');
+      loader.mockModules.set('totalrecall-plugin-reload', plugin);
+      await loader.loadPlugin('totalrecall-plugin-reload');
 
-      expect(registry.get('kiro-memory-plugin-reload')).toBeDefined();
+      expect(registry.get('totalrecall-plugin-reload')).toBeDefined();
 
       const reloadedPlugin = makePlugin({
-        name: 'kiro-memory-plugin-reload',
+        name: 'totalrecall-plugin-reload',
         version: '2.0.0'
       });
-      loader.mockModules.set('kiro-memory-plugin-reload', reloadedPlugin);
+      loader.mockModules.set('totalrecall-plugin-reload', reloadedPlugin);
 
-      await loader.reloadPlugin('kiro-memory-plugin-reload');
+      await loader.reloadPlugin('totalrecall-plugin-reload');
 
       expect(destroyCalled).toBe(true);
-      expect(registry.get('kiro-memory-plugin-reload')).toBeDefined();
+      expect(registry.get('totalrecall-plugin-reload')).toBeDefined();
     });
   });
 
@@ -325,15 +325,15 @@ describe('PluginLoader', () => {
     it('loadPlugin registra il plugin senza chiamare init (responsabilità del registry)', async () => {
       let initCalled = false;
       const plugin = makePlugin({
-        name: 'kiro-memory-plugin-noinit',
+        name: 'totalrecall-plugin-noinit',
         async init() { initCalled = true; }
       });
 
-      loader.mockModules.set('kiro-memory-plugin-noinit', plugin);
-      await loader.loadPlugin('kiro-memory-plugin-noinit');
+      loader.mockModules.set('totalrecall-plugin-noinit', plugin);
+      await loader.loadPlugin('totalrecall-plugin-noinit');
 
       // Il loader registra ma NON chiama init
-      expect(registry.get('kiro-memory-plugin-noinit')).toBeDefined();
+      expect(registry.get('totalrecall-plugin-noinit')).toBeDefined();
       expect(initCalled).toBe(false);
     });
   });
@@ -342,26 +342,26 @@ describe('PluginLoader', () => {
 
   describe('gestione duplicati', () => {
     it('loadPlugin registra il plugin nel registry', async () => {
-      const plugin = makePlugin({ name: 'kiro-memory-plugin-dup', version: '1.0.0' });
-      loader.mockModules.set('kiro-memory-plugin-dup', plugin);
+      const plugin = makePlugin({ name: 'totalrecall-plugin-dup', version: '1.0.0' });
+      loader.mockModules.set('totalrecall-plugin-dup', plugin);
 
-      await loader.loadPlugin('kiro-memory-plugin-dup');
+      await loader.loadPlugin('totalrecall-plugin-dup');
 
-      expect(registry.get('kiro-memory-plugin-dup')).toBeDefined();
-      expect(registry.get('kiro-memory-plugin-dup')?.version).toBe('1.0.0');
+      expect(registry.get('totalrecall-plugin-dup')).toBeDefined();
+      expect(registry.get('totalrecall-plugin-dup')?.version).toBe('1.0.0');
     });
 
     it('loadAll salta i plugin già registrati nel registry', async () => {
-      const plugin = makePlugin({ name: 'kiro-memory-plugin-pre', version: '1.0.0' });
+      const plugin = makePlugin({ name: 'totalrecall-plugin-pre', version: '1.0.0' });
       registry.register(plugin);
 
-      const updatedPlugin = makePlugin({ name: 'kiro-memory-plugin-pre', version: '2.0.0' });
-      loader.mockModules.set('kiro-memory-plugin-pre', updatedPlugin);
+      const updatedPlugin = makePlugin({ name: 'totalrecall-plugin-pre', version: '2.0.0' });
+      loader.mockModules.set('totalrecall-plugin-pre', updatedPlugin);
 
       const result = await loader.loadAll();
 
-      expect(registry.get('kiro-memory-plugin-pre')?.version).toBe('1.0.0');
-      expect(result.loaded).not.toContain('kiro-memory-plugin-pre');
+      expect(registry.get('totalrecall-plugin-pre')?.version).toBe('1.0.0');
+      expect(result.loaded).not.toContain('totalrecall-plugin-pre');
     });
   });
 
@@ -369,16 +369,16 @@ describe('PluginLoader', () => {
 
   describe('integrazione', () => {
     it('loadPlugin rende il plugin disponibile tramite registry.get()', async () => {
-      const plugin = makePlugin({ name: 'kiro-memory-plugin-avail' });
-      loader.mockModules.set('kiro-memory-plugin-avail', plugin);
+      const plugin = makePlugin({ name: 'totalrecall-plugin-avail' });
+      loader.mockModules.set('totalrecall-plugin-avail', plugin);
 
-      expect(registry.get('kiro-memory-plugin-avail')).toBeUndefined();
-      await loader.loadPlugin('kiro-memory-plugin-avail');
-      expect(registry.get('kiro-memory-plugin-avail')).toBeDefined();
+      expect(registry.get('totalrecall-plugin-avail')).toBeUndefined();
+      await loader.loadPlugin('totalrecall-plugin-avail');
+      expect(registry.get('totalrecall-plugin-avail')).toBeDefined();
     });
 
     it('più plugin possono essere caricati indipendentemente', async () => {
-      const names = ['kiro-memory-plugin-a', 'kiro-memory-plugin-b', 'kiro-memory-plugin-c'];
+      const names = ['totalrecall-plugin-a', 'totalrecall-plugin-b', 'totalrecall-plugin-c'];
 
       for (const name of names) {
         loader.mockModules.set(name, makePlugin({ name }));

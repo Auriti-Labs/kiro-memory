@@ -1,32 +1,38 @@
 {
-  "name": "kiro-memory",
-  "version": "3.1.1",
-  "description": "Persistent cross-session memory for AI coding assistants. Works with Claude Code, Cursor, Windsurf, Cline, and any MCP-compatible editor.",
+  "name": "totalrecallai",
+  "version": "4.0.0",
+  "description": "Your AI remembers everything. Persistent cross-session memory for AI coding assistants. Works with Claude Code, Cursor, Windsurf, Cline, and any MCP-compatible editor.",
   "keywords": [
-    "kiro",
+    "totalrecall",
+    "ai-memory",
     "claude-code",
     "cursor",
     "windsurf",
     "cline",
     "memory",
     "mcp",
-    "context",
-    "persistence",
+    "model-context-protocol",
+    "persistent-memory",
     "vector-search",
     "embeddings",
     "sqlite",
     "typescript",
-    "ai-tools"
+    "ai-agents",
+    "coding-assistant",
+    "session-memory",
+    "semantic-search",
+    "context-management",
+    "developer-tools"
   ],
   "author": "Auriti Labs",
   "license": "AGPL-3.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Auriti-Labs/kiro-memory.git"
+    "url": "https://github.com/Auriti-Labs/totalrecall.git"
   },
-  "homepage": "https://github.com/Auriti-Labs/kiro-memory#readme",
+  "homepage": "https://github.com/Auriti-Labs/totalrecall#readme",
   "bugs": {
-    "url": "https://github.com/Auriti-Labs/kiro-memory/issues"
+    "url": "https://github.com/Auriti-Labs/totalrecall/issues"
   },
   "type": "module",
   "exports": {
@@ -45,6 +51,7 @@
     "scripts/postinstall.cjs"
   ],
   "bin": {
+    "totalrecall": "./plugin/dist/cli/contextkit.js",
     "kiro-memory": "./plugin/dist/cli/contextkit.js"
   },
   "engines": {

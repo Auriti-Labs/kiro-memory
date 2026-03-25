@@ -1,5 +1,5 @@
 /**
- * Test suite per la specifica OpenAPI di Kiro Memory.
+ * Test suite per la specifica OpenAPI di Total Recall.
  *
  * Verifica che:
  *   1. La struttura OpenAPI 3.1 sia valida (campi obbligatori presenti)

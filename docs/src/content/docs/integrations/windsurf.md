@@ -1,9 +1,9 @@
 ---
 title: Windsurf
-description: Set up Kiro Memory with Windsurf IDE for persistent cross-session memory via MCP tools.
+description: Set up Total Recall with Windsurf IDE for persistent cross-session memory via MCP tools.
 ---
 
-[Windsurf](https://windsurf.com) (by Codeium) is an AI-powered IDE that supports MCP servers. Once connected, the Windsurf AI agent (Cascade) can search, save, and manage cross-session memory through Kiro Memory's MCP tools.
+[Windsurf](https://windsurf.com) (by Codeium) is an AI-powered IDE that supports MCP servers. Once connected, the Windsurf AI agent (Cascade) can search, save, and manage cross-session memory through Total Recall's MCP tools.
 
 ## Prerequisites
 
@@ -20,8 +20,8 @@ On WSL, ensure Node.js is installed natively inside WSL. Run `which node` to ver
 ### Option 1: Automatic setup (recommended)
 
 ```bash
-npm install -g kiro-memory
-kiro-memory install --windsurf
+npm install -g totalrecall
+totalrecall install --windsurf
 ```
 
 The installer will:
@@ -37,9 +37,9 @@ Create or edit `~/.codeium/windsurf/mcp_config.json`:
 ```json
 {
   "mcpServers": {
-    "kiro-memory": {
+    "totalrecall": {
       "command": "npx",
-      "args": ["kiro-memory", "mcp"]
+      "args": ["totalrecall", "mcp"]
     }
   }
 }
@@ -52,7 +52,7 @@ The configuration file path is `~/.codeium/windsurf/mcp_config.json`. This is Wi
 For faster startup times, install globally first:
 
 ```bash
-npm install -g kiro-memory
+npm install -g totalrecall
 ```
 
 Then reference the installed binary directly:
@@ -60,8 +60,8 @@ Then reference the installed binary directly:
 ```json
 {
   "mcpServers": {
-    "kiro-memory": {
-      "command": "kiro-memory",
+    "totalrecall": {
+      "command": "totalrecall",
       "args": ["mcp"]
     }
   }
@@ -71,14 +71,14 @@ Then reference the installed binary directly:
 ## Verify the connection
 
 1. Open Windsurf and start a new Cascade session
-2. Check the MCP section in Windsurf settings to confirm `kiro-memory` is listed
+2. Check the MCP section in Windsurf settings to confirm `totalrecall` is listed
 3. Ask Cascade to use a memory tool:
 
 ```
 Search my memory for "database migration"
 ```
 
-Cascade should call the `kiro-memory/search` tool and return matching observations.
+Cascade should call the `totalrecall/search` tool and return matching observations.
 
 You can also verify the worker at [http://localhost:3001](http://localhost:3001).
 
@@ -88,16 +88,16 @@ Windsurf does not currently support lifecycle hooks for automatic observation ca
 
 1. **Using `save_memory` to persist important context.** Ask Cascade to save summaries of completed work.
 2. **Using `store_knowledge` for decisions.** Record architectural choices and constraints explicitly.
-3. **Using a `.windsurfrules` file** to instruct Cascade to interact with Kiro Memory tools proactively.
+3. **Using a `.windsurfrules` file** to instruct Cascade to interact with Total Recall tools proactively.
 
 ### Setting up `.windsurfrules`
 
 Create a `.windsurfrules` file in your project root:
 
 ```
-When starting a new task, search kiro-memory for relevant past context on this project.
-After completing a task, save a summary using the kiro-memory save_memory tool.
-When making architectural decisions, store them using kiro-memory store_knowledge.
+When starting a new task, search totalrecall for relevant past context on this project.
+After completing a task, save a summary using the totalrecall save_memory tool.
+When making architectural decisions, store them using totalrecall store_knowledge.
 Before proposing changes, check if there are previous decisions or constraints stored in memory.
 ```
 
@@ -105,7 +105,7 @@ This guides Cascade to use memory tools throughout your session.
 
 ## Using the MCP tools
 
-All 10 Kiro Memory tools are available to the Windsurf AI agent. Common patterns:
+All 10 Total Recall tools are available to the Windsurf AI agent. Common patterns:
 
 ### Search previous sessions
 
@@ -176,13 +176,13 @@ Resume my last session, then search for any decisions about the auth system
 **Tools return "Worker unreachable":** The worker needs to be running. Start it manually:
 
 ```bash
-kiro-memory worker start
+totalrecall worker start
 ```
 
 Check the worker status:
 
 ```bash
-kiro-memory doctor
+totalrecall doctor
 ```
 
 **Configuration file location:** If `~/.codeium/windsurf/mcp_config.json` does not work, check Windsurf's settings UI for the correct MCP configuration path. The location may vary by Windsurf version and OS.
@@ -190,5 +190,5 @@ kiro-memory doctor
 **Slow first response:** If using `npx` without a global install, the first tool call downloads the package. Install globally for instant startup:
 
 ```bash
-npm install -g kiro-memory
+npm install -g totalrecall
 ```

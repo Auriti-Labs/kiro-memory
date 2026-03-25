@@ -352,7 +352,7 @@ describe('emitHook()', () => {
 
     await registry.enable('sum-listener', makeContext());
 
-    const expected = { id: 7, project: 'kiro-memory', request: 'Implementa plugin' };
+    const expected = { id: 7, project: 'totalrecall', request: 'Implementa plugin' };
     await registry.emitHook('onSummary', expected);
 
     expect(payloadRicevuto).toEqual(expected);

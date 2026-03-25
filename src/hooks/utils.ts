@@ -13,19 +13,19 @@ import type { KiroHookInput, ScoredItem, Summary } from '../types/worker-types.j
 import { estimateTokens } from '../services/search/ScoringEngine.js';
 
 // Path to shared authentication token with the worker
-const DATA_DIR = process.env.KIRO_MEMORY_DATA_DIR
+const DATA_DIR = process.env.TOTALRECALL_DATA_DIR
   || process.env.CONTEXTKIT_DATA_DIR
-  || join(process.env.HOME || '/tmp', '.kiro-memory');
+  || join(process.env.HOME || '/tmp', '.totalrecall');
 const TOKEN_FILE = join(DATA_DIR, 'worker.token');
 
 /**
- * Logging di debug per gli hook (attivo solo con KIRO_MEMORY_LOG_LEVEL=DEBUG)
+ * Logging di debug per gli hook (attivo solo con TOTALRECALL_LOG_LEVEL=DEBUG)
  */
 export function debugLog(hookName: string, label: string, data: unknown): void {
-  if ((process.env.KIRO_MEMORY_LOG_LEVEL || '').toUpperCase() !== 'DEBUG') return;
+  if ((process.env.TOTALRECALL_LOG_LEVEL || '').toUpperCase() !== 'DEBUG') return;
   try {
-    const dataDir = process.env.KIRO_MEMORY_DATA_DIR
-      || join(process.env.HOME || '/tmp', '.kiro-memory');
+    const dataDir = process.env.TOTALRECALL_DATA_DIR
+      || join(process.env.HOME || '/tmp', '.totalrecall');
     const logDir = join(dataDir, 'logs');
     if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true });
 
@@ -135,8 +135,8 @@ export function formatContext(data: {
  * Non-blocking: silently ignores if the worker is not running.
  */
 export async function notifyWorker(event: string, data?: Record<string, unknown>): Promise<void> {
-  const host = process.env.KIRO_MEMORY_WORKER_HOST || '127.0.0.1';
-  const port = process.env.KIRO_MEMORY_WORKER_PORT || '3001';
+  const host = process.env.TOTALRECALL_WORKER_HOST || '127.0.0.1';
+  const port = process.env.TOTALRECALL_WORKER_PORT || '3001';
   try {
     // Read shared authentication token with the worker
     let token = '';
@@ -176,14 +176,14 @@ export function formatSmartContext(data: {
   tokenBudget?: number;
 }): string {
   const budget = data.tokenBudget
-    || parseInt(process.env.KIRO_MEMORY_CONTEXT_TOKENS || '0', 10)
+    || parseInt(process.env.TOTALRECALL_CONTEXT_TOKENS || '0', 10)
     || 2000;
 
   let output = '';
   let tokensUsed = 0;
 
   // Header
-  const header = '# Kiro Memory: Previous Sessions Context\n\n';
+  const header = '# Total Recall: Previous Sessions Context\n\n';
   tokensUsed += estimateTokens(header);
   output += header;
 
@@ -266,7 +266,7 @@ export async function runHook(
     process.exit(0);
   } catch (error) {
     debugLog(name, 'error', { error: String(error) });
-    process.stderr.write(`[kiro-memory:${name}] Error: ${error}\n`);
+    process.stderr.write(`[totalrecall:${name}] Error: ${error}\n`);
     process.exit(0); // Exit 0 for silent degradation (don't block Kiro)
   }
 }

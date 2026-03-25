@@ -1,7 +1,7 @@
 import { Database } from '../../db/index.js';
 
 /**
- * Analytics module for Kiro Memory.
+ * Analytics module for Total Recall.
  * Aggregate queries for metrics dashboard.
  */
 

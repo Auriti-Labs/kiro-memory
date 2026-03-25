@@ -146,7 +146,7 @@ export class GitHubClient {
       'Authorization': `token ${this.token}`,
       'Accept': 'application/vnd.github.v3+json',
       'Content-Type': 'application/json',
-      'User-Agent': 'kiro-memory-plugin-github/1.0.0',
+      'User-Agent': 'totalrecall-plugin-github/1.0.0',
     };
 
     let lastError: Error | null = null;

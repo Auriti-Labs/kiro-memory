@@ -22,7 +22,7 @@ export const ALL_TYPES = [
   'tool-use',
 ] as const;
 
-const SAVED_FILTERS_KEY = 'kiro-memory-saved-filters';
+const SAVED_FILTERS_KEY = 'totalrecall-saved-filters';
 
 // ── Stato iniziale ──
 function buildInitialState(): FilterState {

@@ -1,5 +1,5 @@
 /**
- * Provider TreeView per le sessioni Kiro Memory.
+ * Provider TreeView per le sessioni Total Recall.
  *
  * Mostra le sessioni recenti con durata e numero di osservazioni.
  * Ogni sessione è espandibile per vedere le osservazioni contenute.
@@ -7,7 +7,7 @@
  */
 
 import * as vscode from 'vscode';
-import type { KiroMemoryClient, Session } from '../api-client';
+import type { TotalRecallClient, Session } from '../api-client';
 
 // ── Nodo TreeView sessione ─────────────────────────────────────────────────
 
@@ -97,7 +97,7 @@ export class SessionsProvider implements vscode.TreeDataProvider<SessionTreeItem
   /** Cache locale delle sessioni */
   private cachedItems: SessionTreeItem[] = [];
 
-  constructor(private readonly client: KiroMemoryClient) {}
+  constructor(private readonly client: TotalRecallClient) {}
 
   /** Forza aggiornamento della tree view */
   refresh(): void {
@@ -142,7 +142,7 @@ export class SessionsProvider implements vscode.TreeDataProvider<SessionTreeItem
       return items;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Errore sconosciuto';
-      vscode.window.showErrorMessage(`Kiro Memory: impossibile caricare le sessioni — ${msg}`);
+      vscode.window.showErrorMessage(`Total Recall: impossibile caricare le sessioni — ${msg}`);
       return this.cachedItems.length > 0 ? this.cachedItems : [this.buildOfflineItem()];
     }
   }

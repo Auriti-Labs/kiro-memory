@@ -1,9 +1,9 @@
 ---
 title: Cursor
-description: Set up Kiro Memory with Cursor IDE for persistent cross-session memory with MCP tools and hooks.
+description: Set up Total Recall with Cursor IDE for persistent cross-session memory with MCP tools and hooks.
 ---
 
-Cursor supports both MCP servers and hooks, making it a strong option for Kiro Memory integration. The AI agent gets access to all memory tools, and hooks can automatically capture file edits, shell commands, and session events.
+Cursor supports both MCP servers and hooks, making it a strong option for Total Recall integration. The AI agent gets access to all memory tools, and hooks can automatically capture file edits, shell commands, and session events.
 
 ## Prerequisites
 
@@ -20,8 +20,8 @@ On WSL, ensure you are using a native Linux Node.js. Run `which node` to verify 
 ### Option 1: Automatic setup (recommended)
 
 ```bash
-npm install -g kiro-memory
-kiro-memory install --cursor
+npm install -g totalrecall
+totalrecall install --cursor
 ```
 
 The installer will:
@@ -38,9 +38,9 @@ The installer will:
 ```json
 {
   "mcpServers": {
-    "kiro-memory": {
+    "totalrecall": {
       "command": "npx",
-      "args": ["kiro-memory", "mcp"]
+      "args": ["totalrecall", "mcp"]
     }
   }
 }
@@ -49,7 +49,7 @@ The installer will:
 For project-level configuration, create `.cursor/mcp.json` in your project root with the same structure.
 
 :::note
-When using `npx`, Node.js will download and run the latest version of `kiro-memory` if not installed globally. For faster startup, install globally first: `npm install -g kiro-memory`.
+When using `npx`, Node.js will download and run the latest version of `totalrecall` if not installed globally. For faster startup, install globally first: `npm install -g totalrecall`.
 :::
 
 **Hooks** -- Create or edit `~/.cursor/hooks.json`:
@@ -59,50 +59,50 @@ When using `npx`, Node.js will download and run the latest version of `kiro-memo
   "version": 1,
   "hooks": {
     "sessionStart": [
-      { "command": "npx kiro-memory hook agentSpawn" }
+      { "command": "npx totalrecall hook agentSpawn" }
     ],
     "beforeSubmitPrompt": [
-      { "command": "npx kiro-memory hook userPromptSubmit" }
+      { "command": "npx totalrecall hook userPromptSubmit" }
     ],
     "afterFileEdit": [
-      { "command": "npx kiro-memory hook postToolUse" }
+      { "command": "npx totalrecall hook postToolUse" }
     ],
     "afterShellExecution": [
-      { "command": "npx kiro-memory hook postToolUse" }
+      { "command": "npx totalrecall hook postToolUse" }
     ],
     "afterMCPExecution": [
-      { "command": "npx kiro-memory hook postToolUse" }
+      { "command": "npx totalrecall hook postToolUse" }
     ],
     "stop": [
-      { "command": "npx kiro-memory hook stop" }
+      { "command": "npx totalrecall hook stop" }
     ]
   }
 }
 ```
 
 :::caution
-If you already have hooks configured in `hooks.json`, merge the Kiro Memory entries into the existing arrays for each event.
+If you already have hooks configured in `hooks.json`, merge the Total Recall entries into the existing arrays for each event.
 :::
 
 ## Verify the connection
 
 1. Open Cursor and start a new AI chat session
-2. Open the **MCP panel** in Cursor settings to confirm `kiro-memory` appears as a connected server
+2. Open the **MCP panel** in Cursor settings to confirm `totalrecall` appears as a connected server
 3. Ask the AI agent to use a memory tool:
 
 ```
 Search my memory for "database schema"
 ```
 
-The agent should call `kiro-memory/search` and return matching observations.
+The agent should call `totalrecall/search` and return matching observations.
 
 You can also verify the worker is running by opening [http://localhost:3001](http://localhost:3001) in your browser.
 
 ## Cursor hook events
 
-Cursor fires the following hook events that Kiro Memory uses:
+Cursor fires the following hook events that Total Recall uses:
 
-| Cursor event | Kiro Memory hook | What it captures |
+| Cursor event | Total Recall hook | What it captures |
 |---|---|---|
 | `sessionStart` | `agentSpawn` | Starts worker, injects previous context |
 | `beforeSubmitPrompt` | `userPromptSubmit` | Records the user prompt |
@@ -113,7 +113,7 @@ Cursor fires the following hook events that Kiro Memory uses:
 
 ## Using the MCP tools
 
-All 10 Kiro Memory tools are available to the Cursor AI agent. Common usage patterns:
+All 10 Total Recall tools are available to the Cursor AI agent. Common usage patterns:
 
 ### Search previous sessions
 
@@ -147,10 +147,10 @@ Generate a weekly activity report
 
 ## Tips for effective use with Cursor
 
-1. **Use Cursor Rules for steering.** Add a `.cursorrules` file to your project with instructions to use Kiro Memory tools:
+1. **Use Cursor Rules for steering.** Add a `.cursorrules` file to your project with instructions to use Total Recall tools:
 
 ```
-When starting a new task, check kiro-memory for previous context on this project.
+When starting a new task, check totalrecall for previous context on this project.
 When making architectural decisions, store them using the store_knowledge tool.
 At the end of complex tasks, save a summary using save_memory.
 ```
@@ -170,13 +170,13 @@ At the end of complex tasks, save a summary using save_memory.
 **Tools return "Worker unreachable":** Start the worker manually:
 
 ```bash
-kiro-memory worker start
+totalrecall worker start
 ```
 
 Or check its status:
 
 ```bash
-kiro-memory doctor
+totalrecall doctor
 ```
 
 **Hooks not firing:** Verify `~/.cursor/hooks.json` exists and has the correct structure. Cursor requires the `version: 1` field.
@@ -184,5 +184,5 @@ kiro-memory doctor
 **Slow tool responses:** If using `npx` without a global install, the first call downloads the package. Install globally for instant startup:
 
 ```bash
-npm install -g kiro-memory
+npm install -g totalrecall
 ```

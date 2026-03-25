@@ -1,9 +1,9 @@
 /**
- * Kiro Memory CLI - Command line interface
+ * Total Recall CLI - Command line interface
  * (shebang added automatically by the build)
  */
 
-import { createKiroMemory } from '../sdk/index.js';
+import { createTotalRecall } from '../sdk/index.js';
 import { formatReportText, formatReportMarkdown, formatReportJson } from '../services/report-formatter.js';
 import { printBanner } from './banner.js';
 import {
@@ -20,7 +20,7 @@ import {
   removeOrphanedEmbeddings,
   vacuumDatabase,
 } from './cli-utils.js';
-import { KiroMemoryDatabase } from '../services/sqlite/Database.js';
+import { TotalRecallDatabase } from '../services/sqlite/Database.js';
 import { getObservationsByProject } from '../services/sqlite/Observations.js';
 import { createBackup, listBackups, restoreBackup, rotateBackups } from '../services/sqlite/Backup.js';
 import { DB_PATH, BACKUPS_DIR } from '../shared/paths.js';
@@ -52,12 +52,12 @@ try {
 
 /** Agent config template — __DIST_DIR__ is replaced at install time */
 const AGENT_TEMPLATE = JSON.stringify({
-  name: "kiro-memory",
-  description: "Agent with persistent cross-session memory. Uses Kiro Memory to remember context from previous sessions and automatically save what it learns.",
+  name: "totalrecall",
+  description: "Agent with persistent cross-session memory. Uses Total Recall to remember context from previous sessions and automatically save what it learns.",
   model: "claude-sonnet-4",
-  tools: ["read", "write", "shell", "glob", "grep", "web_search", "web_fetch", "@kiro-memory"],
+  tools: ["read", "write", "shell", "glob", "grep", "web_search", "web_fetch", "@totalrecall"],
   mcpServers: {
-    "kiro-memory": {
+    "totalrecall": {
       command: "node",
       args: ["__DIST_DIR__/servers/mcp-server.js"]
     }
@@ -68,29 +68,29 @@ const AGENT_TEMPLATE = JSON.stringify({
     postToolUse: [{ command: "node __DIST_DIR__/hooks/postToolUse.js", matcher: "*", timeout_ms: 5000 }],
     stop: [{ command: "node __DIST_DIR__/hooks/stop.js", timeout_ms: 10000 }]
   },
-  resources: ["file://.kiro/steering/kiro-memory.md"]
+  resources: ["file://.kiro/steering/totalrecall.md"]
 }, null, 2);
 
 /** Steering file content — embedded directly */
-const STEERING_CONTENT = `# Kiro Memory - Persistent Memory
+const STEERING_CONTENT = `# Total Recall - Persistent Memory
 
-You have access to Kiro Memory, a persistent cross-session memory system.
+You have access to Total Recall, a persistent cross-session memory system.
 
 ## Available MCP Tools
 
-### @kiro-memory/search
+### @totalrecall/search
 Search previous session memory. Use when:
 - The user mentions past work
 - You need context on previous decisions
 - You want to check if a problem was already addressed
 
-### @kiro-memory/get_context
+### @totalrecall/get_context
 Retrieve recent context for the current project. Use at the start of complex tasks to understand what was done before.
 
-### @kiro-memory/timeline
+### @totalrecall/timeline
 Show chronological context around an observation. Use to understand the sequence of events.
 
-### @kiro-memory/get_observations
+### @totalrecall/get_observations
 Retrieve full details of specific observations. Use after \`search\` to drill down.
 
 ## Behavior
@@ -183,7 +183,7 @@ function runEnvironmentChecks(): CheckResult[] {
           ? `npm global prefix points to Windows: ${npmPrefix}`
           : `npm global prefix: ${npmPrefix}`,
         fix: prefixOnWindows
-          ? 'Fix npm prefix:\n  mkdir -p ~/.npm-global\n  npm config set prefix ~/.npm-global\n  echo \'export PATH="$HOME/.npm-global/bin:$PATH"\' >> ~/.bashrc\n  source ~/.bashrc\n  Then reinstall: npm install -g kiro-memory'
+          ? 'Fix npm prefix:\n  mkdir -p ~/.npm-global\n  npm config set prefix ~/.npm-global\n  echo \'export PATH="$HOME/.npm-global/bin:$PATH"\' >> ~/.bashrc\n  source ~/.bashrc\n  Then reinstall: npm install -g totalrecall'
           : undefined,
       });
     } catch {
@@ -242,7 +242,7 @@ function runEnvironmentChecks(): CheckResult[] {
     message: sqliteMsg,
     fix: !sqliteOk
       ? (wsl
-        ? 'In WSL, rebuild the native module:\n  npm rebuild better-sqlite3\n  If that fails, reinstall:\n  npm install -g kiro-memory --build-from-source'
+        ? 'In WSL, rebuild the native module:\n  npm rebuild better-sqlite3\n  If that fails, reinstall:\n  npm install -g totalrecall --build-from-source'
         : 'Rebuild the native module:\n  npm rebuild better-sqlite3')
       : undefined,
   });
@@ -264,7 +264,7 @@ function runEnvironmentChecks(): CheckResult[] {
         ? 'make, g++, python3 available'
         : `Missing: ${missing.join(', ')}`,
       fix: !allPresent
-        ? `Install required packages:\n  sudo apt-get update && sudo apt-get install -y ${missing.join(' ')}\n  Then reinstall: npm install -g kiro-memory --build-from-source`
+        ? `Install required packages:\n  sudo apt-get update && sudo apt-get install -y ${missing.join(' ')}\n  Then reinstall: npm install -g totalrecall --build-from-source`
         : undefined,
     });
   }
@@ -341,7 +341,7 @@ async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean
 
   const answer = await askUser('  Fix automatically? [Y/n] ');
   if (answer !== '' && answer !== 'y' && answer !== 'yes') {
-    console.log('\n  Skipped auto-fix. Fix manually and run: kiro-memory install\n');
+    console.log('\n  Skipped auto-fix. Fix manually and run: totalrecall install\n');
     return { fixed: false, needsRestart: false };
   }
 
@@ -365,7 +365,7 @@ async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean
         alreadyInRc = content.includes('.npm-global/bin');
       }
       if (!alreadyInRc) {
-        appendFileSync(rcFile, `\n# npm global prefix (added by kiro-memory)\n${exportLine}\n`);
+        appendFileSync(rcFile, `\n# npm global prefix (added by totalrecall)\n${exportLine}\n`);
       }
 
       // Update PATH of the current process
@@ -441,7 +441,7 @@ async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean
       const { spawnSync: spawnRebuild } = require('child_process');
       const globalDirResult = spawnRebuild('npm', ['prefix', '-g'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
       const globalDir = (globalDirResult.stdout || '').trim();
-      const sqlitePkg = join(globalDir, 'lib', 'node_modules', 'kiro-memory');
+      const sqlitePkg = join(globalDir, 'lib', 'node_modules', 'totalrecall');
       if (existsSync(sqlitePkg)) {
         spawnRebuild('npm', ['rebuild', 'better-sqlite3'], {
           cwd: sqlitePkg,
@@ -455,7 +455,7 @@ async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean
       anyFixed = true;
     } catch (err: any) {
       console.log(`  \x1b[31m✗\x1b[0m Could not rebuild: ${err.message}`);
-      console.log('  Try: npm install -g kiro-memory --build-from-source');
+      console.log('  Try: npm install -g totalrecall --build-from-source');
     }
   }
 
@@ -466,7 +466,7 @@ async function tryAutoFix(failedChecks: CheckResult[]): Promise<{ fixed: boolean
 // ─── Install command ───
 
 async function installKiro() {
-  console.log('\n=== Kiro Memory - Installation ===\n');
+  console.log('\n=== Total Recall - Installation ===\n');
   console.log('[1/4] Running environment checks...');
 
   let checks = runEnvironmentChecks();
@@ -482,8 +482,8 @@ async function installKiro() {
       console.log('  \x1b[33m│\x1b[0m  Node.js was installed via nvm. To activate it:         \x1b[33m│\x1b[0m');
       console.log('  \x1b[33m│\x1b[0m                                                         \x1b[33m│\x1b[0m');
       console.log('  \x1b[33m│\x1b[0m  1. Close and reopen your terminal                      \x1b[33m│\x1b[0m');
-      console.log('  \x1b[33m│\x1b[0m  2. Run: \x1b[1mnpm install -g kiro-memory\x1b[0m                     \x1b[33m│\x1b[0m');
-      console.log('  \x1b[33m│\x1b[0m  3. Run: \x1b[1mkiro-memory install\x1b[0m                            \x1b[33m│\x1b[0m');
+      console.log('  \x1b[33m│\x1b[0m  2. Run: \x1b[1mnpm install -g totalrecall\x1b[0m                     \x1b[33m│\x1b[0m');
+      console.log('  \x1b[33m│\x1b[0m  3. Run: \x1b[1mtotalrecall install\x1b[0m                            \x1b[33m│\x1b[0m');
       console.log('  \x1b[33m└─────────────────────────────────────────────────────────┘\x1b[0m\n');
       process.exit(0);
     }
@@ -497,7 +497,7 @@ async function installKiro() {
 
     if (hasErrors) {
       console.log('\x1b[31mInstallation aborted.\x1b[0m Fix the remaining issues and retry.');
-      console.log('After fixing, run: kiro-memory install\n');
+      console.log('After fixing, run: totalrecall install\n');
       process.exit(1);
     }
   }
@@ -510,7 +510,7 @@ async function installKiro() {
   const agentsDir = join(kiroDir, 'agents');
   const settingsDir = join(kiroDir, 'settings');
   const steeringDir = join(kiroDir, 'steering');
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.contextkit');
+  const dataDir = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.contextkit');
 
   console.log('[2/4] Installing Kiro configuration...\n');
 
@@ -521,7 +521,7 @@ async function installKiro() {
 
   // Generate agent config with absolute paths (from embedded template)
   const agentConfig = AGENT_TEMPLATE.replace(/__DIST_DIR__/g, distDir);
-  const agentDestPath = join(agentsDir, 'kiro-memory.json');
+  const agentDestPath = join(agentsDir, 'totalrecall.json');
   writeFileSync(agentDestPath, agentConfig, 'utf8');
   console.log(`  → Agent config: ${agentDestPath}`);
 
@@ -538,7 +538,7 @@ async function installKiro() {
     }
   }
 
-  mcpConfig.mcpServers['kiro-memory'] = {
+  mcpConfig.mcpServers['totalrecall'] = {
     command: 'node',
     args: [join(distDir, 'servers', 'mcp-server.js')]
   };
@@ -546,7 +546,7 @@ async function installKiro() {
   console.log(`  → MCP config:   ${mcpFilePath}`);
 
   // Write steering file (from embedded content)
-  const steeringDestPath = join(steeringDir, 'kiro-memory.md');
+  const steeringDestPath = join(steeringDir, 'totalrecall.md');
   writeFileSync(steeringDestPath, STEERING_CONTENT, 'utf8');
   console.log(`  → Steering:     ${steeringDestPath}`);
 
@@ -556,13 +556,13 @@ async function installKiro() {
   console.log('\n[3/4] Shell alias setup\n');
 
   const { rcFile } = detectShellRc();
-  const aliasLine = 'alias kiro="kiro-cli --agent kiro-memory"';
+  const aliasLine = 'alias kiro="kiro-cli --agent totalrecall"';
 
   // Check if alias is already set
   let aliasAlreadySet = false;
   if (existsSync(rcFile)) {
     const rcContent = readFileSync(rcFile, 'utf8');
-    aliasAlreadySet = rcContent.includes('alias kiro=') && rcContent.includes('kiro-memory');
+    aliasAlreadySet = rcContent.includes('alias kiro=') && rcContent.includes('totalrecall');
   }
 
   if (aliasAlreadySet) {
@@ -571,7 +571,7 @@ async function installKiro() {
     // Highlighted box for the alias
     console.log('  \x1b[36m┌─────────────────────────────────────────────────────────┐\x1b[0m');
     console.log('  \x1b[36m│\x1b[0m  Without an alias, you must type every time:            \x1b[36m│\x1b[0m');
-    console.log('  \x1b[36m│\x1b[0m    \x1b[2mkiro-cli --agent kiro-memory\x1b[0m                          \x1b[36m│\x1b[0m');
+    console.log('  \x1b[36m│\x1b[0m    \x1b[2mkiro-cli --agent totalrecall\x1b[0m                          \x1b[36m│\x1b[0m');
     console.log('  \x1b[36m│\x1b[0m                                                         \x1b[36m│\x1b[0m');
     console.log('  \x1b[36m│\x1b[0m  With the alias, just type:                              \x1b[36m│\x1b[0m');
     console.log('  \x1b[36m│\x1b[0m    \x1b[1m\x1b[32mkiro\x1b[0m                                                 \x1b[36m│\x1b[0m');
@@ -582,7 +582,7 @@ async function installKiro() {
 
     if (answer === '' || answer === 'y' || answer === 'yes') {
       try {
-        appendFileSync(rcFile, `\n# Kiro Memory — persistent memory alias\n${aliasLine}\n`);
+        appendFileSync(rcFile, `\n# Total Recall — persistent memory alias\n${aliasLine}\n`);
         console.log(`\n  \x1b[32m✓\x1b[0m Alias added to ${rcFile}`);
         console.log(`  \x1b[33m→\x1b[0m Run \x1b[1msource ${rcFile}\x1b[0m or open a new terminal to activate it.`);
       } catch (err: any) {
@@ -612,32 +612,32 @@ async function installKiro() {
   if (aliasAlreadySet) {
     console.log('    \x1b[1mkiro\x1b[0m\n');
   } else {
-    console.log('    \x1b[1mkiro-cli --agent kiro-memory\x1b[0m\n');
+    console.log('    \x1b[1mkiro-cli --agent totalrecall\x1b[0m\n');
   }
 }
 
 // ─── Install Claude Code command ───
 
 /** Steering content for Claude Code (injected into ~/.claude/CLAUDE.md) */
-const CLAUDE_CODE_STEERING = `# Kiro Memory - Persistent Cross-Session Memory
+const CLAUDE_CODE_STEERING = `# Total Recall - Persistent Cross-Session Memory
 
-You have access to Kiro Memory, a persistent cross-session memory system that remembers context across sessions.
+You have access to Total Recall, a persistent cross-session memory system that remembers context across sessions.
 
 ## Available MCP Tools
 
-### kiro-memory/search
+### totalrecall/search
 Search previous session memory. Use when:
 - The user mentions past work or previous sessions
 - You need context on previous decisions
 - You want to check if a problem was already addressed
 
-### kiro-memory/get_context
+### totalrecall/get_context
 Retrieve recent context for the current project. Use at the start of complex tasks.
 
-### kiro-memory/timeline
+### totalrecall/timeline
 Show chronological context around an observation. Use to understand sequences of events.
 
-### kiro-memory/get_observations
+### totalrecall/get_observations
 Retrieve full details of specific observations by ID. Use after search to drill down.
 
 ## Behavior
@@ -649,7 +649,7 @@ Retrieve full details of specific observations by ID. Use after search to drill 
 `;
 
 async function installClaudeCode() {
-  console.log('\n=== Kiro Memory - Claude Code Installation ===\n');
+  console.log('\n=== Total Recall - Claude Code Installation ===\n');
   console.log('[1/3] Running environment checks...');
 
   const checks = runEnvironmentChecks();
@@ -659,7 +659,7 @@ async function installClaudeCode() {
     const { fixed, needsRestart } = await tryAutoFix(checks);
 
     if (needsRestart) {
-      console.log('  \x1b[33mRestart your terminal and re-run: kiro-memory install --claude-code\x1b[0m\n');
+      console.log('  \x1b[33mRestart your terminal and re-run: totalrecall install --claude-code\x1b[0m\n');
       process.exit(0);
     }
 
@@ -679,7 +679,7 @@ async function installClaudeCode() {
 
   const distDir = DIST_DIR;
   const claudeDir = join(homedir(), '.claude');
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.kiro-memory');
+  const dataDir = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.totalrecall');
 
   console.log('[2/3] Installing Claude Code configuration...\n');
 
@@ -722,10 +722,10 @@ async function installClaudeCode() {
     if (!settings[event]) {
       settings[event] = [hookEntry];
     } else if (Array.isArray(settings[event])) {
-      // Remove any previous kiro-memory hooks and add the new one
+      // Remove any previous totalrecall hooks and add the new one
       settings[event] = settings[event].filter(
         (h: any) => !h.hooks?.some((hk: any) =>
-          hk.command?.includes('kiro-memory') || hk.command?.includes('contextkit')
+          hk.command?.includes('totalrecall') || hk.command?.includes('contextkit')
         )
       );
       settings[event].push(hookEntry);
@@ -749,7 +749,7 @@ async function installClaudeCode() {
 
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
 
-  mcpConfig.mcpServers['kiro-memory'] = {
+  mcpConfig.mcpServers['totalrecall'] = {
     command: 'node',
     args: [join(distDir, 'servers', 'mcp-server.js')]
   };
@@ -766,7 +766,7 @@ async function installClaudeCode() {
   }
 
   // Add steering only if not already present
-  if (!existingSteering.includes('Kiro Memory')) {
+  if (!existingSteering.includes('Total Recall')) {
     const separator = existingSteering.length > 0 ? '\n\n---\n\n' : '';
     writeFileSync(steeringPath, existingSteering + separator + CLAUDE_CODE_STEERING, 'utf8');
     console.log(`  → Steering:     ${steeringPath}`);
@@ -794,7 +794,7 @@ async function installClaudeCode() {
 // ─── Install Cursor command ───
 
 async function installCursor() {
-  console.log('\n=== Kiro Memory - Cursor Installation ===\n');
+  console.log('\n=== Total Recall - Cursor Installation ===\n');
   console.log('[1/3] Running environment checks...');
 
   const checks = runEnvironmentChecks();
@@ -804,7 +804,7 @@ async function installCursor() {
     const { fixed, needsRestart } = await tryAutoFix(checks);
 
     if (needsRestart) {
-      console.log('  \x1b[33mRestart your terminal and re-run: kiro-memory install --cursor\x1b[0m\n');
+      console.log('  \x1b[33mRestart your terminal and re-run: totalrecall install --cursor\x1b[0m\n');
       process.exit(0);
     }
 
@@ -824,7 +824,7 @@ async function installCursor() {
 
   const distDir = DIST_DIR;
   const cursorDir = join(homedir(), '.cursor');
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.kiro-memory');
+  const dataDir = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.totalrecall');
 
   console.log('[2/3] Installing Cursor configuration...\n');
 
@@ -864,9 +864,9 @@ async function installCursor() {
     if (!hooksConfig.hooks[event]) {
       hooksConfig.hooks[event] = [hookEntry];
     } else if (Array.isArray(hooksConfig.hooks[event])) {
-      // Remove previous kiro-memory hooks, add the new one
+      // Remove previous totalrecall hooks, add the new one
       hooksConfig.hooks[event] = hooksConfig.hooks[event].filter(
-        (h: any) => !h.command?.includes('kiro-memory') && !h.command?.includes('contextkit')
+        (h: any) => !h.command?.includes('totalrecall') && !h.command?.includes('contextkit')
       );
       hooksConfig.hooks[event].push(hookEntry);
     }
@@ -889,7 +889,7 @@ async function installCursor() {
 
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
 
-  mcpConfig.mcpServers['kiro-memory'] = {
+  mcpConfig.mcpServers['totalrecall'] = {
     command: 'node',
     args: [join(distDir, 'servers', 'mcp-server.js')]
   };
@@ -915,7 +915,7 @@ async function installCursor() {
 // ─── Install Windsurf command ───
 
 async function installWindsurf() {
-  console.log('\n=== Kiro Memory - Windsurf Installation ===\n');
+  console.log('\n=== Total Recall - Windsurf Installation ===\n');
   console.log('[1/3] Running environment checks...');
 
   const checks = runEnvironmentChecks();
@@ -925,7 +925,7 @@ async function installWindsurf() {
     const { fixed, needsRestart } = await tryAutoFix(checks);
 
     if (needsRestart) {
-      console.log('  \x1b[33mRestart your terminal and re-run: kiro-memory install --windsurf\x1b[0m\n');
+      console.log('  \x1b[33mRestart your terminal and re-run: totalrecall install --windsurf\x1b[0m\n');
       process.exit(0);
     }
 
@@ -944,7 +944,7 @@ async function installWindsurf() {
   }
 
   const distDir = DIST_DIR;
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.kiro-memory');
+  const dataDir = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.totalrecall');
 
   console.log('[2/3] Installing Windsurf configuration...\n');
 
@@ -967,7 +967,7 @@ async function installWindsurf() {
 
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
 
-  mcpConfig.mcpServers['kiro-memory'] = {
+  mcpConfig.mcpServers['totalrecall'] = {
     command: 'node',
     args: [join(distDir, 'servers', 'mcp-server.js')]
   };
@@ -988,13 +988,13 @@ async function installWindsurf() {
     ],
   });
   console.log('  \x1b[2mTip: Add a .windsurfrules file to your project with instructions');
-  console.log('  to use the kiro-memory MCP tools for persistent context.\x1b[0m\n');
+  console.log('  to use the totalrecall MCP tools for persistent context.\x1b[0m\n');
 }
 
 // ─── Install Cline command ───
 
 async function installCline() {
-  console.log('\n=== Kiro Memory - Cline Installation ===\n');
+  console.log('\n=== Total Recall - Cline Installation ===\n');
   console.log('[1/3] Running environment checks...');
 
   const checks = runEnvironmentChecks();
@@ -1004,7 +1004,7 @@ async function installCline() {
     const { fixed, needsRestart } = await tryAutoFix(checks);
 
     if (needsRestart) {
-      console.log('  \x1b[33mRestart your terminal and re-run: kiro-memory install --cline\x1b[0m\n');
+      console.log('  \x1b[33mRestart your terminal and re-run: totalrecall install --cline\x1b[0m\n');
       process.exit(0);
     }
 
@@ -1023,7 +1023,7 @@ async function installCline() {
   }
 
   const distDir = DIST_DIR;
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.kiro-memory');
+  const dataDir = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.totalrecall');
 
   console.log('[2/3] Installing Cline configuration...\n');
 
@@ -1054,7 +1054,7 @@ async function installCline() {
 
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
 
-  mcpConfig.mcpServers['kiro-memory'] = {
+  mcpConfig.mcpServers['totalrecall'] = {
     command: 'node',
     args: [join(distDir, 'servers', 'mcp-server.js')]
   };
@@ -1075,41 +1075,41 @@ async function installCline() {
     ],
   });
   console.log('  \x1b[2mTip: Add a .clinerules file to your project with instructions');
-  console.log('  to use the kiro-memory MCP tools for persistent context.\x1b[0m\n');
+  console.log('  to use the totalrecall MCP tools for persistent context.\x1b[0m\n');
 }
 
 // ─── Doctor command ───
 
 async function runDoctor() {
-  console.log('\n=== Kiro Memory - Diagnostics ===');
+  console.log('\n=== Total Recall - Diagnostics ===');
 
   const checks = runEnvironmentChecks();
 
   // Additional checks on installation status
   const kiroDir = process.env.KIRO_CONFIG_DIR || join(homedir(), '.kiro');
-  const agentPath = join(kiroDir, 'agents', 'kiro-memory.json');
+  const agentPath = join(kiroDir, 'agents', 'totalrecall.json');
   const mcpPath = join(kiroDir, 'settings', 'mcp.json');
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.contextkit');
+  const dataDir = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.contextkit');
 
   checks.push({
     name: 'Kiro agent config',
     ok: existsSync(agentPath),
     message: existsSync(agentPath) ? agentPath : 'Not found',
-    fix: !existsSync(agentPath) ? 'Run: kiro-memory install' : undefined,
+    fix: !existsSync(agentPath) ? 'Run: totalrecall install' : undefined,
   });
 
   let mcpOk = false;
   if (existsSync(mcpPath)) {
     try {
       const mcp = JSON.parse(readFileSync(mcpPath, 'utf8'));
-      mcpOk = !!mcp.mcpServers?.['kiro-memory'] || !!mcp.mcpServers?.contextkit;
+      mcpOk = !!mcp.mcpServers?.['totalrecall'] || !!mcp.mcpServers?.contextkit;
     } catch {}
   }
   checks.push({
     name: 'MCP server configured',
     ok: mcpOk,
-    message: mcpOk ? 'kiro-memory registered in mcp.json' : 'Not configured',
-    fix: !mcpOk ? 'Run: kiro-memory install' : undefined,
+    message: mcpOk ? 'totalrecall registered in mcp.json' : 'Not configured',
+    fix: !mcpOk ? 'Run: totalrecall install' : undefined,
   });
 
   checks.push({
@@ -1127,10 +1127,10 @@ async function runDoctor() {
       const claudeSettings = JSON.parse(readFileSync(claudeSettingsPath, 'utf8'));
       // Claude Code: events are top-level keys in settings.json (no "hooks" wrapper)
       claudeHooksOk = !!(claudeSettings?.SessionStart || claudeSettings?.PostToolUse);
-      // Verify that hooks point to kiro-memory
+      // Verify that hooks point to totalrecall
       if (claudeHooksOk) {
         const allSettings = JSON.stringify(claudeSettings);
-        claudeHooksOk = allSettings.includes('kiro-memory') || allSettings.includes('agentSpawn');
+        claudeHooksOk = allSettings.includes('totalrecall') || allSettings.includes('agentSpawn');
       }
     } catch {}
   }
@@ -1140,7 +1140,7 @@ async function runDoctor() {
   if (existsSync(claudeMcpPath)) {
     try {
       const claudeMcp = JSON.parse(readFileSync(claudeMcpPath, 'utf8'));
-      claudeMcpOk = !!claudeMcp.mcpServers?.['kiro-memory'];
+      claudeMcpOk = !!claudeMcp.mcpServers?.['totalrecall'];
     } catch {}
   }
 
@@ -1149,15 +1149,15 @@ async function runDoctor() {
     ok: true, // Non-blocking: optional installation
     message: claudeHooksOk
       ? 'Configured in ~/.claude/settings.json'
-      : 'Not configured (optional: run kiro-memory install --claude-code)',
+      : 'Not configured (optional: run totalrecall install --claude-code)',
   });
 
   checks.push({
     name: 'Claude Code MCP',
     ok: true, // Non-blocking: optional installation
     message: claudeMcpOk
-      ? 'kiro-memory registered in ~/.mcp.json'
-      : 'Not configured (optional: run kiro-memory install --claude-code)',
+      ? 'totalrecall registered in ~/.mcp.json'
+      : 'Not configured (optional: run totalrecall install --claude-code)',
   });
 
   // Cursor integration check
@@ -1170,7 +1170,7 @@ async function runDoctor() {
       cursorHooksOk = !!(cursorHooks.hooks?.sessionStart || cursorHooks.hooks?.afterFileEdit);
       if (cursorHooksOk) {
         const allHooks = JSON.stringify(cursorHooks.hooks);
-        cursorHooksOk = allHooks.includes('kiro-memory') || allHooks.includes('agentSpawn');
+        cursorHooksOk = allHooks.includes('totalrecall') || allHooks.includes('agentSpawn');
       }
     } catch {}
   }
@@ -1180,7 +1180,7 @@ async function runDoctor() {
   if (existsSync(cursorMcpPath)) {
     try {
       const cursorMcp = JSON.parse(readFileSync(cursorMcpPath, 'utf8'));
-      cursorMcpOk = !!cursorMcp.mcpServers?.['kiro-memory'];
+      cursorMcpOk = !!cursorMcp.mcpServers?.['totalrecall'];
     } catch {}
   }
 
@@ -1189,15 +1189,15 @@ async function runDoctor() {
     ok: true, // Non-blocking: optional installation
     message: cursorHooksOk
       ? 'Configured in ~/.cursor/hooks.json'
-      : 'Not configured (optional: run kiro-memory install --cursor)',
+      : 'Not configured (optional: run totalrecall install --cursor)',
   });
 
   checks.push({
     name: 'Cursor MCP',
     ok: true, // Non-blocking: optional installation
     message: cursorMcpOk
-      ? 'kiro-memory registered in ~/.cursor/mcp.json'
-      : 'Not configured (optional: run kiro-memory install --cursor)',
+      ? 'totalrecall registered in ~/.cursor/mcp.json'
+      : 'Not configured (optional: run totalrecall install --cursor)',
   });
 
   // Windsurf integration check
@@ -1206,7 +1206,7 @@ async function runDoctor() {
   if (existsSync(windsurfMcpPath)) {
     try {
       const windsurfMcp = JSON.parse(readFileSync(windsurfMcpPath, 'utf8'));
-      windsurfMcpOk = !!windsurfMcp.mcpServers?.['kiro-memory'];
+      windsurfMcpOk = !!windsurfMcp.mcpServers?.['totalrecall'];
     } catch {}
   }
 
@@ -1214,8 +1214,8 @@ async function runDoctor() {
     name: 'Windsurf MCP',
     ok: true, // Non-blocking: optional installation
     message: windsurfMcpOk
-      ? 'kiro-memory registered in ~/.codeium/windsurf/mcp_config.json'
-      : 'Not configured (optional: run kiro-memory install --windsurf)',
+      ? 'totalrecall registered in ~/.codeium/windsurf/mcp_config.json'
+      : 'Not configured (optional: run totalrecall install --windsurf)',
   });
 
   // Cline integration check
@@ -1231,7 +1231,7 @@ async function runDoctor() {
   if (existsSync(clineMcpPath)) {
     try {
       const clineMcp = JSON.parse(readFileSync(clineMcpPath, 'utf8'));
-      clineMcpOk = !!clineMcp.mcpServers?.['kiro-memory'];
+      clineMcpOk = !!clineMcp.mcpServers?.['totalrecall'];
     } catch {}
   }
 
@@ -1239,14 +1239,14 @@ async function runDoctor() {
     name: 'Cline MCP',
     ok: true, // Non-blocking: optional installation
     message: clineMcpOk
-      ? `kiro-memory registered in cline_mcp_settings.json`
-      : 'Not configured (optional: run kiro-memory install --cline)',
+      ? `totalrecall registered in cline_mcp_settings.json`
+      : 'Not configured (optional: run totalrecall install --cline)',
   });
 
   // Worker status check (informational, non-blocking)
   let workerOk = false;
   try {
-    const port = process.env.KIRO_MEMORY_WORKER_PORT || '3001';
+    const port = process.env.TOTALRECALL_WORKER_PORT || '3001';
     execSync(`curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${port}/health`, {
       timeout: 2000,
       encoding: 'utf8'
@@ -1265,7 +1265,7 @@ async function runDoctor() {
     console.log('Some checks failed. Fix the issues listed above.\n');
     process.exit(1);
   } else {
-    console.log('All good! Kiro Memory is ready.\n');
+    console.log('All good! Total Recall is ready.\n');
   }
 }
 
@@ -1299,7 +1299,7 @@ async function main() {
 
   // Comandi che non necessitano del SDK completo (accesso diretto al DB)
   if (command === 'export') {
-    const sdk = createKiroMemory();
+    const sdk = createTotalRecall();
     try {
       await exportObservations(sdk, args.slice(1));
     } finally {
@@ -1333,7 +1333,7 @@ async function main() {
     return;
   }
 
-  const sdk = createKiroMemory();
+  const sdk = createTotalRecall();
 
   try {
     switch (command) {
@@ -1405,7 +1405,7 @@ async function main() {
         break;
 
       default:
-        console.log('Kiro Memory CLI\n');
+        console.log('Total Recall CLI\n');
         showHelp();
         process.exit(1);
     }
@@ -1414,7 +1414,7 @@ async function main() {
   }
 }
 
-async function showContext(sdk: ReturnType<typeof createKiroMemory>) {
+async function showContext(sdk: ReturnType<typeof createTotalRecall>) {
   const context = await sdk.getContext();
   
   console.log(`\n📁 Project: ${context.project}\n`);
@@ -1438,7 +1438,7 @@ async function showContext(sdk: ReturnType<typeof createKiroMemory>) {
   console.log('');
 }
 
-async function searchContext(sdk: ReturnType<typeof createKiroMemory>, query: string) {
+async function searchContext(sdk: ReturnType<typeof createTotalRecall>, query: string) {
   if (!query) {
     console.error('Error: Please provide a search query');
     process.exit(1);
@@ -1475,7 +1475,7 @@ async function searchContext(sdk: ReturnType<typeof createKiroMemory>, query: st
   }
 }
 
-async function showObservations(sdk: ReturnType<typeof createKiroMemory>, limit: number) {
+async function showObservations(sdk: ReturnType<typeof createTotalRecall>, limit: number) {
   const observations = await sdk.getRecentObservations(limit);
   
   console.log(`\n📋 Last ${limit} Observations:\n`);
@@ -1490,7 +1490,7 @@ async function showObservations(sdk: ReturnType<typeof createKiroMemory>, limit:
   });
 }
 
-async function showSummaries(sdk: ReturnType<typeof createKiroMemory>, limit: number) {
+async function showSummaries(sdk: ReturnType<typeof createTotalRecall>, limit: number) {
   const summaries = await sdk.getRecentSummaries(limit);
   
   console.log(`\n📊 Last ${limit} Summaries:\n`);
@@ -1512,7 +1512,7 @@ async function showSummaries(sdk: ReturnType<typeof createKiroMemory>, limit: nu
 }
 
 async function addObservation(
-  sdk: ReturnType<typeof createKiroMemory>,
+  sdk: ReturnType<typeof createTotalRecall>,
   title: string,
   content: string
 ) {
@@ -1530,7 +1530,7 @@ async function addObservation(
   console.log(`✅ Observation stored with ID: ${id}\n`);
 }
 
-async function addSummary(sdk: ReturnType<typeof createKiroMemory>, content: string) {
+async function addSummary(sdk: ReturnType<typeof createTotalRecall>, content: string) {
   if (!content) {
     console.error('Error: Please provide summary content');
     process.exit(1);
@@ -1544,7 +1544,7 @@ async function addSummary(sdk: ReturnType<typeof createKiroMemory>, content: str
 }
 
 async function addKnowledge(
-  sdk: ReturnType<typeof createKiroMemory>,
+  sdk: ReturnType<typeof createTotalRecall>,
   knowledgeType: string,
   title: string,
   content: string
@@ -1594,7 +1594,7 @@ async function addKnowledge(
   console.log(`  Title: ${title}\n`);
 }
 
-async function handleEmbeddings(sdk: ReturnType<typeof createKiroMemory>, subcommand: string) {
+async function handleEmbeddings(sdk: ReturnType<typeof createTotalRecall>, subcommand: string) {
   switch (subcommand) {
     case 'stats': {
       const stats = sdk.getEmbeddingStats();
@@ -1612,7 +1612,7 @@ async function handleEmbeddings(sdk: ReturnType<typeof createKiroMemory>, subcom
       console.log(`  Available:           ${embService.isAvailable() ? 'yes' : 'no'}`);
 
       if (stats.percentage < 100 && stats.total > 0) {
-        console.log(`\n  Run 'kiro-memory embeddings backfill' to generate missing embeddings.`);
+        console.log(`\n  Run 'totalrecall embeddings backfill' to generate missing embeddings.`);
       }
       console.log('');
       break;
@@ -1639,14 +1639,14 @@ async function handleEmbeddings(sdk: ReturnType<typeof createKiroMemory>, subcom
       break;
     }
     default:
-      console.log('\nUsage: kiro-memory embeddings <subcommand>\n');
+      console.log('\nUsage: totalrecall embeddings <subcommand>\n');
       console.log('Subcommands:');
       console.log('  stats              Show embedding statistics');
       console.log('  backfill [size]    Generate embeddings for observations without them (default: 50)\n');
   }
 }
 
-async function semanticSearchCli(sdk: ReturnType<typeof createKiroMemory>, query: string) {
+async function semanticSearchCli(sdk: ReturnType<typeof createTotalRecall>, query: string) {
   if (!query) {
     console.error('Error: Please provide a search query');
     process.exit(1);
@@ -1675,7 +1675,7 @@ async function semanticSearchCli(sdk: ReturnType<typeof createKiroMemory>, query
   });
 }
 
-async function handleDecay(sdk: ReturnType<typeof createKiroMemory>, subcommand: string) {
+async function handleDecay(sdk: ReturnType<typeof createTotalRecall>, subcommand: string) {
   switch (subcommand) {
     case 'stats': {
       const stats = await sdk.getDecayStats();
@@ -1719,7 +1719,7 @@ async function handleDecay(sdk: ReturnType<typeof createKiroMemory>, subcommand:
       break;
     }
     default:
-      console.log('\nUsage: kiro-memory decay <subcommand>\n');
+      console.log('\nUsage: totalrecall decay <subcommand>\n');
       console.log('Subcommands:');
       console.log('  stats                Show decay statistics (stale, never accessed, etc.)');
       console.log('  detect-stale         Detect and mark stale observations (files changed)');
@@ -1727,7 +1727,7 @@ async function handleDecay(sdk: ReturnType<typeof createKiroMemory>, subcommand:
   }
 }
 
-async function generateReportCli(sdk: ReturnType<typeof createKiroMemory>, cliArgs: string[]) {
+async function generateReportCli(sdk: ReturnType<typeof createTotalRecall>, cliArgs: string[]) {
   // Parse options
   const periodArg = cliArgs.find(a => a.startsWith('--period='))?.split('=')[1];
   const formatArg = cliArgs.find(a => a.startsWith('--format='))?.split('=')[1];
@@ -1760,7 +1760,7 @@ async function generateReportCli(sdk: ReturnType<typeof createKiroMemory>, cliAr
   }
 }
 
-async function resumeSession(sdk: ReturnType<typeof createKiroMemory>, sessionId?: number) {
+async function resumeSession(sdk: ReturnType<typeof createTotalRecall>, sessionId?: number) {
   const checkpoint = sessionId
     ? await sdk.getCheckpoint(sessionId)
     : await sdk.getLatestProjectCheckpoint();
@@ -1819,7 +1819,7 @@ async function resumeSession(sdk: ReturnType<typeof createKiroMemory>, sessionId
  * Ricerca interattiva REPL con selezione del risultato.
  * Fallback non-interattivo se stdin non è un TTY.
  */
-async function searchInteractive(sdk: ReturnType<typeof createKiroMemory>, cliArgs: string[]) {
+async function searchInteractive(sdk: ReturnType<typeof createTotalRecall>, cliArgs: string[]) {
   const projectArg = cliArgs.find((a, i) => cliArgs[i - 1] === '--project') ||
     cliArgs.find(a => a.startsWith('--project='))?.split('=').slice(1).join('=');
   const isInteractive = cliArgs.includes('--interactive') || cliArgs.includes('-i');
@@ -1859,7 +1859,7 @@ async function searchInteractive(sdk: ReturnType<typeof createKiroMemory>, cliAr
   const bold = (s: string) => useColor ? `\x1b[1m${s}\x1b[0m` : s;
   const dim = (s: string) => useColor ? `\x1b[2m${s}\x1b[0m` : s;
 
-  console.log(`\n${cyan('=== Kiro Memory — Ricerca Interattiva ===')}`);
+  console.log(`\n${cyan('=== Total Recall — Ricerca Interattiva ===')}`);
   if (projectArg) console.log(dim(`  Filtro progetto: ${projectArg}`));
   console.log(dim('  Premi Ctrl+C o digita "exit" per uscire.\n'));
 
@@ -1925,7 +1925,7 @@ async function searchInteractive(sdk: ReturnType<typeof createKiroMemory>, cliAr
  * Esporta le observations di un progetto nel formato specificato.
  * Supporta JSONL, JSON e Markdown. Output su stdout o su file.
  */
-async function exportObservations(sdk: ReturnType<typeof createKiroMemory>, cliArgs: string[]) {
+async function exportObservations(sdk: ReturnType<typeof createTotalRecall>, cliArgs: string[]) {
   // Parsing degli argomenti
   const formatArg = (cliArgs.find(a => a.startsWith('--format='))?.split('=').slice(1).join('=')
     || cliArgs.find((a, i) => cliArgs[i - 1] === '--format')) as string | undefined;
@@ -1951,7 +1951,7 @@ async function exportObservations(sdk: ReturnType<typeof createKiroMemory>, cliA
       process.exit(1);
     }
 
-    const kmDb = new KiroMemoryDatabase();
+    const kmDb = new TotalRecallDatabase();
     let observations;
     try {
       observations = getObservationsByProject(kmDb.db, projectArg, 10_000);
@@ -1985,7 +1985,7 @@ async function exportObservations(sdk: ReturnType<typeof createKiroMemory>, cliA
   if (fromArg) filters.from = fromArg;
   if (toArg) filters.to = toArg;
 
-  const kmDb = new KiroMemoryDatabase();
+  const kmDb = new TotalRecallDatabase();
 
   try {
     // Modalità streaming su file oppure su stdout
@@ -2049,7 +2049,7 @@ async function importObservations(cliArgs: string[]) {
   const dryRun = cliArgs.includes('--dry-run');
 
   if (!filePath) {
-    console.error('Errore: specifica il percorso del file JSONL\n  kiro-memory import <file.jsonl> [--dry-run]');
+    console.error('Errore: specifica il percorso del file JSONL\n  totalrecall import <file.jsonl> [--dry-run]');
     process.exit(1);
   }
 
@@ -2075,7 +2075,7 @@ async function importObservations(cliArgs: string[]) {
   const { importJsonl } = await import('../services/sqlite/ImportExport.js');
   const { formatImportResult } = await import('./cli-utils.js');
 
-  const kmDb = new KiroMemoryDatabase();
+  const kmDb = new TotalRecallDatabase();
   let result;
 
   try {
@@ -2107,9 +2107,9 @@ async function importObservations(cliArgs: string[]) {
  * Estende la diagnostica doctor con la riparazione automatica (--fix).
  */
 async function runDoctorFix() {
-  console.log('\n=== Kiro Memory — Riparazione Database ===\n');
+  console.log('\n=== Total Recall — Riparazione Database ===\n');
 
-  const kmDb = new KiroMemoryDatabase();
+  const kmDb = new TotalRecallDatabase();
   const db = kmDb.db;
   const messages: string[] = [];
 
@@ -2158,7 +2158,7 @@ async function runDoctorFix() {
  * Mostra statistiche aggregate del database.
  */
 async function showStats() {
-  const kmDb = new KiroMemoryDatabase();
+  const kmDb = new TotalRecallDatabase();
   const db = kmDb.db;
 
   try {
@@ -2231,7 +2231,7 @@ async function handleConfig(subArgs: string[]) {
   switch (subcommand) {
     case 'list': {
       const config = listConfig(configPath);
-      console.log('\n=== Configurazione Kiro Memory ===\n');
+      console.log('\n=== Configurazione Total Recall ===\n');
       console.log(`  File: ${configPath}\n`);
 
       for (const [key, value] of Object.entries(config)) {
@@ -2245,7 +2245,7 @@ async function handleConfig(subArgs: string[]) {
     case 'get': {
       const key = subArgs[1];
       if (!key) {
-        console.error('Errore: specifica una chiave\n  kiro-memory config get <chiave>');
+        console.error('Errore: specifica una chiave\n  totalrecall config get <chiave>');
         process.exit(1);
       }
       const val = getConfigValue(key, configPath);
@@ -2262,11 +2262,11 @@ async function handleConfig(subArgs: string[]) {
       const rawValue = subArgs[2];
 
       if (!key) {
-        console.error('Errore: specifica chiave e valore\n  kiro-memory config set <chiave> <valore>');
+        console.error('Errore: specifica chiave e valore\n  totalrecall config set <chiave> <valore>');
         process.exit(1);
       }
       if (rawValue === undefined) {
-        console.error(`Errore: valore mancante per "${key}"\n  kiro-memory config set ${key} <valore>`);
+        console.error(`Errore: valore mancante per "${key}"\n  totalrecall config set ${key} <valore>`);
         process.exit(1);
       }
 
@@ -2276,15 +2276,15 @@ async function handleConfig(subArgs: string[]) {
     }
 
     default:
-      console.log('\nUtilizzo: kiro-memory config <subcommand>\n');
+      console.log('\nUtilizzo: totalrecall config <subcommand>\n');
       console.log('Subcommands:');
       console.log('  list                         Mostra tutte le impostazioni');
       console.log('  get <chiave>                 Legge un valore');
       console.log('  set <chiave> <valore>        Imposta un valore\n');
       console.log('Esempio:');
-      console.log('  kiro-memory config list');
-      console.log('  kiro-memory config get worker.port');
-      console.log('  kiro-memory config set log.level DEBUG\n');
+      console.log('  totalrecall config list');
+      console.log('  totalrecall config get worker.port');
+      console.log('  totalrecall config set log.level DEBUG\n');
   }
 }
 
@@ -2301,7 +2301,7 @@ async function handleBackup(subArgs: string[]): Promise<void> {
 
   if (!subCommand || subCommand === 'help') {
     console.log(`
-Uso: kiro-memory backup <sottocomando>
+Uso: totalrecall backup <sottocomando>
 
 Sottocomandi:
   create              Crea un backup manuale del database
@@ -2314,12 +2314,12 @@ Sottocomandi:
   if (subCommand === 'create') {
     // Crea un backup e ruota i vecchi
     const maxKeep = Number(getConfigValue('backup.maxKeep')) || 7;
-    const db = new KiroMemoryDatabase(DB_PATH, true); // skipMigrations=true
+    const db = new TotalRecallDatabase(DB_PATH, true); // skipMigrations=true
     try {
       const entry = createBackup(DB_PATH, BACKUPS_DIR, db.db);
       const deleted = rotateBackups(BACKUPS_DIR, maxKeep);
 
-      console.log(`\n=== Kiro Memory — Backup Creato ===\n`);
+      console.log(`\n=== Total Recall — Backup Creato ===\n`);
       console.log(`  File:        ${entry.metadata.filename}`);
       console.log(`  Timestamp:   ${entry.metadata.timestamp}`);
       console.log(`  Schema v.:   ${entry.metadata.schemaVersion}`);
@@ -2344,7 +2344,7 @@ Sottocomandi:
       return;
     }
 
-    console.log(`\n=== Kiro Memory — Backup Disponibili ===\n`);
+    console.log(`\n=== Total Recall — Backup Disponibili ===\n`);
     console.log(`  Directory: ${BACKUPS_DIR}\n`);
 
     for (let i = 0; i < entries.length; i++) {
@@ -2365,7 +2365,7 @@ Sottocomandi:
     const file = subArgs[1];
     if (!file) {
       console.error('\n  Errore: specifica il nome del file backup da ripristinare.');
-      console.error('  Esempio: kiro-memory backup restore backup-2026-02-27-150000.db\n');
+      console.error('  Esempio: totalrecall backup restore backup-2026-02-27-150000.db\n');
       process.exit(1);
     }
 
@@ -2382,7 +2382,7 @@ Sottocomandi:
     const found = entries.find(e => e.metadata.filename === file);
     if (!found) {
       console.error(`\n  Errore: backup non trovato: ${file}`);
-      console.error(`  Usa "kiro-memory backup list" per vedere i backup disponibili.\n`);
+      console.error(`  Usa "totalrecall backup list" per vedere i backup disponibili.\n`);
       process.exit(1);
     }
 
@@ -2422,7 +2422,7 @@ Sottocomandi:
 // ─── Plugins command ───
 
 /**
- * Gestisce il comando `kiro-memory plugins <sottocomando>`.
+ * Gestisce il comando `totalrecall plugins <sottocomando>`.
  *
  * Comunica con il worker via HTTP per evitare di caricare il registry
  * nel processo CLI (il registry vive nel worker).
@@ -2434,7 +2434,7 @@ Sottocomandi:
  */
 async function handlePlugins(subArgs: string[]): Promise<void> {
   const subCommand = subArgs[0];
-  const port = process.env.KIRO_MEMORY_WORKER_PORT || process.env.CONTEXTKIT_WORKER_PORT || '3001';
+  const port = process.env.TOTALRECALL_WORKER_PORT || process.env.CONTEXTKIT_WORKER_PORT || '3001';
   const baseUrl = `http://127.0.0.1:${port}`;
 
   // Helper HTTP GET sincrono via Node http
@@ -2482,7 +2482,7 @@ async function handlePlugins(subArgs: string[]): Promise<void> {
       const result = await apiGet('/api/plugins');
       const { plugins } = result.data;
 
-      console.log('\n=== Kiro Memory — Plugin ===\n');
+      console.log('\n=== Total Recall — Plugin ===\n');
 
       if (!plugins || plugins.length === 0) {
         console.log('  Nessun plugin registrato.\n');
@@ -2498,7 +2498,7 @@ async function handlePlugins(subArgs: string[]): Promise<void> {
         console.log('');
       }
     } catch {
-      console.error('\n  Errore: impossibile contattare il worker. Avvialo con: kiro-memory worker start\n');
+      console.error('\n  Errore: impossibile contattare il worker. Avvialo con: totalrecall worker start\n');
       process.exit(1);
     }
     return;
@@ -2507,7 +2507,7 @@ async function handlePlugins(subArgs: string[]): Promise<void> {
   if (subCommand === 'enable') {
     const name = subArgs[1];
     if (!name) {
-      console.error('\n  Errore: specifica il nome del plugin.\n  Esempio: kiro-memory plugins enable mio-plugin\n');
+      console.error('\n  Errore: specifica il nome del plugin.\n  Esempio: totalrecall plugins enable mio-plugin\n');
       process.exit(1);
     }
 
@@ -2533,7 +2533,7 @@ async function handlePlugins(subArgs: string[]): Promise<void> {
   if (subCommand === 'disable') {
     const name = subArgs[1];
     if (!name) {
-      console.error('\n  Errore: specifica il nome del plugin.\n  Esempio: kiro-memory plugins disable mio-plugin\n');
+      console.error('\n  Errore: specifica il nome del plugin.\n  Esempio: totalrecall plugins disable mio-plugin\n');
       process.exit(1);
     }
 
@@ -2558,7 +2558,7 @@ async function handlePlugins(subArgs: string[]): Promise<void> {
 }
 
 function showHelp() {
-  console.log(`Usage: kiro-memory <command> [options]
+  console.log(`Usage: totalrecall <command> [options]
 
 Setup:
   install                   Install for Kiro CLI (default)
@@ -2611,35 +2611,35 @@ Commands:
   help                      Show this help message
 
 Examples:
-  kiro-memory install
-  kiro-memory doctor
-  kiro-memory doctor --fix
-  kiro-memory stats
-  kiro-memory context
-  kiro-memory resume
-  kiro-memory resume 42
-  kiro-memory report
-  kiro-memory report --period=monthly --format=md --output=report.md
-  kiro-memory search "authentication"
-  kiro-memory search --interactive --project myapp
-  kiro-memory semantic-search "how did I fix the auth bug"
-  kiro-memory export --project myapp --format jsonl --output backup.jsonl
-  kiro-memory export --project myapp --format md > notes.md
-  kiro-memory import backup.jsonl
-  kiro-memory backup create
-  kiro-memory backup list
-  kiro-memory backup restore backup-2026-02-27-150000.db
-  kiro-memory config list
-  kiro-memory config get worker.port
-  kiro-memory config set log.level DEBUG
-  kiro-memory add-knowledge constraint "No any in TypeScript" "Never use any type" --severity=hard
-  kiro-memory add-knowledge decision "PostgreSQL over MongoDB" "Chosen for ACID" --alternatives=MongoDB,DynamoDB
-  kiro-memory embeddings stats
-  kiro-memory embeddings backfill 100
-  kiro-memory decay stats
-  kiro-memory decay detect-stale
-  kiro-memory decay consolidate --dry-run
-  kiro-memory observations 20
+  totalrecall install
+  totalrecall doctor
+  totalrecall doctor --fix
+  totalrecall stats
+  totalrecall context
+  totalrecall resume
+  totalrecall resume 42
+  totalrecall report
+  totalrecall report --period=monthly --format=md --output=report.md
+  totalrecall search "authentication"
+  totalrecall search --interactive --project myapp
+  totalrecall semantic-search "how did I fix the auth bug"
+  totalrecall export --project myapp --format jsonl --output backup.jsonl
+  totalrecall export --project myapp --format md > notes.md
+  totalrecall import backup.jsonl
+  totalrecall backup create
+  totalrecall backup list
+  totalrecall backup restore backup-2026-02-27-150000.db
+  totalrecall config list
+  totalrecall config get worker.port
+  totalrecall config set log.level DEBUG
+  totalrecall add-knowledge constraint "No any in TypeScript" "Never use any type" --severity=hard
+  totalrecall add-knowledge decision "PostgreSQL over MongoDB" "Chosen for ACID" --alternatives=MongoDB,DynamoDB
+  totalrecall embeddings stats
+  totalrecall embeddings backfill 100
+  totalrecall decay stats
+  totalrecall decay detect-stale
+  totalrecall decay consolidate --dry-run
+  totalrecall observations 20
 `);
 }
 

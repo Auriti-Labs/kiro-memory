@@ -1,5 +1,5 @@
 /**
- * Kiro Memory Worker Service
+ * Total Recall Worker Service
  *
  * Lean orchestrator: configures Express, mounts modular routers,
  * manages lifecycle (PID, shutdown, error handling).
@@ -24,7 +24,7 @@ import crypto from 'crypto';
 import { join, dirname } from 'path';
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, chmodSync } from 'fs';
 import { fileURLToPath } from 'url';
-import { KiroMemoryDatabase } from './sqlite/Database.js';
+import { TotalRecallDatabase } from './sqlite/Database.js';
 import { getHybridSearch } from './search/HybridSearch.js';
 import { createWorkerContext, getClients } from './worker-context.js';
 import { applyRetention, buildRetentionConfig } from './sqlite/Retention.js';
@@ -60,8 +60,8 @@ import { createPluginsRouter } from './routes/plugins.js';
 // ── Configuration ──
 
 const __worker_dirname = dirname(fileURLToPath(import.meta.url));
-const PORT = process.env.KIRO_MEMORY_WORKER_PORT || process.env.CONTEXTKIT_WORKER_PORT || 3001;
-const HOST = process.env.KIRO_MEMORY_WORKER_HOST || process.env.CONTEXTKIT_WORKER_HOST || '127.0.0.1';
+const PORT = process.env.TOTALRECALL_WORKER_PORT || process.env.CONTEXTKIT_WORKER_PORT || 3001;
+const HOST = process.env.TOTALRECALL_WORKER_HOST || process.env.CONTEXTKIT_WORKER_HOST || '127.0.0.1';
 const PID_FILE = join(DATA_DIR, 'worker.pid');
 const TOKEN_FILE = join(DATA_DIR, 'worker.token');
 
@@ -83,7 +83,7 @@ try {
 }
 
 // Database
-const db = new KiroMemoryDatabase();
+const db = new TotalRecallDatabase();
 logger.info('WORKER', 'Database initialized');
 
 // Embedding service (lazy, non bloccante)
@@ -318,7 +318,7 @@ async function initializePlugins(): Promise<void> {
 // ── Server startup ──
 
 const server = app.listen(Number(PORT), HOST, () => {
-  logger.info('WORKER', `Kiro Memory worker started on http://${HOST}:${PORT}`);
+  logger.info('WORKER', `Total Recall worker started on http://${HOST}:${PORT}`);
   writeFileSync(PID_FILE, String(process.pid), 'utf-8');
 
   // Avvia il plugin system in background dopo che il server è attivo.

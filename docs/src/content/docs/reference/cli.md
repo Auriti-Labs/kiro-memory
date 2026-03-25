@@ -1,17 +1,17 @@
 ---
 title: CLI Commands
-description: Complete reference for all kiro-memory CLI commands with examples and flags.
+description: Complete reference for all totalrecall CLI commands with examples and flags.
 ---
 
-The `kiro-memory` CLI provides commands for setup, diagnostics, search, data management, and worker control.
+The `totalrecall` CLI provides commands for setup, diagnostics, search, data management, and worker control.
 
 ## Installation
 
 ```bash
-npm install -g kiro-memory
+npm install -g totalrecall
 ```
 
-The binary is available as `kiro-memory` after global installation. With a local install, use `npx kiro-memory`.
+The binary is available as `totalrecall` after global installation. With a local install, use `npx totalrecall`.
 
 ---
 
@@ -20,7 +20,7 @@ The binary is available as `kiro-memory` after global installation. With a local
 Interactive setup wizard for configuring hooks and starting the worker.
 
 ```bash
-kiro-memory setup [--editor <name>] [--force]
+totalrecall setup [--editor <name>] [--force]
 ```
 
 **Options:**
@@ -39,19 +39,19 @@ kiro-memory setup [--editor <name>] [--force]
 **Example:**
 
 ```bash
-kiro-memory setup
-kiro-memory setup --editor claude
-kiro-memory setup --editor kiro --force
+totalrecall setup
+totalrecall setup --editor claude
+totalrecall setup --editor kiro --force
 ```
 
 ---
 
 ## doctor
 
-Diagnose the Kiro Memory installation and report any issues.
+Diagnose the Total Recall installation and report any issues.
 
 ```bash
-kiro-memory doctor
+totalrecall doctor
 ```
 
 **Checks performed:**
@@ -66,7 +66,7 @@ kiro-memory doctor
 ```
 [OK] Worker running at http://127.0.0.1:3001
 [OK] Database found at ~/.contextkit/contextkit.db
-[OK] Hooks installed in ~/.kiro/plugins/kiro-memory/
+[OK] Hooks installed in ~/.kiro/plugins/totalrecall/
 [OK] Schema version: 11
 [--] Embedding service: not available (install fastembed or @huggingface/transformers)
 ```
@@ -78,7 +78,7 @@ kiro-memory doctor
 Search your memory database from the command line.
 
 ```bash
-kiro-memory search <query> [--project <name>] [--type <type>] [--limit <n>]
+totalrecall search <query> [--project <name>] [--type <type>] [--limit <n>]
 ```
 
 **Arguments:**
@@ -99,10 +99,10 @@ kiro-memory search <query> [--project <name>] [--type <type>] [--limit <n>]
 **Examples:**
 
 ```bash
-kiro-memory search "authentication"
-kiro-memory search "database migrations" --project my-api
-kiro-memory search "npm test" --type command --limit 5
-kiro-memory search "JWT" --json
+totalrecall search "authentication"
+totalrecall search "database migrations" --project my-api
+totalrecall search "npm test" --type command --limit 5
+totalrecall search "JWT" --json
 ```
 
 **Example output:**
@@ -130,7 +130,7 @@ Search results for "authentication" (3 found)
 Export memory data to a file.
 
 ```bash
-kiro-memory export [--project <name>] [--format <fmt>] [--days <n>] [--output <file>]
+totalrecall export [--project <name>] [--format <fmt>] [--days <n>] [--output <file>]
 ```
 
 **Options:**
@@ -145,9 +145,9 @@ kiro-memory export [--project <name>] [--format <fmt>] [--days <n>] [--output <f
 **Examples:**
 
 ```bash
-kiro-memory export --format markdown --output memory.md
-kiro-memory export --project my-api --days 7 --output my-api-week.json
-kiro-memory export --format markdown > session-notes.md
+totalrecall export --format markdown --output memory.md
+totalrecall export --project my-api --days 7 --output my-api-week.json
+totalrecall export --format markdown > session-notes.md
 ```
 
 ---
@@ -157,7 +157,7 @@ kiro-memory export --format markdown > session-notes.md
 Import observations from a previously exported JSON file.
 
 ```bash
-kiro-memory import <file> [--project <name>] [--dry-run]
+totalrecall import <file> [--project <name>] [--dry-run]
 ```
 
 **Arguments:**
@@ -176,9 +176,9 @@ kiro-memory import <file> [--project <name>] [--dry-run]
 **Examples:**
 
 ```bash
-kiro-memory import memory.json
-kiro-memory import memory.json --project new-project
-kiro-memory import memory.json --dry-run
+totalrecall import memory.json
+totalrecall import memory.json --project new-project
+totalrecall import memory.json --dry-run
 ```
 
 ---
@@ -188,7 +188,7 @@ kiro-memory import memory.json --dry-run
 Show statistics for a project or the entire database.
 
 ```bash
-kiro-memory stats [--project <name>] [--json]
+totalrecall stats [--project <name>] [--json]
 ```
 
 **Options:**
@@ -201,7 +201,7 @@ kiro-memory stats [--project <name>] [--json]
 **Example output:**
 
 ```
-Kiro Memory Statistics
+Total Recall Statistics
 
 Total observations: 342
 Total sessions:     28
@@ -213,7 +213,7 @@ Observations by type:
   command       67  (20%)
   research      32   (9%)
 
-Projects: my-api, kiro-memory, calcfast (3 total)
+Projects: my-api, totalrecall, calcfast (3 total)
 Most active: my-api (145 observations)
 
 Embeddings: 298/342 (87%)
@@ -226,23 +226,23 @@ Embeddings: 298/342 (87%)
 Manage configuration settings.
 
 ```bash
-kiro-memory config [get|set|list] [key] [value]
+totalrecall config [get|set|list] [key] [value]
 ```
 
 **Subcommands:**
 
 ```bash
-kiro-memory config list              # Show all current settings
-kiro-memory config get <key>         # Get a specific setting
-kiro-memory config set <key> <value> # Set a configuration value
+totalrecall config list              # Show all current settings
+totalrecall config get <key>         # Get a specific setting
+totalrecall config set <key> <value> # Set a configuration value
 ```
 
 **Example:**
 
 ```bash
-kiro-memory config list
-kiro-memory config get KIRO_MEMORY_WORKER_PORT
-kiro-memory config set KIRO_MEMORY_LOG_LEVEL DEBUG
+totalrecall config list
+totalrecall config get TOTALRECALL_WORKER_PORT
+totalrecall config set TOTALRECALL_LOG_LEVEL DEBUG
 ```
 
 ---
@@ -252,7 +252,7 @@ kiro-memory config set KIRO_MEMORY_LOG_LEVEL DEBUG
 Generate an activity report for a project.
 
 ```bash
-kiro-memory report [--project <name>] [--period <period>] [--format <fmt>]
+totalrecall report [--project <name>] [--period <period>] [--format <fmt>]
 ```
 
 **Options:**
@@ -266,9 +266,9 @@ kiro-memory report [--project <name>] [--period <period>] [--format <fmt>]
 **Examples:**
 
 ```bash
-kiro-memory report
-kiro-memory report --period monthly
-kiro-memory report --project my-api --format markdown > report.md
+totalrecall report
+totalrecall report --period monthly
+totalrecall report --project my-api --format markdown > report.md
 ```
 
 ---
@@ -280,7 +280,7 @@ Control the background worker service.
 ### worker:start
 
 ```bash
-kiro-memory worker:start
+totalrecall worker:start
 ```
 
 Starts the worker in the background as a detached process. PID is saved to `~/.contextkit/worker.pid`.
@@ -288,7 +288,7 @@ Starts the worker in the background as a detached process. PID is saved to `~/.c
 ### worker:stop
 
 ```bash
-kiro-memory worker:stop
+totalrecall worker:stop
 ```
 
 Sends SIGTERM to the worker process.
@@ -296,7 +296,7 @@ Sends SIGTERM to the worker process.
 ### worker:restart
 
 ```bash
-kiro-memory worker:restart
+totalrecall worker:restart
 ```
 
 Stops and restarts the worker.
@@ -304,7 +304,7 @@ Stops and restarts the worker.
 ### worker:status
 
 ```bash
-kiro-memory worker:status
+totalrecall worker:status
 ```
 
 Shows whether the worker is running, its PID, and the port it's listening on.
@@ -312,7 +312,7 @@ Shows whether the worker is running, its PID, and the port it's listening on.
 ### worker:logs
 
 ```bash
-kiro-memory worker:logs
+totalrecall worker:logs
 ```
 
 Shows the last 50 lines from the current day's log file (`~/.contextkit/logs/worker-YYYY-MM-DD.log`).
@@ -320,7 +320,7 @@ Shows the last 50 lines from the current day's log file (`~/.contextkit/logs/wor
 ### worker:tail
 
 ```bash
-kiro-memory worker:tail
+totalrecall worker:tail
 ```
 
 Follows the log file in real time (equivalent to `tail -f`).
@@ -335,5 +335,5 @@ These flags work with most commands:
 |------|-------------|
 | `--version` | Show the installed version |
 | `--help` | Show help for the command |
-| `--data-dir <path>` | Override `KIRO_MEMORY_DATA_DIR` for this command |
-| `--port <n>` | Override `KIRO_MEMORY_WORKER_PORT` for this command |
+| `--data-dir <path>` | Override `TOTALRECALL_DATA_DIR` for this command |
+| `--port <n>` | Override `TOTALRECALL_WORKER_PORT` for this command |

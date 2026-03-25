@@ -3,7 +3,7 @@ title: Testing
 description: Testing strategy, Bun test runner patterns, database tests with in-memory SQLite, and coverage.
 ---
 
-Kiro Memory uses **Bun's built-in test runner** (not Jest or Vitest). Tests are written in TypeScript and live in the `tests/` directory.
+Total Recall uses **Bun's built-in test runner** (not Jest or Vitest). Tests are written in TypeScript and live in the `tests/` directory.
 
 ## Running Tests
 
@@ -46,7 +46,7 @@ npm run test:server       # server tests
 ```
 tests/
 ├── sqlite/
-│   ├── database.test.ts     # KiroMemoryDatabase, migrations, WAL
+│   ├── database.test.ts     # TotalRecallDatabase, migrations, WAL
 │   ├── observations.test.ts  # Observation CRUD, deduplication, stale
 │   └── sessions.test.ts     # Session lifecycle
 ├── worker/
@@ -59,7 +59,7 @@ tests/
 
 ## Writing Tests
 
-Kiro Memory uses Bun's test API which mirrors the Jest API:
+Total Recall uses Bun's test API which mirrors the Jest API:
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
@@ -83,7 +83,7 @@ Every test follows Arrange, Act, Assert:
 ```typescript
 it('storeObservation_withValidData_returnsPositiveId', async () => {
   // Arrange
-  const sdk = createKiroMemory({ dataDir: ':memory:', project: 'test' });
+  const sdk = createTotalRecall({ dataDir: ':memory:', project: 'test' });
 
   // Act
   const id = await sdk.storeObservation({
@@ -105,14 +105,14 @@ it('storeObservation_withValidData_returnsPositiveId', async () => {
 All database tests use `:memory:` SQLite instances for speed and isolation. **Never use the real `~/.contextkit/contextkit.db` in tests.**
 
 ```typescript
-import { KiroMemoryDatabase } from '../../src/services/sqlite/Database';
+import { TotalRecallDatabase } from '../../src/services/sqlite/Database';
 
 describe('observations', () => {
-  let db: KiroMemoryDatabase;
+  let db: TotalRecallDatabase;
 
   beforeEach(() => {
     // Each test gets a fresh in-memory database
-    db = new KiroMemoryDatabase(':memory:');
+    db = new TotalRecallDatabase(':memory:');
   });
 
   afterEach(() => {
@@ -143,13 +143,13 @@ describe('observations', () => {
 ## SDK Tests
 
 ```typescript
-import { createKiroMemory } from '../../src/sdk/index';
+import { createTotalRecall } from '../../src/sdk/index';
 
-describe('KiroMemorySDK', () => {
-  let sdk: ReturnType<typeof createKiroMemory>;
+describe('TotalRecallSDK', () => {
+  let sdk: ReturnType<typeof createTotalRecall>;
 
   beforeEach(() => {
-    sdk = createKiroMemory({
+    sdk = createTotalRecall({
       dataDir: ':memory:',
       project: 'test-project'
     });

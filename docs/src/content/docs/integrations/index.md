@@ -1,13 +1,13 @@
 ---
 title: IDE Integrations
-description: Connect Kiro Memory to your favorite AI coding assistant for persistent cross-session context.
+description: Connect Total Recall to your favorite AI coding assistant for persistent cross-session context.
 ---
 
-Kiro Memory works with any AI coding tool that supports the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/). Once connected, your AI assistant remembers what you worked on across sessions -- decisions made, files changed, problems solved, and context gathered.
+Total Recall works with any AI coding tool that supports the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/). Once connected, your AI assistant remembers what you worked on across sessions -- decisions made, files changed, problems solved, and context gathered.
 
 ## Why cross-IDE memory matters
 
-AI coding assistants lose context when a session ends. Every new conversation starts from scratch. Kiro Memory fixes this by:
+AI coding assistants lose context when a session ends. Every new conversation starts from scratch. Total Recall fixes this by:
 
 - **Capturing** what happens during each session (files changed, commands run, decisions made)
 - **Storing** observations in a local SQLite database with full-text search
@@ -33,7 +33,7 @@ All data stays on your machine at `~/.contextkit/contextkit.db`. Nothing is sent
 
 ## Available MCP tools
 
-Kiro Memory exposes 10 tools through the MCP server:
+Total Recall exposes 10 tools through the MCP server:
 
 | Tool | Description |
 |---|---|
@@ -50,26 +50,26 @@ Kiro Memory exposes 10 tools through the MCP server:
 
 ## Quick start
 
-Install Kiro Memory globally, then run the installer for your editor:
+Install Total Recall globally, then run the installer for your editor:
 
 ```bash
-npm install -g kiro-memory
+npm install -g totalrecall
 ```
 
 Then pick your editor:
 
 ```bash
 # Claude Code (recommended -- full hook support)
-kiro-memory install --claude-code
+totalrecall install --claude-code
 
 # Cursor
-kiro-memory install --cursor
+totalrecall install --cursor
 
 # Windsurf
-kiro-memory install --windsurf
+totalrecall install --windsurf
 
 # Cline
-kiro-memory install --cline
+totalrecall install --cline
 ```
 
 Each installer runs environment checks, configures MCP, and sets up hooks where supported.
@@ -95,17 +95,17 @@ The dashboard shows your observations, sessions, and search results across all p
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `KIRO_MEMORY_DATA_DIR` | `~/.contextkit` | Base data directory |
-| `KIRO_MEMORY_WORKER_HOST` | `127.0.0.1` | Worker bind address |
-| `KIRO_MEMORY_WORKER_PORT` | `3001` | Worker port |
-| `KIRO_MEMORY_LOG_LEVEL` | `INFO` | Log level (DEBUG, INFO, WARN, ERROR) |
+| `TOTALRECALL_DATA_DIR` | `~/.contextkit` | Base data directory |
+| `TOTALRECALL_WORKER_HOST` | `127.0.0.1` | Worker bind address |
+| `TOTALRECALL_WORKER_PORT` | `3001` | Worker port |
+| `TOTALRECALL_LOG_LEVEL` | `INFO` | Log level (DEBUG, INFO, WARN, ERROR) |
 
 ## Troubleshooting
 
 Run the built-in diagnostics tool to check your environment:
 
 ```bash
-kiro-memory doctor
+totalrecall doctor
 ```
 
 This checks Node.js version, native module compatibility, installation paths, worker status, and more. On WSL, it also verifies that Node.js and npm are native Linux binaries (not Windows mounts).
@@ -113,5 +113,5 @@ This checks Node.js version, native module compatibility, installation paths, wo
 To attempt automatic fixes for detected issues:
 
 ```bash
-kiro-memory doctor --fix
+totalrecall doctor --fix
 ```

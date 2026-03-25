@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Kiro Memory is a persistent cross-session memory system for Kiro CLI. It captures context (files changed, tools used, decisions made) via hooks and feeds it back at the start of the next session. Published as an npm package (`kiro-memory`), it integrates with Kiro CLI as a custom agent.
+Total Recall is a persistent cross-session memory system for Kiro CLI. It captures context (files changed, tools used, decisions made) via hooks and feeds it back at the start of the next session. Published as an npm package (`totalrecall`), it integrates with Kiro CLI as a custom agent.
 
 ## Build & Development
 
 ```bash
 npm run build              # Build all (esbuild → plugin/dist/)
 npm run dev                # Build + sync to Kiro + restart worker
-npm run sync-kiro          # Sync plugin to ~/.kiro/plugins/kiro-memory
+npm run sync-kiro          # Sync plugin to ~/.kiro/plugins/totalrecall
 npm run worker:restart     # Restart the background worker (port 3001)
 npm run worker:status      # Check worker status
 ```
@@ -49,17 +49,17 @@ Hooks read JSON from stdin (`readStdin()`) and output text to stdout. Exit code 
 Express HTTP server on port 3001. Serves the web dashboard, REST API (`/api/*`), and SSE events for live updates. Auto-started by `agentSpawn` hook.
 
 ### SQLite Layer (`src/services/sqlite/`)
-- `Database.ts` — `KiroMemoryDatabase` class with WAL mode, FTS5, and versioned migrations
+- `Database.ts` — `TotalRecallDatabase` class with WAL mode, FTS5, and versioned migrations
 - `Observations.ts`, `Sessions.ts`, `Summaries.ts`, `Prompts.ts` — CRUD per entity
 - `Search.ts` — FTS5 full-text search and timeline queries
 
-DB file: `~/.contextkit/contextkit.db` (overridable via `KIRO_MEMORY_DATA_DIR`). Code uses `bun:sqlite` API — the build shim maps it to `better-sqlite3` for Node.js.
+DB file: `~/.contextkit/contextkit.db` (overridable via `TOTALRECALL_DATA_DIR`). Code uses `bun:sqlite` API — the build shim maps it to `better-sqlite3` for Node.js.
 
 ### MCP Server (`src/servers/mcp-server.ts`)
 Model Context Protocol server (stdio transport) exposing 4 tools: `search`, `timeline`, `get_observations`, `get_context`.
 
 ### SDK (`src/sdk/index.ts`)
-`KiroMemorySDK` class for programmatic access. Exported as `kiro-memory/sdk`. Factory function: `createKiroMemory()`.
+`TotalRecallSDK` class for programmatic access. Exported as `totalrecall/sdk`. Factory function: `createTotalRecall()`.
 
 ### Web UI (`src/ui/`)
 React SPA built for browser target. Entry: `src/ui/viewer/index.tsx`. Served as static files by the worker at `http://localhost:3001`.
@@ -79,14 +79,14 @@ React SPA built for browser target. Entry: `src/ui/viewer/index.tsx`. Served as 
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `KIRO_MEMORY_DATA_DIR` | `~/.contextkit` | Base data directory |
-| `KIRO_MEMORY_WORKER_HOST` | `127.0.0.1` | Worker bind address |
-| `KIRO_MEMORY_WORKER_PORT` | `3001` | Worker port |
-| `KIRO_MEMORY_LOG_LEVEL` | `INFO` | Log level (DEBUG/INFO/WARN/ERROR) |
+| `TOTALRECALL_DATA_DIR` | `~/.contextkit` | Base data directory |
+| `TOTALRECALL_WORKER_HOST` | `127.0.0.1` | Worker bind address |
+| `TOTALRECALL_WORKER_PORT` | `3001` | Worker port |
+| `TOTALRECALL_LOG_LEVEL` | `INFO` | Log level (DEBUG/INFO/WARN/ERROR) |
 | `KIRO_CONFIG_DIR` | `~/.kiro` | Kiro CLI config directory |
 
 ## Package Exports
 
-- `kiro-memory` — Main entry: SDK, database, types, hook utilities
-- `kiro-memory/sdk` — SDK-only entry point
-- `kiro-memory` bin (`kiro-memory` CLI) — `plugin/dist/cli/contextkit.js`
+- `totalrecall` — Main entry: SDK, database, types, hook utilities
+- `totalrecall/sdk` — SDK-only entry point
+- `totalrecall` bin (`totalrecall` CLI) — `plugin/dist/cli/contextkit.js`

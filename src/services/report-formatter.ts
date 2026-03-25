@@ -1,7 +1,7 @@
 import type { ReportData } from '../types/worker-types.js';
 
 /**
- * Report formatters for Kiro Memory.
+ * Report formatters for Total Recall.
  * Three outputs: ANSI text (CLI), markdown (file/sharing), JSON (automations).
  */
 
@@ -14,7 +14,7 @@ export function formatReportText(data: ReportData): string {
 
   // Header
   lines.push('');
-  lines.push(`  \x1b[36m═══ Kiro Memory Report — ${data.period.label} ═══\x1b[0m`);
+  lines.push(`  \x1b[36m═══ Total Recall Report — ${data.period.label} ═══\x1b[0m`);
   lines.push(`  \x1b[2m${data.period.start} → ${data.period.end} (${data.period.days} days)\x1b[0m`);
   lines.push('');
 
@@ -113,7 +113,7 @@ export function formatReportMarkdown(data: ReportData): string {
   const lines: string[] = [];
 
   // Header
-  lines.push(`# Kiro Memory Report — ${data.period.label}`);
+  lines.push(`# Total Recall Report — ${data.period.label}`);
   lines.push('');
   lines.push(`**Period**: ${data.period.start} → ${data.period.end} (${data.period.days} days)`);
   lines.push('');

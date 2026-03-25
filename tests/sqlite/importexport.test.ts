@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
+import { TotalRecallDatabase } from '../../src/services/sqlite/Database.js';
 import { createObservation } from '../../src/services/sqlite/Observations.js';
 import { createSummary } from '../../src/services/sqlite/Summaries.js';
 import { createPrompt } from '../../src/services/sqlite/Prompts.js';
@@ -50,7 +50,7 @@ describe('ImportExport — countExportRecords', () => {
   let db: Database;
 
   beforeEach(() => {
-    db = new KiroMemoryDatabase(':memory:').db;
+    db = new TotalRecallDatabase(':memory:').db;
   });
 
   afterEach(() => {
@@ -96,7 +96,7 @@ describe('ImportExport — generateMetaRecord', () => {
   let db: Database;
 
   beforeEach(() => {
-    db = new KiroMemoryDatabase(':memory:').db;
+    db = new TotalRecallDatabase(':memory:').db;
   });
 
   afterEach(() => {
@@ -131,7 +131,7 @@ describe('ImportExport — exportObservationsStreaming', () => {
   let db: Database;
 
   beforeEach(() => {
-    db = new KiroMemoryDatabase(':memory:').db;
+    db = new TotalRecallDatabase(':memory:').db;
   });
 
   afterEach(() => {
@@ -197,7 +197,7 @@ describe('ImportExport — exportSummariesStreaming', () => {
   let db: Database;
 
   beforeEach(() => {
-    db = new KiroMemoryDatabase(':memory:').db;
+    db = new TotalRecallDatabase(':memory:').db;
   });
 
   afterEach(() => {
@@ -227,7 +227,7 @@ describe('ImportExport — exportPromptsStreaming', () => {
   let db: Database;
 
   beforeEach(() => {
-    db = new KiroMemoryDatabase(':memory:').db;
+    db = new TotalRecallDatabase(':memory:').db;
   });
 
   afterEach(() => {
@@ -378,7 +378,7 @@ describe('ImportExport — importJsonl', () => {
   let db: Database;
 
   beforeEach(() => {
-    db = new KiroMemoryDatabase(':memory:').db;
+    db = new TotalRecallDatabase(':memory:').db;
   });
 
   afterEach(() => {
@@ -643,7 +643,7 @@ describe('ImportExport — hashExistsInObservations', () => {
   let db: Database;
 
   beforeEach(() => {
-    db = new KiroMemoryDatabase(':memory:').db;
+    db = new TotalRecallDatabase(':memory:').db;
   });
 
   afterEach(() => {
@@ -673,7 +673,7 @@ describe('ImportExport — roundtrip export/import', () => {
   let db: Database;
 
   beforeEach(() => {
-    db = new KiroMemoryDatabase(':memory:').db;
+    db = new TotalRecallDatabase(':memory:').db;
   });
 
   afterEach(() => {
@@ -692,7 +692,7 @@ describe('ImportExport — roundtrip export/import', () => {
     const jsonlContent = lines.join('\n');
 
     // Nuovo DB vuoto per l'import
-    const db2 = new KiroMemoryDatabase(':memory:').db;
+    const db2 = new TotalRecallDatabase(':memory:').db;
     try {
       const result = importJsonl(db2, jsonlContent);
       expect(result.imported).toBe(2);

@@ -1,6 +1,6 @@
 ---
 title: REST API Reference
-description: Complete reference for the 35 REST API endpoints exposed by the Kiro Memory worker on port 3001.
+description: Complete reference for the 35 REST API endpoints exposed by the Total Recall worker on port 3001.
 ---
 
 The worker exposes a REST API on `http://localhost:3001`. All endpoints return JSON unless otherwise noted.

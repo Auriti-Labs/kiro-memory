@@ -2,7 +2,7 @@ import { Database } from '../../db/index.js';
 import type { DBCheckpoint } from '../../types/worker-types.js';
 
 /**
- * Checkpoint operations per Kiro Memory database.
+ * Checkpoint operations per Total Recall database.
  * I checkpoint salvano uno snapshot strutturato della sessione per resume futuro.
  */
 

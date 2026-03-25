@@ -1,15 +1,15 @@
 /**
- * Kiro Memory - Persistent cross-session memory for Kiro CLI
+ * Total Recall - Persistent cross-session memory for Kiro CLI
  *
  * @packageDocumentation
  */
 
 // Export SDK
-export { KiroMemorySDK, createKiroMemory } from './sdk/index.js';
-export type { KiroMemoryConfig } from './sdk/index.js';
+export { TotalRecallSDK, createTotalRecall } from './sdk/index.js';
+export type { TotalRecallConfig } from './sdk/index.js';
 
 // Export database
-export { KiroMemoryDatabase } from './services/sqlite/index.js';
+export { TotalRecallDatabase } from './services/sqlite/index.js';
 
 // Export advanced search
 export {

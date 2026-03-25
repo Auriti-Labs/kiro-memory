@@ -1,5 +1,5 @@
 /**
- * Kiro Memory build configuration
+ * Total Recall build configuration
  *
  * Uses better-sqlite3 as the default SQLite provider.
  * No Bun runtime required — works on any Node.js >= 18.
@@ -38,7 +38,7 @@ function ensureDir(dir) {
 }
 
 async function build() {
-  console.log('Building Kiro Memory...\n');
+  console.log('Building Total Recall...\n');
 
   ensureDir(DIST_DIR);
 

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
+import { TotalRecallDatabase } from '../../src/services/sqlite/Database.js';
 import { AnomalyDetector, mean, stdDev } from '../../src/services/analytics/AnomalyDetector.js';
 import { createSession } from '../../src/services/sqlite/Sessions.js';
 import { createObservation } from '../../src/services/sqlite/Observations.js';
@@ -129,11 +129,11 @@ describe('Statistical helpers', () => {
 // ============================================================================
 
 describe('AnomalyDetector', () => {
-  let kiroDb: KiroMemoryDatabase;
+  let kiroDb: TotalRecallDatabase;
   let db: Database;
 
   beforeEach(() => {
-    kiroDb = new KiroMemoryDatabase(':memory:');
+    kiroDb = new TotalRecallDatabase(':memory:');
     db = kiroDb.db;
   });
 

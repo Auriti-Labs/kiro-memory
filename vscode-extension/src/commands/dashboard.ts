@@ -15,7 +15,7 @@ import type { DashboardPanel } from '../views/dashboard-panel';
 let currentPanel: DashboardPanel | undefined;
 
 /**
- * Apre la dashboard Kiro Memory nel pannello WebView.
+ * Apre la dashboard Total Recall nel pannello WebView.
  * Se il pannello è già aperto, lo porta in foreground.
  */
 export async function showDashboardCommand(

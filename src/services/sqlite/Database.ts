@@ -15,16 +15,16 @@ export interface Migration {
 
 
 /**
- * KiroMemoryDatabase - Main entry point for the sqlite module
+ * TotalRecallDatabase - Main entry point for the sqlite module
  *
  * Sets up SQLite with optimized settings and runs all migrations.
  *
  * Usage:
- *   const db = new KiroMemoryDatabase();  // uses default DB_PATH
- *   const db = new KiroMemoryDatabase('/path/to/db.sqlite');
- *   const db = new KiroMemoryDatabase(':memory:');  // for tests
+ *   const db = new TotalRecallDatabase();  // uses default DB_PATH
+ *   const db = new TotalRecallDatabase('/path/to/db.sqlite');
+ *   const db = new TotalRecallDatabase(':memory:');  // for tests
  */
-export class KiroMemoryDatabase {
+export class TotalRecallDatabase {
   private _db: Database;
 
   /**
@@ -98,7 +98,7 @@ export class KiroMemoryDatabase {
 }
 
 /**
- * Migration runner for Kiro Memory
+ * Migration runner for Total Recall
  */
 class MigrationRunner {
   private db: Database;

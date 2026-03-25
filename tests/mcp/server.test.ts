@@ -9,19 +9,19 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
-import { KiroMemorySDK, createKiroMemory } from '../../src/sdk/index.js';
+import { TotalRecallDatabase } from '../../src/services/sqlite/Database.js';
+import { TotalRecallSDK, createTotalRecall } from '../../src/sdk/index.js';
 
 // ---------------------------------------------------------------------------
 // Setup — shared SDK instance backed by an in-memory DB
 // ---------------------------------------------------------------------------
 
 describe('MCP SDK layer (methods called by MCP tool handlers)', () => {
-  let sdk: KiroMemorySDK;
+  let sdk: TotalRecallSDK;
 
   beforeEach(() => {
     // Use an in-memory DB and a fixed project name so tests are deterministic
-    sdk = createKiroMemory({ dataDir: ':memory:', project: 'mcp-test-project' });
+    sdk = createTotalRecall({ dataDir: ':memory:', project: 'mcp-test-project' });
   });
 
   afterEach(() => {

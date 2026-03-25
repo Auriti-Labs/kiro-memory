@@ -1,5 +1,5 @@
 /**
- * Provider TreeView per le osservazioni Kiro Memory.
+ * Provider TreeView per le osservazioni Total Recall.
  *
  * Mostra le osservazioni recenti (filtrabili per progetto) con icone
  * differenziate per tipo (file, comando, decisione, ecc.) e tooltip
@@ -7,7 +7,7 @@
  */
 
 import * as vscode from 'vscode';
-import type { KiroMemoryClient, Observation } from '../api-client';
+import type { TotalRecallClient, Observation } from '../api-client';
 
 // ── Mappatura tipo → icona ThemeIcon ──────────────────────────────────────
 
@@ -101,7 +101,7 @@ export class ObservationsProvider implements vscode.TreeDataProvider<Observation
   private readonly maxItems: number;
 
   constructor(
-    private readonly client: KiroMemoryClient,
+    private readonly client: TotalRecallClient,
     maxItems: number = 50
   ) {
     this.maxItems = maxItems;
@@ -160,7 +160,7 @@ export class ObservationsProvider implements vscode.TreeDataProvider<Observation
       return items;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Errore sconosciuto';
-      vscode.window.showErrorMessage(`Kiro Memory: impossibile caricare le osservazioni — ${msg}`);
+      vscode.window.showErrorMessage(`Total Recall: impossibile caricare le osservazioni — ${msg}`);
       return this.cachedItems.length > 0 ? this.cachedItems : [this.buildOfflineItem()];
     }
   }

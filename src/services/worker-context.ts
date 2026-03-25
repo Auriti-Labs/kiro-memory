@@ -4,7 +4,7 @@
  */
 
 import type { Response } from 'express';
-import { KiroMemoryDatabase } from './sqlite/Database.js';
+import { TotalRecallDatabase } from './sqlite/Database.js';
 import { getEmbeddingService } from './search/EmbeddingService.js';
 import { getVectorSearch } from './search/VectorSearch.js';
 import { logger } from '../utils/logger.js';
@@ -12,7 +12,7 @@ import { logger } from '../utils/logger.js';
 // ── Shared context type ──
 
 export interface WorkerContext {
-  db: KiroMemoryDatabase;
+  db: TotalRecallDatabase;
   broadcast: (event: string, data: any) => void;
   invalidateProjectsCache: () => void;
   generateEmbeddingForObservation: (
@@ -96,7 +96,7 @@ export function isValidString(val: unknown, maxLen: number): val is string {
 
 /** Generate embedding for an observation (fire-and-forget) */
 export async function generateEmbeddingForObservation(
-  db: KiroMemoryDatabase,
+  db: TotalRecallDatabase,
   observationId: number,
   title: string,
   content: string | null,
@@ -128,7 +128,7 @@ export async function generateEmbeddingForObservation(
 
 // ── Context factory ──
 
-export function createWorkerContext(db: KiroMemoryDatabase): WorkerContext {
+export function createWorkerContext(db: TotalRecallDatabase): WorkerContext {
   return {
     db,
     broadcast,

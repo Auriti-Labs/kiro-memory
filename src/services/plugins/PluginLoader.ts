@@ -2,7 +2,7 @@
  * PluginLoader — Discovery automatico e lifecycle management dei plugin.
  *
  * Responsabilità:
- *   1. Discovery automatico: scansiona node_modules/kiro-memory-plugin-*
+ *   1. Discovery automatico: scansiona node_modules/totalrecall-plugin-*
  *   2. Discovery locale: carica plugin da ~/.contextkit/plugins/<nome>/index.js
  *   3. Discovery da configurazione: legge la chiave "plugins" in config.json
  *   4. Validazione: verifica che ogni modulo implementi IPlugin
@@ -25,7 +25,7 @@ import { readConfig } from '../../cli/cli-utils.js';
 import type { IPlugin } from './types.js';
 
 // ── Versione del runtime usata per la verifica minKiroVersion ──
-const KIRO_MEMORY_VERSION = '3.1.1';
+const TOTALRECALL_VERSION = '3.1.1';
 
 /**
  * Interfaccia minima del registry necessaria al Loader.
@@ -124,7 +124,7 @@ export class PluginLoader {
 
   /**
    * Scansiona node_modules alla ricerca di pacchetti con nome
-   * che corrisponde al pattern `kiro-memory-plugin-*`.
+   * che corrisponde al pattern `totalrecall-plugin-*`.
    *
    * Ritorna i percorsi assoluti dei pacchetti trovati.
    */
@@ -148,7 +148,7 @@ export class PluginLoader {
           try {
             const scopedEntries = readdirSync(scopeDir, { withFileTypes: true });
             for (const scoped of scopedEntries) {
-              if (scoped.isDirectory() && scoped.name.startsWith('kiro-memory-plugin-')) {
+              if (scoped.isDirectory() && scoped.name.startsWith('totalrecall-plugin-')) {
                 const pkgPath = join(scopeDir, scoped.name);
                 if (this.hasValidPackageJson(pkgPath)) {
                   discovered.push(pkgPath);
@@ -162,7 +162,7 @@ export class PluginLoader {
         }
 
         // Pacchetti senza scope
-        if (entry.isDirectory() && entry.name.startsWith('kiro-memory-plugin-')) {
+        if (entry.isDirectory() && entry.name.startsWith('totalrecall-plugin-')) {
           const pkgPath = join(nodeModulesDir, entry.name);
           if (this.hasValidPackageJson(pkgPath)) {
             discovered.push(pkgPath);
@@ -344,7 +344,7 @@ export class PluginLoader {
    * Il metodo utilizza _loadRawPlugin() per ottenere il modulo grezzo,
    * poi applica la validazione e il lifecycle (init + register).
    *
-   * @param nameOrPath - Nome npm (es. "kiro-memory-plugin-slack") o percorso assoluto
+   * @param nameOrPath - Nome npm (es. "totalrecall-plugin-slack") o percorso assoluto
    * @param displayName - Nome da mostrare nei log (opzionale, default = nameOrPath)
    */
   async loadPlugin(nameOrPath: string, displayName?: string): Promise<void> {
@@ -461,7 +461,7 @@ export class PluginLoader {
 
   /**
    * Carica tutti i plugin disponibili:
-   *   1. Discovery automatico da node_modules (kiro-memory-plugin-*)
+   *   1. Discovery automatico da node_modules (totalrecall-plugin-*)
    *   2. Plugin locali in ~/.contextkit/plugins/
    *   3. Plugin configurati in config.json
    *
@@ -646,9 +646,9 @@ export class PluginLoader {
 
     // Verifica compatibilità semver semplice (major.minor.patch)
     if (p.minKiroVersion && typeof p.minKiroVersion === 'string') {
-      if (!this.isVersionCompatible(KIRO_MEMORY_VERSION, p.minKiroVersion)) {
+      if (!this.isVersionCompatible(TOTALRECALL_VERSION, p.minKiroVersion)) {
         throw new Error(
-          `Plugin "${p.name}": richiede kiro-memory >= ${p.minKiroVersion}, versione corrente: ${KIRO_MEMORY_VERSION}`
+          `Plugin "${p.name}": richiede totalrecall >= ${p.minKiroVersion}, versione corrente: ${TOTALRECALL_VERSION}`
         );
       }
     }

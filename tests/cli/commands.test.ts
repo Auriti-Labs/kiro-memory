@@ -1,5 +1,5 @@
 /**
- * Test suite per i comandi avanzati della CLI di Kiro Memory.
+ * Test suite per i comandi avanzati della CLI di Total Recall.
  * Testa le funzioni pure estratte in cli-utils.ts (no process.exit, no stdin).
  */
 
@@ -35,7 +35,7 @@ import {
   removeOrphanedEmbeddings,
   vacuumDatabase,
 } from '../../src/cli/cli-utils.js';
-import { KiroMemoryDatabase } from '../../src/services/sqlite/Database.js';
+import { TotalRecallDatabase } from '../../src/services/sqlite/Database.js';
 import { createObservation } from '../../src/services/sqlite/Observations.js';
 import type { Observation } from '../../src/types/worker-types.js';
 
@@ -170,7 +170,7 @@ describe('Export — formato Markdown', () => {
       makeObservation({ id: 2 }),
     ];
     const md = generateMarkdownOutput(observations);
-    expect(md).toContain('# Kiro Memory — Export Observations');
+    expect(md).toContain('# Total Recall — Export Observations');
     expect(md).toContain('Totale: 2');
   });
 
@@ -437,7 +437,7 @@ describe('Stats — formattazione output', () => {
       totalSessions: 28,
       totalProjects: 5,
       dbSizeBytes: 1024 * 512,
-      mostActiveProject: 'kiro-memory',
+      mostActiveProject: 'totalrecall',
       embeddingCoverage: 73,
     };
     const out = formatStatsOutput(stats);
@@ -445,7 +445,7 @@ describe('Stats — formattazione output', () => {
     expect(out).toContain('142');
     expect(out).toContain('28');
     expect(out).toContain('5');
-    expect(out).toContain('kiro-memory');
+    expect(out).toContain('totalrecall');
     expect(out).toContain('73%');
     expect(out).toContain('512.0 KB');
   });
@@ -470,10 +470,10 @@ describe('Stats — formattazione output', () => {
 // ─── Test: Doctor fix — operazioni sul database ───
 
 describe('Doctor fix — operazioni database', () => {
-  let kmDb: KiroMemoryDatabase;
+  let kmDb: TotalRecallDatabase;
 
   beforeEach(() => {
-    kmDb = new KiroMemoryDatabase(':memory:');
+    kmDb = new TotalRecallDatabase(':memory:');
     // Popola con qualche dato di test
     createObservation(
       kmDb.db,

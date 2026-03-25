@@ -17,7 +17,7 @@ Thank you for your interest in contributing to ContextKit! This guide will help 
 ### Getting Started
 
 ```bash
-git clone https://github.com/Auriti-Labs/kiro-memory.git
+git clone https://github.com/Auriti-Labs/totalrecall.git
 cd contextkit
 npm install
 npm run build

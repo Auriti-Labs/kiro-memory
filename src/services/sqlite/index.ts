@@ -1,5 +1,5 @@
 // Export database
-export { KiroMemoryDatabase } from './Database.js';
+export { TotalRecallDatabase } from './Database.js';
 
 // Export keyset pagination utilities
 export { encodeCursor, decodeCursor, buildNextCursor } from './cursor.js';

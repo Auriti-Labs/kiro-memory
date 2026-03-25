@@ -3,7 +3,7 @@ title: Database Schema
 description: SQLite database tables, columns, indexes, FTS5 virtual tables, and migration history.
 ---
 
-Kiro Memory uses a single SQLite database file at `~/.contextkit/contextkit.db` (configurable via `KIRO_MEMORY_DATA_DIR`). The database uses WAL journal mode for concurrent access between hooks and the worker.
+Total Recall uses a single SQLite database file at `~/.contextkit/contextkit.db` (configurable via `TOTALRECALL_DATA_DIR`). The database uses WAL journal mode for concurrent access between hooks and the worker.
 
 ## Configuration
 

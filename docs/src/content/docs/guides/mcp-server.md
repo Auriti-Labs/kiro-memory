@@ -1,9 +1,9 @@
 ---
 title: MCP Server
-description: Using Kiro Memory as a Model Context Protocol server — tools, configuration, and examples.
+description: Using Total Recall as a Model Context Protocol server — tools, configuration, and examples.
 ---
 
-Kiro Memory includes a built-in **Model Context Protocol (MCP)** server that exposes your memory database as tools to any MCP-compatible AI assistant.
+Total Recall includes a built-in **Model Context Protocol (MCP)** server that exposes your memory database as tools to any MCP-compatible AI assistant.
 
 ## Overview
 
@@ -22,10 +22,10 @@ The MCP server binary is included in the npm package:
 
 ```bash
 # Direct invocation
-node node_modules/kiro-memory/plugin/dist/servers/mcp-server.js
+node node_modules/totalrecall/plugin/dist/servers/mcp-server.js
 
 # Or if installed globally
-kiro-memory mcp
+totalrecall mcp
 ```
 
 ## Editor Configuration
@@ -37,11 +37,11 @@ Add to your Claude Code MCP configuration (`.claude/mcp.json` or global settings
 ```json
 {
   "mcpServers": {
-    "kiro-memory": {
+    "totalrecall": {
       "command": "node",
-      "args": ["/path/to/node_modules/kiro-memory/plugin/dist/servers/mcp-server.js"],
+      "args": ["/path/to/node_modules/totalrecall/plugin/dist/servers/mcp-server.js"],
       "env": {
-        "KIRO_MEMORY_DATA_DIR": "/home/user/.contextkit"
+        "TOTALRECALL_DATA_DIR": "/home/user/.contextkit"
       }
     }
   }
@@ -55,8 +55,8 @@ Add to `.cursor/mcp.json`:
 ```json
 {
   "mcpServers": {
-    "kiro-memory": {
-      "command": "kiro-memory",
+    "totalrecall": {
+      "command": "totalrecall",
       "args": ["mcp"]
     }
   }
@@ -69,9 +69,9 @@ The configuration format is standard MCP:
 
 ```json
 {
-  "name": "kiro-memory",
+  "name": "totalrecall",
   "command": "node",
-  "args": ["~/.npm/bin/kiro-memory", "mcp"],
+  "args": ["~/.npm/bin/totalrecall", "mcp"],
   "transport": "stdio"
 }
 ```

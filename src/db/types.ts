@@ -1,5 +1,5 @@
 /**
- * Database adapter types for Kiro Memory
+ * Database adapter types for Total Recall
  *
  * Defines the contract for SQLite database access.
  * The default implementation uses better-sqlite3 (Node.js).

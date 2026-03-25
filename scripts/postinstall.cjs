@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Messaggio post-installazione Kiro Memory
- * Eseguito automaticamente dopo npm install -g kiro-memory
+ * Messaggio post-installazione Total Recall
+ * Eseguito automaticamente dopo npm install -g totalrecall
  * File .cjs per compatibilità con "type": "module" nel package.json
  */
 
@@ -29,14 +29,14 @@ const VIOLET = '\x1b[38;5;135m';
 const CYAN = '\x1b[36m';
 
 console.log('');
-console.log(`  ${c(VIOLET + BOLD, 'Kiro Memory')} ${version ? `v${version}` : ''} installed!`);
+console.log(`  ${c(VIOLET + BOLD, 'Total Recall')} ${version ? `v${version}` : ''} installed!`);
 console.log('');
 console.log(`  ${c(DIM, 'Get started:')}`);
-console.log(`    ${c(BOLD, 'kiro-memory install')}              Auto-detect editor`);
-console.log(`    ${c(BOLD, 'kiro-memory install --claude-code')} Claude Code`);
-console.log(`    ${c(BOLD, 'kiro-memory install --cursor')}      Cursor`);
-console.log(`    ${c(BOLD, 'kiro-memory install --windsurf')}    Windsurf`);
+console.log(`    ${c(BOLD, 'totalrecall install')}              Auto-detect editor`);
+console.log(`    ${c(BOLD, 'totalrecall install --claude-code')} Claude Code`);
+console.log(`    ${c(BOLD, 'totalrecall install --cursor')}      Cursor`);
+console.log(`    ${c(BOLD, 'totalrecall install --windsurf')}    Windsurf`);
 console.log('');
 console.log(`  ${c(CYAN, 'Dashboard:')} ${c(UND, 'http://localhost:3001')}`);
-console.log(`  ${c(DIM, 'Docs:      ')} ${c(UND, 'https://auritidesign.it/docs/kiro-memory/')}`);
+console.log(`  ${c(DIM, 'Docs:      ')} ${c(UND, 'https://auritidesign.it/docs/totalrecall/')}`);
 console.log('');

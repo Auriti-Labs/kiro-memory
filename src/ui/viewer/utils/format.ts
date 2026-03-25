@@ -1,5 +1,5 @@
 /**
- * Kiro Memory Viewer — formatting utilities
+ * Total Recall Viewer — formatting utilities
  */
 
 /**

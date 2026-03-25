@@ -2,7 +2,7 @@ import { Database } from '../../db/index.js';
 import type { Summary } from '../../types/worker-types.js';
 
 /**
- * Summary operations for Kiro Memory database
+ * Summary operations for Total Recall database
  */
 
 /** Escape dei caratteri wildcard LIKE per prevenire pattern injection */

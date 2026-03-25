@@ -1,5 +1,5 @@
 /**
- * Integration test suite — full session lifecycle via KiroMemorySDK.
+ * Integration test suite — full session lifecycle via TotalRecallSDK.
  *
  * Uses an in-memory SQLite database so every test is isolated and fast.
  * Tests cover the complete flow:
@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { KiroMemorySDK } from '../../src/sdk/index.js';
+import { TotalRecallSDK } from '../../src/sdk/index.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -18,16 +18,16 @@ import { KiroMemorySDK } from '../../src/sdk/index.js';
 const TEST_PROJECT = 'test-integration-project';
 
 /** Create a fresh SDK instance backed by an in-memory database. */
-function createSDK(project: string = TEST_PROJECT): KiroMemorySDK {
-  return new KiroMemorySDK({ dataDir: ':memory:', project });
+function createSDK(project: string = TEST_PROJECT): TotalRecallSDK {
+  return new TotalRecallSDK({ dataDir: ':memory:', project });
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('Session lifecycle — KiroMemorySDK integration', () => {
-  let sdk: KiroMemorySDK;
+describe('Session lifecycle — TotalRecallSDK integration', () => {
+  let sdk: TotalRecallSDK;
 
   beforeEach(() => {
     sdk = createSDK();

@@ -1,5 +1,5 @@
 /**
- * Shared types for Kiro Memory Worker Service
+ * Shared types for Total Recall Worker Service
  */
 
 // ============================================================================

@@ -1,5 +1,5 @@
 /**
- * Kiro Memory Viewer Types
+ * Total Recall Viewer Types
  */
 
 export interface Observation {

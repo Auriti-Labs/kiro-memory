@@ -1,5 +1,5 @@
 /**
- * Kiro Memory — Hook definitions for Kiro CLI
+ * Total Recall — Hook definitions for Kiro CLI
  *
  * This file defines hooks in Kiro-compatible format
  */
@@ -8,7 +8,7 @@ export const kiroHookDefinitions = {
   version: '1.0.0',
   hooks: [
     {
-      name: 'kiro-memory-auto-context',
+      name: 'totalrecall-auto-context',
       description: 'Automatically inject relevant context at session start',
       trigger: {
         type: 'session-start',
@@ -16,11 +16,11 @@ export const kiroHookDefinitions = {
       },
       action: {
         type: 'inject-context',
-        source: 'kiro-memory'
+        source: 'totalrecall'
       }
     },
     {
-      name: 'kiro-memory-file-tracker',
+      name: 'totalrecall-file-tracker',
       description: 'Track file changes during development',
       trigger: {
         type: 'file-save',
@@ -28,11 +28,11 @@ export const kiroHookDefinitions = {
       },
       action: {
         type: 'store-observation',
-        source: 'kiro-memory'
+        source: 'totalrecall'
       }
     },
     {
-      name: 'kiro-memory-session-summary',
+      name: 'totalrecall-session-summary',
       description: 'Store session summary when session ends',
       trigger: {
         type: 'session-end',
@@ -40,7 +40,7 @@ export const kiroHookDefinitions = {
       },
       action: {
         type: 'store-summary',
-        source: 'kiro-memory'
+        source: 'totalrecall'
       }
     }
   ]

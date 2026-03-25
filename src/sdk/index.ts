@@ -1,10 +1,10 @@
 /**
- * Kiro Memory SDK for Kiro CLI Integration
+ * Total Recall SDK for Kiro CLI Integration
  *
- * Provides programmatic access to Kiro Memory system
+ * Provides programmatic access to Total Recall system
  */
 
-import { KiroMemoryDatabase } from '../services/sqlite/index.js';
+import { TotalRecallDatabase } from '../services/sqlite/index.js';
 import { encodeCursor, decodeCursor } from '../services/sqlite/cursor.js';
 import type { KeysetPageResult } from '../services/sqlite/cursor.js';
 import { getObservationsByProject, createObservation, searchObservations, updateLastAccessed, consolidateObservations as dbConsolidateObservations, isDuplicateObservation } from '../services/sqlite/Observations.js';
@@ -44,19 +44,19 @@ import type {
 } from '../types/worker-types.js';
 import { KNOWLEDGE_TYPES } from '../types/worker-types.js';
 
-export interface KiroMemoryConfig {
+export interface TotalRecallConfig {
   dataDir?: string;
   project?: string;
   /** Skip migration check for performance (use in high-frequency hooks) */
   skipMigrations?: boolean;
 }
 
-export class KiroMemorySDK {
-  private db: KiroMemoryDatabase;
+export class TotalRecallSDK {
+  private db: TotalRecallDatabase;
   private project: string;
 
-  constructor(config: KiroMemoryConfig = {}) {
-    this.db = new KiroMemoryDatabase(config.dataDir, config.skipMigrations || false);
+  constructor(config: TotalRecallConfig = {}) {
+    this.db = new TotalRecallDatabase(config.dataDir, config.skipMigrations || false);
     this.project = config.project || this.detectProject();
   }
 
@@ -510,7 +510,7 @@ export class KiroMemorySDK {
     query?: string;
   } = {}): Promise<SmartContext> {
     const tokenBudget = options.tokenBudget
-      || parseInt(process.env.KIRO_MEMORY_CONTEXT_TOKENS || '0', 10)
+      || parseInt(process.env.TOTALRECALL_CONTEXT_TOKENS || '0', 10)
       || 2000;
 
     // Summaries always included
@@ -841,8 +841,8 @@ export class KiroMemorySDK {
 }
 
 // Export convenience function
-export function createKiroMemory(config?: KiroMemoryConfig): KiroMemorySDK {
-  return new KiroMemorySDK(config);
+export function createTotalRecall(config?: TotalRecallConfig): TotalRecallSDK {
+  return new TotalRecallSDK(config);
 }
 
 // Re-export types

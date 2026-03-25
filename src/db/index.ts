@@ -1,5 +1,5 @@
 /**
- * Database adapter for Kiro Memory
+ * Database adapter for Total Recall
  *
  * Default implementation: better-sqlite3 (works on any Node.js ≥ 18).
  * No Bun runtime required.

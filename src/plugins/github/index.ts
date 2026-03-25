@@ -1,11 +1,11 @@
 /**
- * Plugin GitHub per Kiro Memory.
+ * Plugin GitHub per Total Recall.
  *
  * Implementa IPlugin con due hook principali:
  *   - onObservation → rileva riferimenti issue (#123) nel titolo/narrative
  *   - onSessionEnd  → commenta automaticamente sulle issue linkate con il summary della sessione
  *
- * Configurazione (in config.json → plugins.kiro-memory-plugin-github):
+ * Configurazione (in config.json → plugins.totalrecall-plugin-github):
  *   - token: GitHub Personal Access Token (obbligatorio)
  *   - repo: repository default "owner/repo" (opzionale)
  *   - baseUrl: URL base per GitHub Enterprise (opzionale)
@@ -48,7 +48,7 @@ interface LinkedIssue {
 // ── Plugin ───────────────────────────────────────────────────────────────────
 
 export class GitHubPlugin implements IPlugin {
-  readonly name = 'kiro-memory-plugin-github';
+  readonly name = 'totalrecall-plugin-github';
   readonly version = '1.0.0';
   readonly description = 'Integrazione GitHub: rileva issue references e commenta a fine sessione';
   readonly minKiroVersion = '2.0.0';
@@ -259,7 +259,7 @@ export class GitHubPlugin implements IPlugin {
   ): string {
     const lines: string[] = [];
 
-    lines.push(`### 🧠 Kiro Memory — Sessione \`${session.id}\``);
+    lines.push(`### 🧠 Total Recall — Sessione \`${session.id}\``);
     lines.push('');
     lines.push(`**Progetto:** ${session.project}`);
     lines.push('');
@@ -288,7 +288,7 @@ export class GitHubPlugin implements IPlugin {
     lines.push(session.summary || '_Nessun riepilogo disponibile_');
     lines.push('');
     lines.push('---');
-    lines.push('_Commento generato automaticamente da [kiro-memory](https://github.com/Auriti-Labs/kiro-memory)_');
+    lines.push('_Commento generato automaticamente da [totalrecall](https://github.com/Auriti-Labs/totalrecall)_');
 
     return lines.join('\n');
   }

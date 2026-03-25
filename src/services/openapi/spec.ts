@@ -1,5 +1,5 @@
 /**
- * Specifica OpenAPI 3.1 per il worker REST di Kiro Memory.
+ * Specifica OpenAPI 3.1 per il worker REST di Total Recall.
  *
  * Documento hand-written che copre TUTTI gli endpoint dei router modulari:
  *   - core.ts         → /health, /events, POST /api/notify
@@ -126,17 +126,17 @@ function errorResponse(description: string) {
 export const openApiSpec = {
   openapi: '3.1.0',
   info: {
-    title: 'Kiro Memory REST API',
+    title: 'Total Recall REST API',
     version: '3.1.1',
     description: [
-      'API REST del worker Kiro Memory (porta 3001).',
+      'API REST del worker Total Recall (porta 3001).',
       'Fornisce accesso a osservazioni, sommari, sessioni, ricerca,',
       'analytics, export, embeddings vettoriali e gestione progetti.'
     ].join(' '),
     license: { name: 'MIT' },
     contact: {
       name: 'Auriti-Labs',
-      url: 'https://github.com/Auriti-Labs/kiro-memory'
+      url: 'https://github.com/Auriti-Labs/totalrecall'
     }
   },
   servers: [

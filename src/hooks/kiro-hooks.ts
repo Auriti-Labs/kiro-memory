@@ -1,11 +1,11 @@
 /**
- * Kiro Memory — Hook system for Kiro CLI integration
+ * Total Recall — Hook system for Kiro CLI integration
  *
  * Kiro uses a different hook format than Claude.
  * Hooks are triggered on file saves, completions, and other events.
  */
 
-import { createKiroMemory } from '../sdk/index.js';
+import { createTotalRecall } from '../sdk/index.js';
 import { logger } from '../utils/logger.js';
 import { getCurrentProjectName } from '../shared/paths.js';
 
@@ -15,7 +15,7 @@ export interface KiroHookContext {
   data?: any;
 }
 
-export interface KiroMemoryHook {
+export interface TotalRecallHook {
   name: string;
   description: string;
   trigger: string;
@@ -25,18 +25,18 @@ export interface KiroMemoryHook {
 /**
  * Auto-context hook - injects relevant context on session start
  */
-export const autoContextHook: KiroMemoryHook = {
-  name: 'kiro-memory-auto-context',
+export const autoContextHook: TotalRecallHook = {
+  name: 'totalrecall-auto-context',
   description: 'Automatically inject relevant context at session start',
   trigger: 'session-start',
   async action(context) {
-    const sdk = createKiroMemory({ project: context.project });
+    const sdk = createTotalRecall({ project: context.project });
 
     try {
       const ctx = await sdk.getContext();
 
       // Generate context summary for Kiro
-      let contextText = `# Kiro Memory: Previous Context\n\n`;
+      let contextText = `# Total Recall: Previous Context\n\n`;
       
       if (ctx.relevantSummaries.length > 0) {
         contextText += `## Recent Learnings\n\n`;
@@ -67,14 +67,14 @@ export const autoContextHook: KiroMemoryHook = {
 /**
  * File change tracker hook - tracks file modifications
  */
-export const fileChangeHook: KiroMemoryHook = {
-  name: 'kiro-memory-file-tracker',
+export const fileChangeHook: TotalRecallHook = {
+  name: 'totalrecall-file-tracker',
   description: 'Track file changes during development',
   trigger: 'file-save',
   async action(context) {
     if (!context.data?.filePath) return;
     
-    const sdk = createKiroMemory({ project: context.project, skipMigrations: true });
+    const sdk = createTotalRecall({ project: context.project, skipMigrations: true });
 
     try {
       await sdk.storeObservation({
@@ -94,14 +94,14 @@ export const fileChangeHook: KiroMemoryHook = {
 /**
  * Session summary hook - stores summary at session end
  */
-export const sessionSummaryHook: KiroMemoryHook = {
-  name: 'kiro-memory-session-summary',
+export const sessionSummaryHook: TotalRecallHook = {
+  name: 'totalrecall-session-summary',
   description: 'Store session summary when session ends',
   trigger: 'session-end',
   async action(context) {
     if (!context.data?.summary) return;
     
-    const sdk = createKiroMemory({ project: context.project, skipMigrations: true });
+    const sdk = createTotalRecall({ project: context.project, skipMigrations: true });
 
     try {
       await sdk.storeSummary({
@@ -116,7 +116,7 @@ export const sessionSummaryHook: KiroMemoryHook = {
 };
 
 // Export all hooks
-export const hooks: KiroMemoryHook[] = [
+export const hooks: TotalRecallHook[] = [
   autoContextHook,
   fileChangeHook,
   sessionSummaryHook

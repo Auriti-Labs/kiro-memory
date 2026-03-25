@@ -2,7 +2,7 @@ import { Database } from '../../db/index.js';
 import type { DBSession } from '../../types/worker-types.js';
 
 /**
- * Session operations for Kiro Memory database
+ * Session operations for Total Recall database
  */
 
 export function createSession(

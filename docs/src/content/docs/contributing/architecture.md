@@ -3,7 +3,7 @@ title: Architecture
 description: System architecture overview — the 5 subsystems, data flow, and how they interact.
 ---
 
-Kiro Memory is a local-first persistent memory system. All data stays on your machine in a single SQLite database. There are no external API calls required for the core functionality.
+Total Recall is a local-first persistent memory system. All data stays on your machine in a single SQLite database. There are no external API calls required for the core functionality.
 
 ## System Overview
 
@@ -89,7 +89,7 @@ The persistence layer. Uses `bun:sqlite` (shimmed to `better-sqlite3` in Node.js
 
 | Module | Purpose |
 |--------|---------|
-| `Database.ts` | `KiroMemoryDatabase` class, migration runner, WAL configuration |
+| `Database.ts` | `TotalRecallDatabase` class, migration runner, WAL configuration |
 | `Observations.ts` | CRUD for observations, deduplication, stale detection |
 | `Sessions.ts` | Session create/complete/query |
 | `Summaries.ts` | Summary CRUD |
@@ -146,15 +146,15 @@ The worker maintains a pool of SSE clients connected to `GET /events`. When hook
 
 A Model Context Protocol server using stdio transport. Spawned as a subprocess by the editor.
 
-The MCP server connects directly to the SQLite database (bypassing the worker) for low-latency reads. It uses the same `KiroMemoryDatabase` and search modules as the SDK.
+The MCP server connects directly to the SQLite database (bypassing the worker) for low-latency reads. It uses the same `TotalRecallDatabase` and search modules as the SDK.
 
-See [MCP Tools Reference](/kiro-memory/reference/mcp-tools) for detailed tool documentation.
+See [MCP Tools Reference](/totalrecall/reference/mcp-tools) for detailed tool documentation.
 
 ## Subsystem 5: SDK
 
 **Location:** `src/sdk/index.ts`
 
-The `KiroMemorySDK` class provides the programmatic API used internally by hooks and exported as `kiro-memory/sdk`.
+The `TotalRecallSDK` class provides the programmatic API used internally by hooks and exported as `totalrecall/sdk`.
 
 The SDK handles:
 - Database connection lifecycle
@@ -163,7 +163,7 @@ The SDK handles:
 - Smart context assembly with 4-signal scoring
 - Knowledge type validation
 
-See [SDK Guide](/kiro-memory/guides/sdk) for full API documentation.
+See [SDK Guide](/totalrecall/guides/sdk) for full API documentation.
 
 ## Data Flow: Observation Lifecycle
 

@@ -1,9 +1,9 @@
 ---
 title: Dashboard
-description: The Kiro Memory web dashboard — real-time memory browser on localhost:3001.
+description: The Total Recall web dashboard — real-time memory browser on localhost:3001.
 ---
 
-The Kiro Memory web dashboard is a React single-page application served by the worker on `http://localhost:3001`. It provides a real-time view of everything your AI assistant has captured.
+The Total Recall web dashboard is a React single-page application served by the worker on `http://localhost:3001`. It provides a real-time view of everything your AI assistant has captured.
 
 ## Accessing the Dashboard
 
@@ -13,10 +13,10 @@ Once the worker is running, open your browser:
 http://localhost:3001
 ```
 
-The worker starts automatically when you open any session with Kiro Memory hooks installed. You can also start it manually:
+The worker starts automatically when you open any session with Total Recall hooks installed. You can also start it manually:
 
 ```bash
-kiro-memory worker:start
+totalrecall worker:start
 ```
 
 ## Features
@@ -98,7 +98,7 @@ Events pushed to the dashboard:
 
 ## Project Aliases
 
-You can rename projects in the dashboard for display purposes. For example, a project detected as `kiro-memory` (from the git directory name) can be displayed as "Kiro Memory v2". Aliases are stored in the `project_aliases` table and persist across sessions.
+You can rename projects in the dashboard for display purposes. For example, a project detected as `totalrecall` (from the git directory name) can be displayed as "Total Recall v2". Aliases are stored in the `project_aliases` table and persist across sessions.
 
 ## Health Check
 
@@ -125,8 +125,8 @@ The dashboard is **local-only by default** — the worker binds to `127.0.0.1`. 
 If you need remote access (not recommended for production), change the bind address:
 
 ```bash
-export KIRO_MEMORY_WORKER_HOST=0.0.0.0
-kiro-memory worker:restart
+export TOTALRECALL_WORKER_HOST=0.0.0.0
+totalrecall worker:restart
 ```
 
 Note: When exposed on the network, consider adding your own reverse proxy with authentication.
@@ -134,12 +134,12 @@ Note: When exposed on the network, consider adding your own reverse proxy with a
 ## Worker Management
 
 ```bash
-kiro-memory worker:start    # Start the background worker
-kiro-memory worker:stop     # Stop the worker
-kiro-memory worker:restart  # Restart the worker
-kiro-memory worker:status   # Check if worker is running
-kiro-memory worker:logs     # Show last 50 log lines
-kiro-memory worker:tail     # Follow logs in real time
+totalrecall worker:start    # Start the background worker
+totalrecall worker:stop     # Stop the worker
+totalrecall worker:restart  # Restart the worker
+totalrecall worker:status   # Check if worker is running
+totalrecall worker:logs     # Show last 50 log lines
+totalrecall worker:tail     # Follow logs in real time
 ```
 
 The worker PID is stored in `~/.contextkit/worker.pid`.

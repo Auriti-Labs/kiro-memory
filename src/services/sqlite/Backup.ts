@@ -1,5 +1,5 @@
 /**
- * Modulo Backup per Kiro Memory.
+ * Modulo Backup per Total Recall.
  *
  * Fornisce funzioni per creare, elencare, ripristinare e ruotare i backup
  * del database SQLite. Utilizza copia diretta del file per compatibilità

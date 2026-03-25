@@ -1,5 +1,5 @@
 /**
- * Client HTTP per il worker Kiro Memory.
+ * Client HTTP per il worker Total Recall.
  *
  * Gestisce tutte le chiamate REST verso il worker Express in esecuzione
  * su porta 3001 (configurabile da impostazioni VS Code).
@@ -78,7 +78,7 @@ export interface ProjectStats {
 
 // ── Classe client ──────────────────────────────────────────────────────────
 
-export class KiroMemoryClient {
+export class TotalRecallClient {
   private baseUrl: string;
   private timeout: number;
   private _isConnected: boolean = false;
@@ -233,13 +233,13 @@ export class KiroMemoryClient {
 // ── Factory da configurazione VS Code ─────────────────────────────────────
 
 /**
- * Crea un'istanza KiroMemoryClient leggendo le impostazioni correnti
+ * Crea un'istanza TotalRecallClient leggendo le impostazioni correnti
  * dalla configurazione VS Code (kiroMemory.workerHost / workerPort).
  */
 export function createClientFromConfig(
   config: ReturnType<typeof vscode.workspace.getConfiguration>
-): KiroMemoryClient {
+): TotalRecallClient {
   const host = config.get<string>('workerHost', '127.0.0.1');
   const port = config.get<number>('workerPort', 3001);
-  return new KiroMemoryClient(host, port);
+  return new TotalRecallClient(host, port);
 }

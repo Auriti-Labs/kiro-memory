@@ -1,9 +1,9 @@
 ---
 title: Claude Code
-description: Set up Kiro Memory with Claude Code for automatic cross-session memory with full hook tracking.
+description: Set up Total Recall with Claude Code for automatic cross-session memory with full hook tracking.
 ---
 
-Claude Code is the **primary supported integration** for Kiro Memory. It provides the most complete experience with automatic observation tracking via hooks -- every file edit, command, and decision is captured without manual intervention.
+Claude Code is the **primary supported integration** for Total Recall. It provides the most complete experience with automatic observation tracking via hooks -- every file edit, command, and decision is captured without manual intervention.
 
 ## Prerequisites
 
@@ -22,8 +22,8 @@ On WSL (Windows Subsystem for Linux), make sure you are using a native Linux Nod
 Install the package globally and run the dedicated installer:
 
 ```bash
-npm install -g kiro-memory
-kiro-memory install --claude-code
+npm install -g totalrecall
+totalrecall install --claude-code
 ```
 
 The installer will:
@@ -43,9 +43,9 @@ If you prefer manual setup or need project-level configuration, create the follo
 ```json
 {
   "mcpServers": {
-    "kiro-memory": {
+    "totalrecall": {
       "command": "npx",
-      "args": ["kiro-memory", "mcp"]
+      "args": ["totalrecall", "mcp"]
     }
   }
 }
@@ -61,7 +61,7 @@ If you prefer manual setup or need project-level configuration, create the follo
       "hooks": [
         {
           "type": "command",
-          "command": "npx kiro-memory hook agentSpawn",
+          "command": "npx totalrecall hook agentSpawn",
           "timeout": 10
         }
       ]
@@ -73,7 +73,7 @@ If you prefer manual setup or need project-level configuration, create the follo
       "hooks": [
         {
           "type": "command",
-          "command": "npx kiro-memory hook userPromptSubmit",
+          "command": "npx totalrecall hook userPromptSubmit",
           "timeout": 5
         }
       ]
@@ -85,7 +85,7 @@ If you prefer manual setup or need project-level configuration, create the follo
       "hooks": [
         {
           "type": "command",
-          "command": "npx kiro-memory hook postToolUse",
+          "command": "npx totalrecall hook postToolUse",
           "timeout": 5
         }
       ]
@@ -97,7 +97,7 @@ If you prefer manual setup or need project-level configuration, create the follo
       "hooks": [
         {
           "type": "command",
-          "command": "npx kiro-memory hook stop",
+          "command": "npx totalrecall hook stop",
           "timeout": 10
         }
       ]
@@ -107,32 +107,32 @@ If you prefer manual setup or need project-level configuration, create the follo
 ```
 
 :::caution
-If you already have other hooks in `settings.json`, merge the Kiro Memory entries into the existing arrays rather than replacing them.
+If you already have other hooks in `settings.json`, merge the Total Recall entries into the existing arrays rather than replacing them.
 :::
 
 ## Verify the connection
 
 1. Start a new Claude Code session in any project directory
 2. The `SessionStart` hook will auto-start the worker service and inject previous context
-3. Ask Claude to use a Kiro Memory tool:
+3. Ask Claude to use a Total Recall tool:
 
 ```
 Search my memory for "authentication"
 ```
 
-You should see Claude call the `kiro-memory/search` tool and return results from your observation database.
+You should see Claude call the `totalrecall/search` tool and return results from your observation database.
 
 You can also check the worker is running:
 
 ```bash
-kiro-memory doctor
+totalrecall doctor
 ```
 
 Or open the web dashboard at [http://localhost:3001](http://localhost:3001).
 
 ## How hooks work
 
-Kiro Memory uses four hooks to automatically track your coding sessions:
+Total Recall uses four hooks to automatically track your coding sessions:
 
 | Hook | Event | What it does |
 |---|---|---|
@@ -145,12 +145,12 @@ Hooks read from stdin and write to stdout. They communicate with the worker serv
 
 ## Using the MCP tools
 
-Once connected, Claude Code can use all 10 Kiro Memory tools. Here are common workflows:
+Once connected, Claude Code can use all 10 Total Recall tools. Here are common workflows:
 
 ### Search for past context
 
 ```
-Search my memory for "database migration" in the kiro-memory project
+Search my memory for "database migration" in the totalrecall project
 ```
 
 This calls `search` with a query and optional project filter.
@@ -158,7 +158,7 @@ This calls `search` with a query and optional project filter.
 ### Get project context at the start of a session
 
 ```
-Get the recent context for my "kiro-memory" project
+Get the recent context for my "totalrecall" project
 ```
 
 This calls `get_context` and returns recent observations, summaries, and prompts.
@@ -182,7 +182,7 @@ This calls `store_knowledge` with `knowledge_type: "decision"` and persists the 
 ### Generate an activity report
 
 ```
-Generate a weekly report for kiro-memory
+Generate a weekly report for totalrecall
 ```
 
 This calls `generate_report` and returns a markdown summary of sessions, learnings, completed tasks, and file hotspots.
@@ -206,11 +206,11 @@ For project-specific MCP configuration, create a `.mcp.json` file in your projec
 ```json
 {
   "mcpServers": {
-    "kiro-memory": {
+    "totalrecall": {
       "command": "npx",
-      "args": ["kiro-memory", "mcp"],
+      "args": ["totalrecall", "mcp"],
       "env": {
-        "KIRO_MEMORY_DATA_DIR": "~/.contextkit"
+        "TOTALRECALL_DATA_DIR": "~/.contextkit"
       }
     }
   }
@@ -224,15 +224,15 @@ This is useful when you want different data directories per project or need to o
 **Worker not reachable:** If tools return "Worker unreachable", start it manually:
 
 ```bash
-kiro-memory worker start
+totalrecall worker start
 ```
 
-**Hooks not firing:** Verify hooks are in `~/.claude/settings.json` and that the paths to the hook scripts are correct. Run `kiro-memory doctor` to check.
+**Hooks not firing:** Verify hooks are in `~/.claude/settings.json` and that the paths to the hook scripts are correct. Run `totalrecall doctor` to check.
 
 **Empty context on session start:** The `agentSpawn` hook only injects context if there are previous observations for the detected project. Try saving something first:
 
 ```bash
-kiro-memory save --project my-project --title "Test" --content "Testing memory"
+totalrecall save --project my-project --title "Test" --content "Testing memory"
 ```
 
-**Permission errors on WSL:** If you see EPERM or EACCES errors, your Node.js or npm may be the Windows version. Run `kiro-memory doctor --fix` for automatic correction.
+**Permission errors on WSL:** If you see EPERM or EACCES errors, your Node.js or npm may be the Windows version. Run `totalrecall doctor --fix` for automatic correction.

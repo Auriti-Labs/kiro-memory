@@ -1,5 +1,5 @@
 /**
- * Kiro Memory — Algoritmo diff basato su LCS (Longest Common Subsequence)
+ * Total Recall — Algoritmo diff basato su LCS (Longest Common Subsequence)
  *
  * Implementazione pura senza dipendenze esterne.
  * Produce un array di DiffChunk compatibile con il componente DiffViewer.

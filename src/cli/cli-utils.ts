@@ -115,7 +115,7 @@ export function generateMarkdownOutput(observations: Observation[]): string {
   if (observations.length === 0) return '# Nessuna observation trovata\n';
 
   const header = [
-    '# Kiro Memory — Export Observations',
+    '# Total Recall — Export Observations',
     '',
     `> Progetto: ${observations[0].project} | Totale: ${observations.length}`,
     '',
@@ -238,7 +238,7 @@ export function parseJsonlFile(content: string): Array<{ line: number; record?: 
 
 /** Percorso di default del file di configurazione */
 export function getConfigPath(): string {
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR
+  const dataDir = process.env.TOTALRECALL_DATA_DIR
     || process.env.CONTEXTKIT_DATA_DIR
     || join(homedir(), '.contextkit');
   return join(dataDir, 'config.json');
@@ -388,7 +388,7 @@ export function getDbFileSize(dbPath: string): number {
 export function formatStatsOutput(stats: StatsResult): string {
   const lines: string[] = [
     '',
-    '=== Kiro Memory — Statistiche Database ===',
+    '=== Total Recall — Statistiche Database ===',
     '',
     `  Observations totali:   ${stats.totalObservations}`,
     `  Sessioni totali:       ${stats.totalSessions}`,
@@ -447,7 +447,7 @@ export function formatImportResult(result: {
   const prefix = result.dryRun ? '[DRY RUN] ' : '';
   const lines: string[] = [
     '',
-    `=== ${prefix}Kiro Memory — Import JSONL ===`,
+    `=== ${prefix}Total Recall — Import JSONL ===`,
     '',
     `  Record totali analizzati: ${result.total}`,
     `  Importati:                ${result.imported}`,

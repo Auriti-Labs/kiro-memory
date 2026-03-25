@@ -1,9 +1,9 @@
 ---
 title: Configuration
-description: All environment variables, config.json settings, and tuning options for Kiro Memory.
+description: All environment variables, config.json settings, and tuning options for Total Recall.
 ---
 
-Kiro Memory is configured through environment variables. There is no required configuration file — sane defaults work out of the box.
+Total Recall is configured through environment variables. There is no required configuration file — sane defaults work out of the box.
 
 ## Environment Variables
 
@@ -11,24 +11,24 @@ Kiro Memory is configured through environment variables. There is no required co
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `KIRO_MEMORY_DATA_DIR` | `~/.contextkit` | Base data directory for the SQLite database, PID file, logs, and token file |
-| `KIRO_MEMORY_WORKER_HOST` | `127.0.0.1` | Address the worker HTTP server binds to. Use `0.0.0.0` to expose on the network (not recommended) |
-| `KIRO_MEMORY_WORKER_PORT` | `3001` | TCP port for the worker HTTP server and web dashboard |
-| `KIRO_MEMORY_LOG_LEVEL` | `INFO` | Log verbosity: `DEBUG`, `INFO`, `WARN`, or `ERROR` |
+| `TOTALRECALL_DATA_DIR` | `~/.contextkit` | Base data directory for the SQLite database, PID file, logs, and token file |
+| `TOTALRECALL_WORKER_HOST` | `127.0.0.1` | Address the worker HTTP server binds to. Use `0.0.0.0` to expose on the network (not recommended) |
+| `TOTALRECALL_WORKER_PORT` | `3001` | TCP port for the worker HTTP server and web dashboard |
+| `TOTALRECALL_LOG_LEVEL` | `INFO` | Log verbosity: `DEBUG`, `INFO`, `WARN`, or `ERROR` |
 
 ### Search and Embeddings
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `KIRO_MEMORY_EMBEDDING_MODEL` | auto-detected | Embedding model to use. When using `@huggingface/transformers`, set to a model ID like `Xenova/all-MiniLM-L6-v2` |
-| `KIRO_MEMORY_CONTEXT_TOKENS` | `2000` | Token budget for context injection in `agentSpawn`. Larger values include more context but use more of the agent's context window |
+| `TOTALRECALL_EMBEDDING_MODEL` | auto-detected | Embedding model to use. When using `@huggingface/transformers`, set to a model ID like `Xenova/all-MiniLM-L6-v2` |
+| `TOTALRECALL_CONTEXT_TOKENS` | `2000` | Token budget for context injection in `agentSpawn`. Larger values include more context but use more of the agent's context window |
 
 ### Legacy / Compatibility
 
 | Variable | Replaces | Notes |
 |----------|---------|-------|
-| `CONTEXTKIT_WORKER_HOST` | `KIRO_MEMORY_WORKER_HOST` | Deprecated — will be removed in v3 |
-| `CONTEXTKIT_WORKER_PORT` | `KIRO_MEMORY_WORKER_PORT` | Deprecated — will be removed in v3 |
+| `CONTEXTKIT_WORKER_HOST` | `TOTALRECALL_WORKER_HOST` | Deprecated — will be removed in v3 |
+| `CONTEXTKIT_WORKER_PORT` | `TOTALRECALL_WORKER_PORT` | Deprecated — will be removed in v3 |
 
 ## Setting Environment Variables
 
@@ -37,24 +37,24 @@ Kiro Memory is configured through environment variables. There is no required co
 Add to your `~/.bashrc`, `~/.zshrc`, or equivalent:
 
 ```bash
-export KIRO_MEMORY_DATA_DIR="$HOME/.contextkit"
-export KIRO_MEMORY_WORKER_PORT="3001"
-export KIRO_MEMORY_LOG_LEVEL="INFO"
-export KIRO_MEMORY_CONTEXT_TOKENS="3000"
+export TOTALRECALL_DATA_DIR="$HOME/.contextkit"
+export TOTALRECALL_WORKER_PORT="3001"
+export TOTALRECALL_LOG_LEVEL="INFO"
+export TOTALRECALL_CONTEXT_TOKENS="3000"
 ```
 
 ### Per-session
 
 ```bash
-KIRO_MEMORY_CONTEXT_TOKENS=5000 kiro-memory worker:start
+TOTALRECALL_CONTEXT_TOKENS=5000 totalrecall worker:start
 ```
 
 ### In a `.env` file (project-level)
 
-Kiro Memory does not automatically read `.env` files, but you can source one before starting the worker:
+Total Recall does not automatically read `.env` files, but you can source one before starting the worker:
 
 ```bash
-source .env && kiro-memory worker:start
+source .env && totalrecall worker:start
 ```
 
 ## Changing the Data Directory
@@ -62,15 +62,15 @@ source .env && kiro-memory worker:start
 By default, all data is stored in `~/.contextkit/`. To change this:
 
 ```bash
-export KIRO_MEMORY_DATA_DIR="/data/my-ai-memory"
-kiro-memory setup
+export TOTALRECALL_DATA_DIR="/data/my-ai-memory"
+totalrecall setup
 ```
 
 The directory will be created automatically if it does not exist.
 
 ## Token Budget
 
-The `KIRO_MEMORY_CONTEXT_TOKENS` variable controls how much context gets injected at session start. The system uses a 4-character-per-token estimate:
+The `TOTALRECALL_CONTEXT_TOKENS` variable controls how much context gets injected at session start. The system uses a 4-character-per-token estimate:
 
 ```
 discoveryTokens = ceil(content.length / 4)
@@ -80,7 +80,7 @@ Items are scored by recency, project relevance, and semantic similarity. The hig
 
 Recommended values:
 
-| Context window | Suggested `KIRO_MEMORY_CONTEXT_TOKENS` |
+| Context window | Suggested `TOTALRECALL_CONTEXT_TOKENS` |
 |---------------|----------------------------------------|
 | 8K tokens | 1000 |
 | 32K tokens | 3000 |
@@ -92,8 +92,8 @@ Recommended values:
 If port 3001 is already in use:
 
 ```bash
-export KIRO_MEMORY_WORKER_PORT=3002
-kiro-memory worker:restart
+export TOTALRECALL_WORKER_PORT=3002
+totalrecall worker:restart
 ```
 
 The dashboard will be available at [http://localhost:3002](http://localhost:3002).
@@ -102,13 +102,13 @@ The dashboard will be available at [http://localhost:3002](http://localhost:3002
 
 ```bash
 # Minimal output (production)
-export KIRO_MEMORY_LOG_LEVEL=WARN
+export TOTALRECALL_LOG_LEVEL=WARN
 
 # Normal output
-export KIRO_MEMORY_LOG_LEVEL=INFO
+export TOTALRECALL_LOG_LEVEL=INFO
 
 # Verbose output (debugging)
-export KIRO_MEMORY_LOG_LEVEL=DEBUG
+export TOTALRECALL_LOG_LEVEL=DEBUG
 ```
 
 Log files are written to `~/.contextkit/logs/worker-YYYY-MM-DD.log`.
@@ -116,8 +116,8 @@ Log files are written to `~/.contextkit/logs/worker-YYYY-MM-DD.log`.
 View logs:
 
 ```bash
-kiro-memory worker:logs   # last 50 lines
-kiro-memory worker:tail   # follow live
+totalrecall worker:logs   # last 50 lines
+totalrecall worker:tail   # follow live
 ```
 
 ## Embedding Models
@@ -130,10 +130,10 @@ When semantic search is enabled, the model is auto-detected based on the install
 To use a different HuggingFace model:
 
 ```bash
-export KIRO_MEMORY_EMBEDDING_MODEL="Xenova/all-mpnet-base-v2"
+export TOTALRECALL_EMBEDDING_MODEL="Xenova/all-mpnet-base-v2"
 ```
 
-Note: changing the model after embeddings have been generated will cause a mismatch — run `kiro-memory backfill-embeddings` to regenerate.
+Note: changing the model after embeddings have been generated will cause a mismatch — run `totalrecall backfill-embeddings` to regenerate.
 
 ## Security Considerations
 

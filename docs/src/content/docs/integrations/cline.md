@@ -1,9 +1,9 @@
 ---
 title: Cline
-description: Set up Kiro Memory with Cline (VS Code extension) for persistent cross-session memory via MCP tools.
+description: Set up Total Recall with Cline (VS Code extension) for persistent cross-session memory via MCP tools.
 ---
 
-[Cline](https://github.com/cline/cline) is an autonomous AI coding agent that runs as a VS Code extension. It supports MCP servers, giving you access to all Kiro Memory tools for searching, saving, and managing cross-session context.
+[Cline](https://github.com/cline/cline) is an autonomous AI coding agent that runs as a VS Code extension. It supports MCP servers, giving you access to all Total Recall tools for searching, saving, and managing cross-session context.
 
 ## Prerequisites
 
@@ -20,8 +20,8 @@ On WSL, use the VS Code Remote - WSL extension and ensure Node.js is installed n
 ### Option 1: Automatic setup (recommended)
 
 ```bash
-npm install -g kiro-memory
-kiro-memory install --cline
+npm install -g totalrecall
+totalrecall install --cline
 ```
 
 The installer will:
@@ -39,14 +39,14 @@ The settings file location depends on your OS:
 
 ### Option 2: Manual configuration
 
-Locate your Cline MCP settings file (see paths above) and add the `kiro-memory` server:
+Locate your Cline MCP settings file (see paths above) and add the `totalrecall` server:
 
 ```json
 {
   "mcpServers": {
-    "kiro-memory": {
+    "totalrecall": {
       "command": "npx",
-      "args": ["kiro-memory", "mcp"]
+      "args": ["totalrecall", "mcp"]
     }
   }
 }
@@ -59,7 +59,7 @@ If the file or directory does not exist, create it. The Cline extension reads th
 For faster startup times, install globally first:
 
 ```bash
-npm install -g kiro-memory
+npm install -g totalrecall
 ```
 
 Then reference the installed binary directly:
@@ -67,8 +67,8 @@ Then reference the installed binary directly:
 ```json
 {
   "mcpServers": {
-    "kiro-memory": {
-      "command": "kiro-memory",
+    "totalrecall": {
+      "command": "totalrecall",
       "args": ["mcp"]
     }
   }
@@ -78,14 +78,14 @@ Then reference the installed binary directly:
 ## Verify the connection
 
 1. Open VS Code and activate the Cline extension
-2. Open the Cline MCP settings panel -- `kiro-memory` should appear as a connected server
+2. Open the Cline MCP settings panel -- `totalrecall` should appear as a connected server
 3. Ask Cline to use a memory tool:
 
 ```
 Search my memory for "refactoring"
 ```
 
-Cline should call the `kiro-memory/search` tool and display results.
+Cline should call the `totalrecall/search` tool and display results.
 
 You can also open [http://localhost:3001](http://localhost:3001) to verify the worker is running.
 
@@ -108,17 +108,17 @@ Store a decision: chose PostgreSQL over SQLite for the production database becau
 3. **Using `.clinerules` for automatic behavior.** Create a `.clinerules` file in your project root:
 
 ```
-At the start of each task, search kiro-memory for relevant past context.
+At the start of each task, search totalrecall for relevant past context.
 After completing a task, save a summary using the save_memory tool.
 When making architectural decisions, store them using store_knowledge.
 Always check for previous decisions before proposing changes.
 ```
 
-This instructs Cline to interact with Kiro Memory tools proactively.
+This instructs Cline to interact with Total Recall tools proactively.
 
 ## Using the MCP tools
 
-All 10 Kiro Memory tools are available to Cline. Here are the most useful patterns:
+All 10 Total Recall tools are available to Cline. Here are the most useful patterns:
 
 ### Search for past work
 
@@ -175,7 +175,7 @@ Use semantic search to find observations about "error handling patterns"
 **Tools return "Worker unreachable":** The worker may not have started. Start it manually:
 
 ```bash
-kiro-memory worker start
+totalrecall worker start
 ```
 
 **Settings file not found:** The Cline extension must be installed and activated at least once before the `globalStorage` directory is created. Open VS Code, activate Cline, then retry the install.
