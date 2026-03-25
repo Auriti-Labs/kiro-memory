@@ -1,14 +1,14 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="Total Recall" width="480" />
+  <img src="assets/banner.svg" alt="Total Recall — Your AI remembers everything" width="520" />
 </p>
 
 <p align="center">
-  <strong>Persistent cross-session memory for AI coding assistants.</strong><br/>
-  <em>Works with <a href="https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview">Claude Code</a>, <a href="https://www.cursor.com/">Cursor</a>, <a href="https://codeium.com/windsurf">Windsurf</a>, <a href="https://github.com/cline/cline">Cline</a>, and any MCP-compatible editor.</em>
+  <strong>Your AI remembers everything.</strong><br/>
+  <em>Persistent cross-session memory for <a href="https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview">Claude Code</a>, <a href="https://www.cursor.com/">Cursor</a>, <a href="https://codeium.com/windsurf">Windsurf</a>, <a href="https://github.com/cline/cline">Cline</a>, and any MCP-compatible editor.</em>
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/totalrecall"><img src="https://img.shields.io/npm/v/totalrecall" alt="npm" /></a>
+  <a href="https://www.npmjs.com/package/totalrecallai"><img src="https://img.shields.io/npm/v/totalrecallai" alt="npm" /></a>
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License" />
   <img src="https://img.shields.io/badge/node-%3E%3D18-green" alt="Node" />
   <a href="https://auritidesign.it/docs/totalrecall/"><img src="https://img.shields.io/badge/docs-auritidesign.it-00b4d8" alt="Docs" /></a>
@@ -74,7 +74,7 @@ When a new session starts, Total Recall automatically injects previous session c
 
 ```bash
 # Install globally
-npm install -g totalrecall
+npm install -g totalrecallai
 
 # Install for your editor
 totalrecall install              # Auto-detects your editor
@@ -99,7 +99,7 @@ Once installed, the worker auto-starts and the web dashboard is available at `ht
 
 ```bash
 # Update to the latest version
-npm update -g totalrecall
+npm update -g totalrecallai
 
 # Verify the installed version
 totalrecall --version
@@ -382,7 +382,7 @@ nvm install 22
 which node  # Should be /home/... or /root/.nvm/...
 
 # Reinstall
-npm install -g totalrecall
+npm install -g totalrecallai
 ```
 
 ### `npm prefix` pointing to Windows (WSL)
@@ -398,7 +398,7 @@ echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 
 # Reinstall
-npm install -g totalrecall
+npm install -g totalrecallai
 ```
 
 ### Missing build tools (Linux/WSL)
@@ -414,7 +414,7 @@ Native modules like `better-sqlite3` need compilation tools.
 
 ```bash
 sudo apt-get update && sudo apt-get install -y build-essential python3
-npm install -g totalrecall --build-from-source
+npm install -g totalrecallai --build-from-source
 ```
 
 ### `no agent with name totalrecall found`
