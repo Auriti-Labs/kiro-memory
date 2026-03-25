@@ -13,7 +13,7 @@
  *     sempre esentate, indipendentemente dalla configurazione.
  */
 
-import { Database } from 'bun:sqlite';
+import { Database } from '../../db/index.js';
 import { KNOWLEDGE_TYPES } from '../../types/worker-types.js';
 
 // ── Tipi pubblici ──────────────────────────────────────────────────────────────

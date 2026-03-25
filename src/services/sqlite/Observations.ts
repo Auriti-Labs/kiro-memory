@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import { Database } from '../../db/index.js';
 import type { Observation } from '../../types/worker-types.js';
 import { redactSecrets } from '../../utils/secrets.js';
 import { categorize } from '../../utils/categorizer.js';

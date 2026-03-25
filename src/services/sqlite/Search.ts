@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import { Database } from '../../db/index.js';
 import { existsSync, statSync } from 'fs';
 import type { Observation, Summary, SearchFilters, TimelineEntry } from '../../types/worker-types.js';
 

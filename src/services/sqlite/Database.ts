@@ -1,4 +1,4 @@
-import { Database } from 'bun:sqlite';
+import { Database } from '../../db/index.js';
 import { DATA_DIR, DB_PATH, ensureDir } from '../../shared/paths.js';
 import { logger } from '../../utils/logger.js';
 
@@ -17,7 +17,7 @@ export interface Migration {
 /**
  * KiroMemoryDatabase - Main entry point for the sqlite module
  *
- * Sets up bun:sqlite with optimized settings and runs all migrations.
+ * Sets up SQLite with optimized settings and runs all migrations.
  *
  * Usage:
  *   const db = new KiroMemoryDatabase();  // uses default DB_PATH
@@ -467,5 +467,5 @@ class MigrationRunner {
   }
 }
 
-// Re-export bun:sqlite Database type
+// Re-export Database type from adapter
 export { Database };

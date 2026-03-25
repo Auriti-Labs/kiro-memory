@@ -1,7 +1,8 @@
 /**
  * Kiro Memory build configuration
  *
- * Usa lo shim bun:sqlite → better-sqlite3 per compatibilità Node.js puro.
+ * Uses better-sqlite3 as the default SQLite provider.
+ * No Bun runtime required — works on any Node.js >= 18.
  */
 
 import * as esbuild from 'esbuild';
@@ -14,30 +15,19 @@ const SRC_DIR = join(ROOT_DIR, 'src');
 const PLUGIN_DIR = join(ROOT_DIR, 'plugin');
 const DIST_DIR = join(PLUGIN_DIR, 'dist');
 
-// Plugin esbuild: sostituisce 'bun:sqlite' con lo shim better-sqlite3
-const bunSqliteShimPlugin = {
-  name: 'bun-sqlite-shim',
-  setup(build) {
-    build.onResolve({ filter: /^bun:sqlite$/ }, () => ({
-      path: join(SRC_DIR, 'shims', 'bun-sqlite.ts'),
-    }));
-  }
-};
-
-// Banner per abilitare require() in contesto ESM (necessario per moduli CJS nativi come better-sqlite3)
+// Banner to enable require() in ESM context (needed for native CJS modules like better-sqlite3)
 const esmRequireBanner = {
   js: `import { createRequire } from 'module';const require = createRequire(import.meta.url);`
 };
 
-// Opzioni comuni per tutti i build Node.js
+// Common options for all Node.js builds
 const nodeCommon = {
   bundle: true,
   platform: 'node',
   target: 'node18',
   format: 'esm',
   banner: esmRequireBanner,
-  plugins: [bunSqliteShimPlugin],
-  // CJS nativi e optional deps, caricati a runtime
+  // Native CJS modules and optional deps, loaded at runtime
   external: ['better-sqlite3', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
 };
 

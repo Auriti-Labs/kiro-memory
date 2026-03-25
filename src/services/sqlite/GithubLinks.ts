@@ -5,7 +5,7 @@
  * (stessa convenzione degli altri moduli sqlite del progetto).
  */
 
-import { Database } from 'bun:sqlite';
+import { Database } from '../../db/index.js';
 
 // ── Tipi ──
 

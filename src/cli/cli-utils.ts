@@ -481,7 +481,7 @@ export function formatImportResult(result: {
  * Verifica se un indice FTS5 è danneggiato eseguendo una query di integrità.
  * Ritorna true se l'indice è integro.
  */
-export function checkFtsIntegrity(db: import('bun:sqlite').Database): boolean {
+export function checkFtsIntegrity(db: import('../db/types.js').Database): boolean {
   try {
     // fts5 integrity check: eseguire insert fittizio su tabella shadow causa errore se corrotta
     db.query("INSERT INTO observations_fts(observations_fts) VALUES('integrity-check')").run();
@@ -495,7 +495,7 @@ export function checkFtsIntegrity(db: import('bun:sqlite').Database): boolean {
  * Ricostruisce l'indice FTS5 per le observations.
  * Ritorna true se l'operazione è riuscita.
  */
-export function rebuildFtsIndex(db: import('bun:sqlite').Database): boolean {
+export function rebuildFtsIndex(db: import('../db/types.js').Database): boolean {
   try {
     db.run("INSERT INTO observations_fts(observations_fts) VALUES('rebuild')");
     return true;
@@ -508,7 +508,7 @@ export function rebuildFtsIndex(db: import('bun:sqlite').Database): boolean {
  * Rimuove gli embeddings orfani (observation_id non più presente).
  * Ritorna il numero di record rimossi.
  */
-export function removeOrphanedEmbeddings(db: import('bun:sqlite').Database): number {
+export function removeOrphanedEmbeddings(db: import('../db/types.js').Database): number {
   try {
     const result = db.run(
       `DELETE FROM observation_embeddings
@@ -524,7 +524,7 @@ export function removeOrphanedEmbeddings(db: import('bun:sqlite').Database): num
  * Esegue VACUUM sul database per recuperare spazio.
  * Ritorna true se l'operazione è riuscita.
  */
-export function vacuumDatabase(db: import('bun:sqlite').Database): boolean {
+export function vacuumDatabase(db: import('../db/types.js').Database): boolean {
   try {
     db.run('VACUUM');
     return true;
