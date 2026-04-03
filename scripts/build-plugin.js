@@ -27,8 +27,8 @@ const nodeCommon = {
   target: 'node18',
   format: 'esm',
   banner: esmRequireBanner,
-  // Native CJS modules and optional deps, loaded at runtime
-  external: ['better-sqlite3', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
+  // Native CJS modules, optional deps, and runtime-specific adapters
+  external: ['better-sqlite3', 'bun:sqlite', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
 };
 
 function ensureDir(dir) {
@@ -65,7 +65,7 @@ async function build() {
     ...nodeCommon,
     entryPoints: [join(SRC_DIR, 'services', 'worker-service.ts')],
     outfile: join(DIST_DIR, 'worker-service.js'),
-    external: ['better-sqlite3', 'express', 'cors', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers'],
+    external: ['better-sqlite3', 'bun:sqlite', 'express', 'cors', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers'],
     minify: true,
     sourcemap: true
   });
@@ -95,7 +95,7 @@ async function build() {
     ...nodeCommon,
     entryPoints: [join(SRC_DIR, 'servers', 'mcp-server.ts')],
     outfile: join(DIST_DIR, 'servers', 'mcp-server.js'),
-    external: ['better-sqlite3', '@modelcontextprotocol/sdk']
+    external: ['better-sqlite3', 'bun:sqlite', '@modelcontextprotocol/sdk']
   });
 
   // Build SQLite services (singoli file)
@@ -128,7 +128,7 @@ async function build() {
       join(SRC_DIR, 'services', 'search', 'ScoringEngine.ts')
     ],
     outdir: join(DIST_DIR, 'services', 'search'),
-    external: ['better-sqlite3', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
+    external: ['better-sqlite3', 'bun:sqlite', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
   });
 
   // Build plugin Slack (notifiche Slack per sessioni)
@@ -184,7 +184,7 @@ async function build() {
     ...nodeCommon,
     entryPoints: [join(SRC_DIR, 'index.ts')],
     outfile: join(DIST_DIR, 'index.js'),
-    external: ['better-sqlite3', 'express', 'cors', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
+    external: ['better-sqlite3', 'bun:sqlite', 'express', 'cors', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
   });
 
   // Build Tailwind CSS (da CDN a build-time)

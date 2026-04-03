@@ -1,12 +1,30 @@
 /**
  * Database adapter for Total Recall
  *
- * Default implementation: better-sqlite3 (works on any Node.js ≥ 18).
- * No Bun runtime required.
+ * Auto-detects runtime:
+ * - Bun → uses bun:sqlite (native, zero dependencies)
+ * - Node.js → uses better-sqlite3
  *
- * Re-exports the Database class and adapter types so the rest of the
- * codebase imports from '@db' (mapped via tsconfig paths) or '../db'.
+ * Re-exports the Database class so the rest of the codebase
+ * imports from '../db' without caring about the runtime.
  */
 
 export type { Database as DatabaseInterface, Statement, RunResult } from './types.js';
-export { Database } from './better-sqlite3-adapter.js';
+
+// Detect Bun runtime at module level
+const isBun = typeof globalThis.Bun !== 'undefined';
+
+// Dynamic re-export based on runtime
+let DatabaseClass: any;
+
+if (isBun) {
+  // bun:sqlite is always available under Bun
+  const mod = await import('./bun-sqlite-adapter.js');
+  DatabaseClass = mod.Database;
+} else {
+  // Node.js: use better-sqlite3
+  const mod = await import('./better-sqlite3-adapter.js');
+  DatabaseClass = mod.Database;
+}
+
+export const Database = DatabaseClass as typeof import('./better-sqlite3-adapter.js').Database;
