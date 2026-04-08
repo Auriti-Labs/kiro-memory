@@ -308,7 +308,7 @@ var Database4 = DatabaseClass;
 // src/shared/paths.ts
 import { join, dirname, basename } from "path";
 import { homedir } from "os";
-import { existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync, statSync } from "fs";
 import { fileURLToPath } from "url";
 function getDirname() {
   if (typeof __dirname !== "undefined") {
@@ -319,7 +319,24 @@ function getDirname() {
 var _dirname = getDirname();
 var _legacyV1Dir = join(homedir(), ".contextkit");
 var _canonicalDir = join(homedir(), ".totalrecall");
+function getFileSize(path) {
+  try {
+    return existsSync(path) ? statSync(path).size : -1;
+  } catch {
+    return -1;
+  }
+}
 function resolveDataDir() {
+  const canonicalDb = join(_canonicalDir, "totalrecall.db");
+  const legacyCanonicalNamedDb = join(_legacyV1Dir, "totalrecall.db");
+  const legacyDb = join(_legacyV1Dir, "contextkit.db");
+  const canonicalSize = getFileSize(canonicalDb);
+  const legacySize = Math.max(getFileSize(legacyCanonicalNamedDb), getFileSize(legacyDb));
+  if (canonicalSize > 0 && legacySize > 0) {
+    return legacySize > canonicalSize ? _legacyV1Dir : _canonicalDir;
+  }
+  if (legacySize > 0) return _legacyV1Dir;
+  if (canonicalSize > 0) return _canonicalDir;
   if (existsSync(_canonicalDir)) return _canonicalDir;
   if (existsSync(_legacyV1Dir)) return _legacyV1Dir;
   return _canonicalDir;
@@ -1668,7 +1685,7 @@ function getReportData(db, project, startEpoch, endEpoch) {
 }
 
 // src/services/sqlite/Search.ts
-import { existsSync as existsSync3, statSync } from "fs";
+import { existsSync as existsSync3, statSync as statSync2 } from "fs";
 var BM25_WEIGHTS = "10.0, 1.0, 5.0, 3.0";
 function escapeLikePattern3(input) {
   return input.replace(/[%_\\]/g, "\\$&");
@@ -1890,7 +1907,7 @@ function getStaleObservations(db, project) {
     for (const filepath of files) {
       try {
         if (!existsSync3(filepath)) continue;
-        const stat = statSync(filepath);
+        const stat = statSync2(filepath);
         if (stat.mtimeMs > obs.created_at_epoch) {
           isStale = true;
           break;
@@ -2618,7 +2635,7 @@ import {
   mkdirSync as mkdirSync3,
   copyFileSync,
   readdirSync,
-  statSync as statSync2,
+  statSync as statSync3,
   unlinkSync,
   readFileSync as readFileSync2,
   writeFileSync
@@ -2657,7 +2674,7 @@ function collectStats(db, dbPath) {
       return 0;
     }
   };
-  const dbSizeBytes = existsSync4(dbPath) ? statSync2(dbPath).size : 0;
+  const dbSizeBytes = existsSync4(dbPath) ? statSync3(dbPath).size : 0;
   return {
     observations: countTable("observations"),
     sessions: countTable("sessions"),

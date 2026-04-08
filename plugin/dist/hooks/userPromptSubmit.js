@@ -751,7 +751,7 @@ __export(Search_exports, {
   searchObservationsLIKE: () => searchObservationsLIKE,
   searchSummariesFiltered: () => searchSummariesFiltered
 });
-import { existsSync as existsSync4, statSync } from "fs";
+import { existsSync as existsSync4, statSync as statSync2 } from "fs";
 function escapeLikePattern3(input) {
   return input.replace(/[%_\\]/g, "\\$&");
 }
@@ -972,7 +972,7 @@ function getStaleObservations(db, project) {
     for (const filepath of files) {
       try {
         if (!existsSync4(filepath)) continue;
-        const stat = statSync(filepath);
+        const stat = statSync2(filepath);
         if (stat.mtimeMs > obs.created_at_epoch) {
           isStale = true;
           break;
@@ -1181,7 +1181,7 @@ var Database4 = DatabaseClass;
 // src/shared/paths.ts
 import { join as join2, dirname, basename } from "path";
 import { homedir } from "os";
-import { existsSync as existsSync2, mkdirSync as mkdirSync2 } from "fs";
+import { existsSync as existsSync2, mkdirSync as mkdirSync2, statSync } from "fs";
 import { fileURLToPath } from "url";
 function getDirname() {
   if (typeof __dirname !== "undefined") {
@@ -1192,7 +1192,24 @@ function getDirname() {
 var _dirname = getDirname();
 var _legacyV1Dir = join2(homedir(), ".contextkit");
 var _canonicalDir = join2(homedir(), ".totalrecall");
+function getFileSize(path) {
+  try {
+    return existsSync2(path) ? statSync(path).size : -1;
+  } catch {
+    return -1;
+  }
+}
 function resolveDataDir() {
+  const canonicalDb = join2(_canonicalDir, "totalrecall.db");
+  const legacyCanonicalNamedDb = join2(_legacyV1Dir, "totalrecall.db");
+  const legacyDb = join2(_legacyV1Dir, "contextkit.db");
+  const canonicalSize = getFileSize(canonicalDb);
+  const legacySize = Math.max(getFileSize(legacyCanonicalNamedDb), getFileSize(legacyDb));
+  if (canonicalSize > 0 && legacySize > 0) {
+    return legacySize > canonicalSize ? _legacyV1Dir : _canonicalDir;
+  }
+  if (legacySize > 0) return _legacyV1Dir;
+  if (canonicalSize > 0) return _canonicalDir;
   if (existsSync2(_canonicalDir)) return _canonicalDir;
   if (existsSync2(_legacyV1Dir)) return _legacyV1Dir;
   return _canonicalDir;

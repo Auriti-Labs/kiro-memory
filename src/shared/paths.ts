@@ -1,6 +1,6 @@
 import { join, dirname, basename } from 'path';
 import { homedir } from 'os';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, statSync } from 'fs';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
@@ -23,11 +23,37 @@ const _dirname = getDirname();
 const _legacyV1Dir = join(homedir(), '.contextkit');
 const _canonicalDir = join(homedir(), '.totalrecall');
 
+function getFileSize(path: string): number {
+  try {
+    return existsSync(path) ? statSync(path).size : -1;
+  } catch {
+    return -1;
+  }
+}
+
 function resolveDataDir(): string {
-  // Prefer canonical name when present
+  const canonicalDb = join(_canonicalDir, 'totalrecall.db');
+  const legacyCanonicalNamedDb = join(_legacyV1Dir, 'totalrecall.db');
+  const legacyDb = join(_legacyV1Dir, 'contextkit.db');
+
+  // If both installs exist, prefer the one whose DB file is larger.
+  // In practice an accidentally initialized canonical DB may only contain
+  // schema + migrations, while all historical data still lives in the legacy
+  // directory. Comparing sizes avoids showing an empty UI after upgrades.
+  const canonicalSize = getFileSize(canonicalDb);
+  const legacySize = Math.max(getFileSize(legacyCanonicalNamedDb), getFileSize(legacyDb));
+
+  if (canonicalSize > 0 && legacySize > 0) {
+    return legacySize > canonicalSize ? _legacyV1Dir : _canonicalDir;
+  }
+
+  if (legacySize > 0) return _legacyV1Dir;
+  if (canonicalSize > 0) return _canonicalDir;
+
+  // Otherwise fall back to whichever directory already exists.
   if (existsSync(_canonicalDir)) return _canonicalDir;
-  // Fall back to legacy installs
   if (existsSync(_legacyV1Dir)) return _legacyV1Dir;
+
   // Default to canonical name for fresh installs
   return _canonicalDir;
 }

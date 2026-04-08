@@ -6,7 +6,7 @@ import {
   mkdirSync as mkdirSync3,
   copyFileSync,
   readdirSync,
-  statSync,
+  statSync as statSync2,
   unlinkSync,
   readFileSync as readFileSync2,
   writeFileSync
@@ -20,7 +20,7 @@ import { join as join2 } from "path";
 // src/shared/paths.ts
 import { join, dirname, basename } from "path";
 import { homedir } from "os";
-import { existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync, statSync } from "fs";
 import { fileURLToPath } from "url";
 function getDirname() {
   if (typeof __dirname !== "undefined") {
@@ -31,7 +31,24 @@ function getDirname() {
 var _dirname = getDirname();
 var _legacyV1Dir = join(homedir(), ".contextkit");
 var _canonicalDir = join(homedir(), ".totalrecall");
+function getFileSize(path) {
+  try {
+    return existsSync(path) ? statSync(path).size : -1;
+  } catch {
+    return -1;
+  }
+}
 function resolveDataDir() {
+  const canonicalDb = join(_canonicalDir, "totalrecall.db");
+  const legacyCanonicalNamedDb = join(_legacyV1Dir, "totalrecall.db");
+  const legacyDb = join(_legacyV1Dir, "contextkit.db");
+  const canonicalSize = getFileSize(canonicalDb);
+  const legacySize = Math.max(getFileSize(legacyCanonicalNamedDb), getFileSize(legacyDb));
+  if (canonicalSize > 0 && legacySize > 0) {
+    return legacySize > canonicalSize ? _legacyV1Dir : _canonicalDir;
+  }
+  if (legacySize > 0) return _legacyV1Dir;
+  if (canonicalSize > 0) return _canonicalDir;
   if (existsSync(_canonicalDir)) return _canonicalDir;
   if (existsSync(_legacyV1Dir)) return _legacyV1Dir;
   return _canonicalDir;
@@ -306,7 +323,7 @@ function collectStats(db, dbPath) {
       return 0;
     }
   };
-  const dbSizeBytes = existsSync3(dbPath) ? statSync(dbPath).size : 0;
+  const dbSizeBytes = existsSync3(dbPath) ? statSync2(dbPath).size : 0;
   return {
     observations: countTable("observations"),
     sessions: countTable("sessions"),

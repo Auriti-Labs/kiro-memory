@@ -22,7 +22,7 @@ __export(Search_exports, {
   searchObservationsLIKE: () => searchObservationsLIKE,
   searchSummariesFiltered: () => searchSummariesFiltered
 });
-import { existsSync as existsSync3, statSync } from "fs";
+import { existsSync as existsSync3, statSync as statSync2 } from "fs";
 function escapeLikePattern(input) {
   return input.replace(/[%_\\]/g, "\\$&");
 }
@@ -243,7 +243,7 @@ function getStaleObservations(db, project) {
     for (const filepath of files) {
       try {
         if (!existsSync3(filepath)) continue;
-        const stat = statSync(filepath);
+        const stat = statSync2(filepath);
         if (stat.mtimeMs > obs.created_at_epoch) {
           isStale = true;
           break;
@@ -720,7 +720,7 @@ import { join as join2 } from "path";
 // src/shared/paths.ts
 import { join, dirname, basename } from "path";
 import { homedir } from "os";
-import { existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync, statSync } from "fs";
 import { fileURLToPath } from "url";
 function getDirname() {
   if (typeof __dirname !== "undefined") {
@@ -731,7 +731,24 @@ function getDirname() {
 var _dirname = getDirname();
 var _legacyV1Dir = join(homedir(), ".contextkit");
 var _canonicalDir = join(homedir(), ".totalrecall");
+function getFileSize(path) {
+  try {
+    return existsSync(path) ? statSync(path).size : -1;
+  } catch {
+    return -1;
+  }
+}
 function resolveDataDir() {
+  const canonicalDb = join(_canonicalDir, "totalrecall.db");
+  const legacyCanonicalNamedDb = join(_legacyV1Dir, "totalrecall.db");
+  const legacyDb = join(_legacyV1Dir, "contextkit.db");
+  const canonicalSize = getFileSize(canonicalDb);
+  const legacySize = Math.max(getFileSize(legacyCanonicalNamedDb), getFileSize(legacyDb));
+  if (canonicalSize > 0 && legacySize > 0) {
+    return legacySize > canonicalSize ? _legacyV1Dir : _canonicalDir;
+  }
+  if (legacySize > 0) return _legacyV1Dir;
+  if (canonicalSize > 0) return _canonicalDir;
   if (existsSync(_canonicalDir)) return _canonicalDir;
   if (existsSync(_legacyV1Dir)) return _legacyV1Dir;
   return _canonicalDir;

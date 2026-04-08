@@ -303,7 +303,7 @@ var init_better_sqlite3_adapter = __esm({
 // src/shared/paths.ts
 import { join, dirname, basename } from "path";
 import { homedir } from "os";
-import { existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync, statSync } from "fs";
 import { fileURLToPath } from "url";
 function getDirname() {
   if (typeof __dirname !== "undefined") {
@@ -311,7 +311,24 @@ function getDirname() {
   }
   return dirname(fileURLToPath(import.meta.url));
 }
+function getFileSize(path) {
+  try {
+    return existsSync(path) ? statSync(path).size : -1;
+  } catch {
+    return -1;
+  }
+}
 function resolveDataDir() {
+  const canonicalDb = join(_canonicalDir, "totalrecall.db");
+  const legacyCanonicalNamedDb = join(_legacyV1Dir, "totalrecall.db");
+  const legacyDb = join(_legacyV1Dir, "contextkit.db");
+  const canonicalSize = getFileSize(canonicalDb);
+  const legacySize = Math.max(getFileSize(legacyCanonicalNamedDb), getFileSize(legacyDb));
+  if (canonicalSize > 0 && legacySize > 0) {
+    return legacySize > canonicalSize ? _legacyV1Dir : _canonicalDir;
+  }
+  if (legacySize > 0) return _legacyV1Dir;
+  if (canonicalSize > 0) return _canonicalDir;
   if (existsSync(_canonicalDir)) return _canonicalDir;
   if (existsSync(_legacyV1Dir)) return _legacyV1Dir;
   return _canonicalDir;
@@ -1024,7 +1041,7 @@ __export(Search_exports, {
   searchObservationsLIKE: () => searchObservationsLIKE,
   searchSummariesFiltered: () => searchSummariesFiltered
 });
-import { existsSync as existsSync3, statSync } from "fs";
+import { existsSync as existsSync3, statSync as statSync2 } from "fs";
 function escapeLikePattern3(input) {
   return input.replace(/[%_\\]/g, "\\$&");
 }
@@ -1245,7 +1262,7 @@ function getStaleObservations(db, project) {
     for (const filepath of files) {
       try {
         if (!existsSync3(filepath)) continue;
-        const stat = statSync(filepath);
+        const stat = statSync2(filepath);
         if (stat.mtimeMs > obs.created_at_epoch) {
           isStale = true;
           break;
@@ -2023,7 +2040,7 @@ __export(cli_utils_exports, {
   validateImportRecord: () => validateImportRecord,
   writeConfig: () => writeConfig
 });
-import { existsSync as existsSync5, statSync as statSync3, readFileSync as readFileSync3, writeFileSync as writeFileSync2, mkdirSync as mkdirSync4 } from "fs";
+import { existsSync as existsSync5, statSync as statSync4, readFileSync as readFileSync3, writeFileSync as writeFileSync2, mkdirSync as mkdirSync4 } from "fs";
 import { join as join4 } from "path";
 function observationToJsonl(obs) {
   return JSON.stringify(obs);
@@ -2188,7 +2205,7 @@ function formatBytes(bytes) {
 function getDbFileSize(dbPath) {
   try {
     if (!existsSync5(dbPath)) return 0;
-    return statSync3(dbPath).size;
+    return statSync4(dbPath).size;
   } catch {
     return 0;
   }
@@ -2973,7 +2990,7 @@ import {
   mkdirSync as mkdirSync3,
   copyFileSync,
   readdirSync,
-  statSync as statSync2,
+  statSync as statSync3,
   unlinkSync,
   readFileSync as readFileSync2,
   writeFileSync
@@ -3012,7 +3029,7 @@ function collectStats(db, dbPath) {
       return 0;
     }
   };
-  const dbSizeBytes = existsSync4(dbPath) ? statSync2(dbPath).size : 0;
+  const dbSizeBytes = existsSync4(dbPath) ? statSync3(dbPath).size : 0;
   return {
     observations: countTable("observations"),
     sessions: countTable("sessions"),
