@@ -16,6 +16,8 @@
  *                       POST /api/retention/cleanup, GET /api/export, GET /api/report
  */
 
+import { TOTALRECALL_VERSION } from '../../shared/version.js';
+
 // ── Componenti riutilizzabili ──
 
 /** Schema di errore standard */
@@ -127,7 +129,7 @@ export const openApiSpec = {
   openapi: '3.1.0',
   info: {
     title: 'Total Recall REST API',
-    version: '3.1.1',
+    version: TOTALRECALL_VERSION,
     description: [
       'API REST del worker Total Recall (porta 3001).',
       'Fornisce accesso a osservazioni, sommari, sessioni, ricerca,',

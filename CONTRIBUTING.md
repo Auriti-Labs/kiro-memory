@@ -1,11 +1,27 @@
-# Contributing to ContextKit
+# Contributing to Total Recall
 
-Thank you for your interest in contributing to ContextKit! This guide will help you get started.
+Thank you for your interest in contributing to Total Recall! This guide will help you get started.
 
 ## Before You Start
 
 - **Open an issue first.** Discuss proposed changes before writing code. This avoids wasted effort on both sides.
 - **One change per PR.** Keep pull requests focused on a single concern.
+
+## Naming & Compatibility
+
+Use these names consistently in new contributions:
+
+- **Product name**: `Total Recall`
+- **Primary CLI**: `totalrecall`
+- **Primary data dir**: `~/.totalrecall`
+- **Canonical repo identity**: `Auriti-Labs/totalrecall`
+
+Legacy identifiers are compatibility-only:
+
+- `kiro-memory` may remain as a legacy CLI alias
+- `~/.contextkit` may still appear only where migration/compatibility is required
+- `contextkit` and `Kiro Memory` should not be introduced in new user-facing text unless explicitly documenting legacy behavior
+- `Kiro CLI` should be treated as one supported integration, not the product identity
 
 ## Development Setup
 
@@ -18,7 +34,7 @@ Thank you for your interest in contributing to ContextKit! This guide will help 
 
 ```bash
 git clone https://github.com/Auriti-Labs/totalrecall.git
-cd contextkit
+cd totalrecall
 npm install
 npm run build
 ```
@@ -101,7 +117,7 @@ Open an issue with:
 - **What happened** (actual behavior)
 - **What you expected** (expected behavior)
 - **How to reproduce** (steps, environment, OS)
-- **Logs** if available (`~/.contextkit/logs/`)
+- **Logs** if available (`~/.totalrecall/logs/`, or `~/.contextkit/logs/` for legacy installs)
 
 ## Security Issues
 

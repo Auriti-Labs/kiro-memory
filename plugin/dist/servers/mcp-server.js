@@ -4052,9 +4052,9 @@ var coerce = {
 var NEVER = INVALID;
 
 // src/servers/mcp-server.ts
-console.log = (...args) => console.error("[kiro-memory-mcp]", ...args);
-var WORKER_HOST = process.env.KIRO_MEMORY_WORKER_HOST || "127.0.0.1";
-var WORKER_PORT = process.env.KIRO_MEMORY_WORKER_PORT || "3001";
+console.log = (...args) => console.error("[totalrecall-mcp]", ...args);
+var WORKER_HOST = process.env.TOTALRECALL_WORKER_HOST || "127.0.0.1";
+var WORKER_PORT = process.env.TOTALRECALL_WORKER_PORT || "3001";
 var WORKER_BASE = `http://${WORKER_HOST}:${WORKER_PORT}`;
 async function callWorkerGET(endpoint, params = {}) {
   const url = new URL(endpoint, WORKER_BASE);
@@ -4082,8 +4082,8 @@ function buildErrorResult(error) {
     return {
       content: [{
         type: "text",
-        text: `Kiro Memory worker non raggiungibile su ${WORKER_BASE}.
-Avvia il worker con: cd <kiro-memory-dir> && npm run worker:start`
+        text: `Total Recall worker non raggiungibile su ${WORKER_BASE}.
+Avvia il worker con: cd <totalrecall-dir> && npm run worker:start`
       }]
     };
   }
@@ -4094,13 +4094,13 @@ Avvia il worker con: cd <kiro-memory-dir> && npm run worker:start`
 }
 async function main() {
   const server = new McpServer({
-    name: "kiro-memory",
+    name: "totalrecall",
     version: "1.0.0"
   });
   server.registerTool(
     "search",
     {
-      description: "Cerca in Kiro Memory. Restituisce osservazioni e sommari che corrispondono alla query. Usa questo tool per trovare contesto dalle sessioni precedenti.",
+      description: "Cerca in Total Recall. Restituisce osservazioni e sommari che corrispondono alla query. Usa questo tool per trovare contesto dalle sessioni precedenti.",
       inputSchema: {
         query: external_exports.string().describe("Testo da cercare in osservazioni e sommari"),
         project: external_exports.string().optional().describe("Filtra per nome progetto (opzionale)"),
@@ -4358,7 +4358,7 @@ async function main() {
 `;
         if (result.percentage < 100 && result.total > 0) {
           output += `
-_Suggerimento: esegui \`kiro-memory embeddings backfill\` per generare gli embedding mancanti._
+_Suggerimento: esegui \`totalrecall embeddings backfill\` per generare gli embedding mancanti._
 `;
         }
         return { content: [{ type: "text", text: output }] };
@@ -4417,7 +4417,7 @@ _Suggerimento: esegui \`kiro-memory embeddings backfill\` per generare gli embed
         if (args.session_id) {
           checkpoint = await callWorkerGET(`/api/sessions/${args.session_id}/checkpoint`);
         } else {
-          const project = args.project || process.env.KIRO_MEMORY_PROJECT || "";
+          const project = args.project || process.env.TOTALRECALL_PROJECT || "";
           if (!project) {
             return {
               content: [{
@@ -4498,7 +4498,7 @@ _Checkpoint creato: ${checkpoint.created_at}_`);
     },
     async (args) => {
       try {
-        const project = args.project || process.env.KIRO_MEMORY_PROJECT || "";
+        const project = args.project || process.env.TOTALRECALL_PROJECT || "";
         const period = args.period === "monthly" ? "monthly" : "weekly";
         const params = { period, format: "markdown" };
         if (project) params.project = project;
@@ -4552,7 +4552,7 @@ _Checkpoint creato: ${checkpoint.created_at}_`);
   );
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.log("Kiro Memory MCP server avviato su stdio (API v2)");
+  console.log("Total Recall MCP server avviato su stdio (API v2)");
 }
 main().catch((err) => {
   console.error("Errore di avvio MCP server:", err);

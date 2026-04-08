@@ -16,6 +16,290 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
+// src/shims/bun-sqlite.ts
+import BetterSqlite3 from "better-sqlite3";
+var Database, BunQueryCompat;
+var init_bun_sqlite = __esm({
+  "src/shims/bun-sqlite.ts"() {
+    Database = class {
+      _db;
+      _stmtCache = /* @__PURE__ */ new Map();
+      constructor(path, options) {
+        this._db = new BetterSqlite3(path, {
+          // better-sqlite3 creates the file by default ('create' not needed)
+          readonly: options?.readwrite === false ? true : false
+        });
+      }
+      /**
+       * Execute a SQL query without results.
+       * PRAGMA statements are handled via better-sqlite3's native pragma() method.
+       */
+      run(sql, params) {
+        const trimmed = sql.trim();
+        if (/^PRAGMA\s+/i.test(trimmed)) {
+          const pragmaBody = trimmed.replace(/^PRAGMA\s+/i, "").replace(/;$/, "");
+          this._db.pragma(pragmaBody);
+          return { lastInsertRowid: 0, changes: 0 };
+        }
+        const stmt = this._db.prepare(sql);
+        const result = params ? stmt.run(...params) : stmt.run();
+        return result;
+      }
+      /**
+       * Prepare a query with bun:sqlite-compatible interface.
+       * Returns a cached prepared statement for repeated queries.
+       */
+      query(sql) {
+        let cached = this._stmtCache.get(sql);
+        if (!cached) {
+          cached = new BunQueryCompat(this._db, sql);
+          this._stmtCache.set(sql, cached);
+        }
+        return cached;
+      }
+      /**
+       * Create a transaction
+       */
+      transaction(fn) {
+        return this._db.transaction(fn);
+      }
+      /**
+       * Close the connection
+       */
+      close() {
+        this._stmtCache.clear();
+        this._db.close();
+      }
+    };
+    BunQueryCompat = class {
+      _stmt;
+      constructor(db, sql) {
+        this._stmt = db.prepare(sql);
+      }
+      /**
+       * Adatta parametri named da formato bun:sqlite a better-sqlite3.
+       * bun:sqlite: chiavi CON prefisso (es. { $todayStart: 123 })
+       * better-sqlite3: chiavi SENZA prefisso (es. { todayStart: 123 })
+       */
+      _adaptParams(params) {
+        if (params.length !== 1 || typeof params[0] !== "object" || params[0] === null || Array.isArray(params[0])) {
+          return params;
+        }
+        const obj = params[0];
+        const keys = Object.keys(obj);
+        if (keys.length === 0) return params;
+        if (!keys[0].startsWith("$") && !keys[0].startsWith("@") && !keys[0].startsWith(":")) {
+          return params;
+        }
+        const adapted = {};
+        for (const key of keys) {
+          adapted[key.slice(1)] = obj[key];
+        }
+        return [adapted];
+      }
+      /**
+       * Returns all rows
+       */
+      all(...params) {
+        if (params.length === 0) return this._stmt.all();
+        return this._stmt.all(...this._adaptParams(params));
+      }
+      /**
+       * Returns the first row or null
+       */
+      get(...params) {
+        if (params.length === 0) return this._stmt.get();
+        return this._stmt.get(...this._adaptParams(params));
+      }
+      /**
+       * Execute without results
+       */
+      run(...params) {
+        if (params.length === 0) return this._stmt.run();
+        return this._stmt.run(...this._adaptParams(params));
+      }
+    };
+  }
+});
+
+// src/db/bun-sqlite-adapter.ts
+var bun_sqlite_adapter_exports = {};
+__export(bun_sqlite_adapter_exports, {
+  Database: () => Database2
+});
+var Database2;
+var init_bun_sqlite_adapter = __esm({
+  "src/db/bun-sqlite-adapter.ts"() {
+    "use strict";
+    init_bun_sqlite();
+    Database2 = class {
+      _db;
+      constructor(path, _options) {
+        this._db = new Database(path, { create: true, readwrite: true });
+      }
+      /**
+       * Execute a SQL query without results.
+       */
+      run(sql, params) {
+        const stmt = this._db.query(sql);
+        const result = params ? stmt.run(...params) : stmt.run();
+        return {
+          lastInsertRowid: result?.lastInsertRowid ?? 0,
+          changes: result?.changes ?? 0
+        };
+      }
+      /**
+       * Prepare a query and return a statement wrapper.
+       */
+      query(sql) {
+        const stmt = this._db.query(sql);
+        return {
+          all(...params) {
+            if (params.length === 0) return stmt.all();
+            return stmt.all(...params);
+          },
+          get(...params) {
+            if (params.length === 0) return stmt.get();
+            return stmt.get(...params);
+          },
+          run(...params) {
+            if (params.length === 0) {
+              const r2 = stmt.run();
+              return { lastInsertRowid: r2?.lastInsertRowid ?? 0, changes: r2?.changes ?? 0 };
+            }
+            const r = stmt.run(...params);
+            return { lastInsertRowid: r?.lastInsertRowid ?? 0, changes: r?.changes ?? 0 };
+          }
+        };
+      }
+      /**
+       * Create a transaction
+       */
+      transaction(fn) {
+        return this._db.transaction(fn);
+      }
+      /**
+       * Close the connection
+       */
+      close() {
+        this._db.close();
+      }
+    };
+  }
+});
+
+// src/db/better-sqlite3-adapter.ts
+var better_sqlite3_adapter_exports = {};
+__export(better_sqlite3_adapter_exports, {
+  Database: () => Database3
+});
+import BetterSqlite32 from "better-sqlite3";
+var Database3, PreparedStatement;
+var init_better_sqlite3_adapter = __esm({
+  "src/db/better-sqlite3-adapter.ts"() {
+    "use strict";
+    Database3 = class {
+      _db;
+      _stmtCache = /* @__PURE__ */ new Map();
+      constructor(path, options) {
+        this._db = new BetterSqlite32(path, {
+          // better-sqlite3 creates the file by default ('create' not needed)
+          readonly: options?.readwrite === false ? true : false
+        });
+      }
+      /**
+       * Execute a SQL query without results.
+       * PRAGMA statements are handled via better-sqlite3's native pragma() method.
+       */
+      run(sql, params) {
+        const trimmed = sql.trim();
+        if (/^PRAGMA\s+/i.test(trimmed)) {
+          const pragmaBody = trimmed.replace(/^PRAGMA\s+/i, "").replace(/;$/, "");
+          this._db.pragma(pragmaBody);
+          return { lastInsertRowid: 0, changes: 0 };
+        }
+        const stmt = this._db.prepare(sql);
+        const result = params ? stmt.run(...params) : stmt.run();
+        return result;
+      }
+      /**
+       * Prepare a query and return a cached prepared statement.
+       * Returns a cached prepared statement for repeated queries.
+       */
+      query(sql) {
+        let cached = this._stmtCache.get(sql);
+        if (!cached) {
+          cached = new PreparedStatement(this._db, sql);
+          this._stmtCache.set(sql, cached);
+        }
+        return cached;
+      }
+      /**
+       * Create a transaction
+       */
+      transaction(fn) {
+        return this._db.transaction(fn);
+      }
+      /**
+       * Close the connection
+       */
+      close() {
+        this._stmtCache.clear();
+        this._db.close();
+      }
+    };
+    PreparedStatement = class {
+      _stmt;
+      constructor(db, sql) {
+        this._stmt = db.prepare(sql);
+      }
+      /**
+       * Adapt named parameters from $-prefixed format to plain keys.
+       * Input:  { $todayStart: 123 }
+       * Output: { todayStart: 123 }
+       * (better-sqlite3 expects keys without the $ prefix)
+       */
+      _adaptParams(params) {
+        if (params.length !== 1 || typeof params[0] !== "object" || params[0] === null || Array.isArray(params[0])) {
+          return params;
+        }
+        const obj = params[0];
+        const keys = Object.keys(obj);
+        if (keys.length === 0) return params;
+        if (!keys[0].startsWith("$") && !keys[0].startsWith("@") && !keys[0].startsWith(":")) {
+          return params;
+        }
+        const adapted = {};
+        for (const key of keys) {
+          adapted[key.slice(1)] = obj[key];
+        }
+        return [adapted];
+      }
+      /**
+       * Returns all rows
+       */
+      all(...params) {
+        if (params.length === 0) return this._stmt.all();
+        return this._stmt.all(...this._adaptParams(params));
+      }
+      /**
+       * Returns the first row or null
+       */
+      get(...params) {
+        if (params.length === 0) return this._stmt.get();
+        return this._stmt.get(...this._adaptParams(params));
+      }
+      /**
+       * Execute without results
+       */
+      run(...params) {
+        if (params.length === 0) return this._stmt.run();
+        return this._stmt.run(...this._adaptParams(params));
+      }
+    };
+  }
+});
+
 // src/utils/secrets.ts
 function redactSecrets(text) {
   if (!text) return text;
@@ -775,12 +1059,12 @@ function estimateTokens(text) {
 }
 
 // src/hooks/utils.ts
-var DATA_DIR = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(process.env.HOME || "/tmp", ".kiro-memory");
+var DATA_DIR = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(process.env.HOME || "/tmp", ".totalrecall");
 var TOKEN_FILE = join(DATA_DIR, "worker.token");
 function debugLog(hookName, label, data) {
-  if ((process.env.KIRO_MEMORY_LOG_LEVEL || "").toUpperCase() !== "DEBUG") return;
+  if ((process.env.TOTALRECALL_LOG_LEVEL || "").toUpperCase() !== "DEBUG") return;
   try {
-    const dataDir = process.env.KIRO_MEMORY_DATA_DIR || join(process.env.HOME || "/tmp", ".kiro-memory");
+    const dataDir = process.env.TOTALRECALL_DATA_DIR || join(process.env.HOME || "/tmp", ".totalrecall");
     const logDir = join(dataDir, "logs");
     if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true });
     const ts = (/* @__PURE__ */ new Date()).toISOString();
@@ -841,10 +1125,10 @@ function detectProject(cwd) {
   }
 }
 function formatSmartContext(data) {
-  const budget = data.tokenBudget || parseInt(process.env.KIRO_MEMORY_CONTEXT_TOKENS || "0", 10) || 2e3;
+  const budget = data.tokenBudget || parseInt(process.env.TOTALRECALL_CONTEXT_TOKENS || "0", 10) || 2e3;
   let output = "";
   let tokensUsed = 0;
-  const header = "# Kiro Memory: Previous Sessions Context\n\n";
+  const header = "# Total Recall: Previous Sessions Context\n\n";
   tokensUsed += estimateTokens(header);
   output += header;
   if (data.summaries && data.summaries.length > 0) {
@@ -901,123 +1185,72 @@ async function runHook(name, handler) {
     process.exit(0);
   } catch (error) {
     debugLog(name, "error", { error: String(error) });
-    process.stderr.write(`[kiro-memory:${name}] Error: ${error}
+    process.stderr.write(`[totalrecall:${name}] Error: ${error}
 `);
     process.exit(0);
   }
 }
 
-// src/shims/bun-sqlite.ts
-import BetterSqlite3 from "better-sqlite3";
-var Database = class {
-  _db;
-  _stmtCache = /* @__PURE__ */ new Map();
-  constructor(path, options) {
-    this._db = new BetterSqlite3(path, {
-      // better-sqlite3 creates the file by default ('create' not needed)
-      readonly: options?.readwrite === false ? true : false
-    });
-  }
-  /**
-   * Execute a SQL query without results.
-   * PRAGMA statements are handled via better-sqlite3's native pragma() method.
-   */
-  run(sql, params) {
-    const trimmed = sql.trim();
-    if (/^PRAGMA\s+/i.test(trimmed)) {
-      const pragmaBody = trimmed.replace(/^PRAGMA\s+/i, "").replace(/;$/, "");
-      this._db.pragma(pragmaBody);
-      return { lastInsertRowid: 0, changes: 0 };
-    }
-    const stmt = this._db.prepare(sql);
-    const result = params ? stmt.run(...params) : stmt.run();
-    return result;
-  }
-  /**
-   * Prepare a query with bun:sqlite-compatible interface.
-   * Returns a cached prepared statement for repeated queries.
-   */
-  query(sql) {
-    let cached = this._stmtCache.get(sql);
-    if (!cached) {
-      cached = new BunQueryCompat(this._db, sql);
-      this._stmtCache.set(sql, cached);
-    }
-    return cached;
-  }
-  /**
-   * Create a transaction
-   */
-  transaction(fn) {
-    return this._db.transaction(fn);
-  }
-  /**
-   * Close the connection
-   */
-  close() {
-    this._stmtCache.clear();
-    this._db.close();
-  }
-};
-var BunQueryCompat = class {
-  _stmt;
-  constructor(db, sql) {
-    this._stmt = db.prepare(sql);
-  }
-  /**
-   * Adatta parametri named da formato bun:sqlite a better-sqlite3.
-   * bun:sqlite: chiavi CON prefisso (es. { $todayStart: 123 })
-   * better-sqlite3: chiavi SENZA prefisso (es. { todayStart: 123 })
-   */
-  _adaptParams(params) {
-    if (params.length !== 1 || typeof params[0] !== "object" || params[0] === null || Array.isArray(params[0])) {
-      return params;
-    }
-    const obj = params[0];
-    const keys = Object.keys(obj);
-    if (keys.length === 0) return params;
-    if (!keys[0].startsWith("$") && !keys[0].startsWith("@") && !keys[0].startsWith(":")) {
-      return params;
-    }
-    const adapted = {};
-    for (const key of keys) {
-      adapted[key.slice(1)] = obj[key];
-    }
-    return [adapted];
-  }
-  /**
-   * Returns all rows
-   */
-  all(...params) {
-    if (params.length === 0) return this._stmt.all();
-    return this._stmt.all(...this._adaptParams(params));
-  }
-  /**
-   * Returns the first row or null
-   */
-  get(...params) {
-    if (params.length === 0) return this._stmt.get();
-    return this._stmt.get(...this._adaptParams(params));
-  }
-  /**
-   * Execute without results
-   */
-  run(...params) {
-    if (params.length === 0) return this._stmt.run();
-    return this._stmt.run(...this._adaptParams(params));
-  }
-};
+// src/db/index.ts
+var isBun = "Bun" in globalThis;
+var DatabaseClass;
+if (isBun) {
+  const mod = await Promise.resolve().then(() => (init_bun_sqlite_adapter(), bun_sqlite_adapter_exports));
+  DatabaseClass = mod.Database;
+} else {
+  const mod = await Promise.resolve().then(() => (init_better_sqlite3_adapter(), better_sqlite3_adapter_exports));
+  DatabaseClass = mod.Database;
+}
+var Database4 = DatabaseClass;
 
 // src/shared/paths.ts
-import { join as join3, dirname, basename } from "path";
-import { homedir as homedir2 } from "os";
-import { existsSync as existsSync3, mkdirSync as mkdirSync3 } from "fs";
+import { join as join2, dirname, basename } from "path";
+import { homedir } from "os";
+import { existsSync as existsSync2, mkdirSync as mkdirSync2 } from "fs";
 import { fileURLToPath } from "url";
+function getDirname() {
+  if (typeof __dirname !== "undefined") {
+    return __dirname;
+  }
+  return dirname(fileURLToPath(import.meta.url));
+}
+var _dirname = getDirname();
+var _legacyV1Dir = join2(homedir(), ".contextkit");
+var _canonicalDir = join2(homedir(), ".totalrecall");
+function resolveDataDir() {
+  if (existsSync2(_canonicalDir)) return _canonicalDir;
+  if (existsSync2(_legacyV1Dir)) return _legacyV1Dir;
+  return _canonicalDir;
+}
+var DATA_DIR2 = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || resolveDataDir();
+var KIRO_CONFIG_DIR = process.env.KIRO_CONFIG_DIR || join2(homedir(), ".kiro");
+var PLUGIN_ROOT = join2(KIRO_CONFIG_DIR, "plugins", "totalrecall");
+var ARCHIVES_DIR = join2(DATA_DIR2, "archives");
+var LOGS_DIR = join2(DATA_DIR2, "logs");
+var TRASH_DIR = join2(DATA_DIR2, "trash");
+var BACKUPS_DIR = join2(DATA_DIR2, "backups");
+var MODES_DIR = join2(DATA_DIR2, "modes");
+var USER_SETTINGS_PATH = join2(DATA_DIR2, "settings.json");
+var _legacyDbV1 = join2(DATA_DIR2, "contextkit.db");
+var _legacyDbV3 = join2(DATA_DIR2, "totalrecall.db");
+function resolveDbPath() {
+  if (existsSync2(join2(DATA_DIR2, "totalrecall.db"))) return join2(DATA_DIR2, "totalrecall.db");
+  if (existsSync2(_legacyDbV3)) return _legacyDbV3;
+  if (existsSync2(_legacyDbV1)) return _legacyDbV1;
+  return join2(DATA_DIR2, "totalrecall.db");
+}
+var DB_PATH = resolveDbPath();
+var VECTOR_DB_DIR = join2(DATA_DIR2, "vector-db");
+var OBSERVER_SESSIONS_DIR = join2(DATA_DIR2, "observer-sessions");
+var KIRO_SETTINGS_PATH = join2(KIRO_CONFIG_DIR, "settings.json");
+var KIRO_CONTEXT_PATH = join2(KIRO_CONFIG_DIR, "context.md");
+function ensureDir(dirPath) {
+  mkdirSync2(dirPath, { recursive: true });
+}
 
 // src/utils/logger.ts
-import { appendFileSync, existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync2 } from "fs";
-import { join as join2 } from "path";
-import { homedir } from "os";
+import { appendFileSync, existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync2 } from "fs";
+import { join as join3 } from "path";
 var LogLevel = /* @__PURE__ */ ((LogLevel2) => {
   LogLevel2[LogLevel2["DEBUG"] = 0] = "DEBUG";
   LogLevel2[LogLevel2["INFO"] = 1] = "INFO";
@@ -1026,7 +1259,6 @@ var LogLevel = /* @__PURE__ */ ((LogLevel2) => {
   LogLevel2[LogLevel2["SILENT"] = 4] = "SILENT";
   return LogLevel2;
 })(LogLevel || {});
-var DEFAULT_DATA_DIR = join2(homedir(), ".contextkit");
 var Logger = class {
   level = null;
   useColor;
@@ -1042,12 +1274,11 @@ var Logger = class {
     if (this.logFileInitialized) return;
     this.logFileInitialized = true;
     try {
-      const logsDir = join2(DEFAULT_DATA_DIR, "logs");
-      if (!existsSync2(logsDir)) {
-        mkdirSync2(logsDir, { recursive: true });
+      if (!existsSync3(LOGS_DIR)) {
+        mkdirSync3(LOGS_DIR, { recursive: true });
       }
       const date = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-      this.logFilePath = join2(logsDir, `kiro-memory-${date}.log`);
+      this.logFilePath = join3(LOGS_DIR, `totalrecall-${date}.log`);
     } catch (error) {
       console.error("[LOGGER] Failed to initialize log file:", error);
       this.logFilePath = null;
@@ -1059,11 +1290,10 @@ var Logger = class {
   getLevel() {
     if (this.level === null) {
       try {
-        const settingsPath = join2(DEFAULT_DATA_DIR, "settings.json");
-        if (existsSync2(settingsPath)) {
-          const settingsData = readFileSync2(settingsPath, "utf-8");
+        if (existsSync3(USER_SETTINGS_PATH)) {
+          const settingsData = readFileSync2(USER_SETTINGS_PATH, "utf-8");
           const settings = JSON.parse(settingsData);
-          const envLevel = (settings.KIRO_MEMORY_LOG_LEVEL || settings.CONTEXTKIT_LOG_LEVEL || "INFO").toUpperCase();
+          const envLevel = (settings.TOTALRECALL_LOG_LEVEL || settings.CONTEXTKIT_LOG_LEVEL || "INFO").toUpperCase();
           this.level = LogLevel[envLevel] ?? 1 /* INFO */;
         } else {
           this.level = 1 /* INFO */;
@@ -1233,39 +1463,10 @@ ${data.stack}` : ` ${data.message}`;
 };
 var logger = new Logger();
 
-// src/shared/paths.ts
-function getDirname() {
-  if (typeof __dirname !== "undefined") {
-    return __dirname;
-  }
-  return dirname(fileURLToPath(import.meta.url));
-}
-var _dirname = getDirname();
-var _legacyDir = join3(homedir2(), ".contextkit");
-var _defaultDir = existsSync3(_legacyDir) ? _legacyDir : join3(homedir2(), ".kiro-memory");
-var DATA_DIR2 = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || _defaultDir;
-var KIRO_CONFIG_DIR = process.env.KIRO_CONFIG_DIR || join3(homedir2(), ".kiro");
-var PLUGIN_ROOT = join3(KIRO_CONFIG_DIR, "plugins", "kiro-memory");
-var ARCHIVES_DIR = join3(DATA_DIR2, "archives");
-var LOGS_DIR = join3(DATA_DIR2, "logs");
-var TRASH_DIR = join3(DATA_DIR2, "trash");
-var BACKUPS_DIR = join3(DATA_DIR2, "backups");
-var MODES_DIR = join3(DATA_DIR2, "modes");
-var USER_SETTINGS_PATH = join3(DATA_DIR2, "settings.json");
-var _legacyDb = join3(DATA_DIR2, "contextkit.db");
-var DB_PATH = existsSync3(_legacyDb) ? _legacyDb : join3(DATA_DIR2, "kiro-memory.db");
-var VECTOR_DB_DIR = join3(DATA_DIR2, "vector-db");
-var OBSERVER_SESSIONS_DIR = join3(DATA_DIR2, "observer-sessions");
-var KIRO_SETTINGS_PATH = join3(KIRO_CONFIG_DIR, "settings.json");
-var KIRO_CONTEXT_PATH = join3(KIRO_CONFIG_DIR, "context.md");
-function ensureDir(dirPath) {
-  mkdirSync3(dirPath, { recursive: true });
-}
-
 // src/services/sqlite/Database.ts
 var SQLITE_MMAP_SIZE_BYTES = 256 * 1024 * 1024;
 var SQLITE_CACHE_SIZE_PAGES = 1e4;
-var KiroMemoryDatabase = class {
+var TotalRecallDatabase = class {
   _db;
   /**
    * Readonly accessor for the underlying Database instance.
@@ -1282,7 +1483,7 @@ var KiroMemoryDatabase = class {
     if (dbPath !== ":memory:") {
       ensureDir(DATA_DIR2);
     }
-    this._db = new Database(dbPath, { create: true, readwrite: true });
+    this._db = new Database4(dbPath, { create: true, readwrite: true });
     this._db.run("PRAGMA journal_mode = WAL");
     this._db.run("PRAGMA busy_timeout = 5000");
     this._db.run("PRAGMA synchronous = NORMAL");
@@ -1933,12 +2134,12 @@ var EmbeddingService = class {
   config;
   configName;
   constructor() {
-    const envModel = process.env.KIRO_MEMORY_EMBEDDING_MODEL || "all-MiniLM-L6-v2";
+    const envModel = process.env.TOTALRECALL_EMBEDDING_MODEL || "all-MiniLM-L6-v2";
     this.configName = envModel;
     if (MODEL_CONFIGS[envModel]) {
       this.config = MODEL_CONFIGS[envModel];
     } else if (envModel.includes("/")) {
-      const dimensions = parseInt(process.env.KIRO_MEMORY_EMBEDDING_DIMENSIONS || "384", 10);
+      const dimensions = parseInt(process.env.TOTALRECALL_EMBEDDING_DIMENSIONS || "384", 10);
       this.config = {
         modelId: envModel,
         dimensions: isNaN(dimensions) ? 384 : dimensions
@@ -2462,11 +2663,11 @@ function getHybridSearch() {
 }
 
 // src/sdk/index.ts
-var KiroMemorySDK = class {
+var TotalRecallSDK = class {
   db;
   project;
   constructor(config = {}) {
-    this.db = new KiroMemoryDatabase(config.dataDir, config.skipMigrations || false);
+    this.db = new TotalRecallDatabase(config.dataDir, config.skipMigrations || false);
     this.project = config.project || this.detectProject();
   }
   detectProject() {
@@ -2860,7 +3061,7 @@ var KiroMemorySDK = class {
    * If no query: ranking by recency + project match (CONTEXT_WEIGHTS).
    */
   async getSmartContext(options = {}) {
-    const tokenBudget = options.tokenBudget || parseInt(process.env.KIRO_MEMORY_CONTEXT_TOKENS || "0", 10) || 2e3;
+    const tokenBudget = options.tokenBudget || parseInt(process.env.TOTALRECALL_CONTEXT_TOKENS || "0", 10) || 2e3;
     const summaries = getSummariesByProject(this.db.db, this.project, 5);
     let items;
     if (options.query) {
@@ -3090,8 +3291,8 @@ var KiroMemorySDK = class {
     this.db.close();
   }
 };
-function createKiroMemory(config) {
-  return new KiroMemorySDK(config);
+function createTotalRecall(config) {
+  return new TotalRecallSDK(config);
 }
 
 // src/hooks/agentSpawn.ts
@@ -3101,8 +3302,8 @@ import { fileURLToPath as fileURLToPath2 } from "url";
 var __filename_hook = fileURLToPath2(import.meta.url);
 var __dirname_hook = dirname2(__filename_hook);
 async function ensureWorkerRunning() {
-  const host = process.env.KIRO_MEMORY_WORKER_HOST || "127.0.0.1";
-  const port = process.env.KIRO_MEMORY_WORKER_PORT || "3001";
+  const host = process.env.TOTALRECALL_WORKER_HOST || "127.0.0.1";
+  const port = process.env.TOTALRECALL_WORKER_PORT || "3001";
   const healthUrl = `http://${host}:${port}/health`;
   try {
     const controller = new AbortController();
@@ -3135,7 +3336,7 @@ runHook("agentSpawn", async (input) => {
   await ensureWorkerRunning().catch(() => {
   });
   const project = detectProject(input.cwd);
-  const sdk = createKiroMemory({ project });
+  const sdk = createTotalRecall({ project });
   try {
     const smartCtx = await sdk.getSmartContext();
     if (smartCtx.items.length === 0 && smartCtx.summaries.length === 0) {
@@ -3146,7 +3347,7 @@ runHook("agentSpawn", async (input) => {
       summaries: smartCtx.summaries,
       project
     });
-    output += `> UI available at http://127.0.0.1:${process.env.KIRO_MEMORY_WORKER_PORT || "3001"}
+    output += `> UI available at http://127.0.0.1:${process.env.TOTALRECALL_WORKER_PORT || "3001"}
 `;
     process.stdout.write(output);
   } finally {

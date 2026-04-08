@@ -1,4 +1,5 @@
 import { Database } from '../../db/index.js';
+import type { DatabaseInterface } from '../../db/index.js';
 import { DATA_DIR, DB_PATH, ensureDir } from '../../shared/paths.js';
 import { logger } from '../../utils/logger.js';
 
@@ -8,8 +9,8 @@ const SQLITE_CACHE_SIZE_PAGES = 10_000;
 
 export interface Migration {
   version: number;
-  up: (db: Database) => void;
-  down?: (db: Database) => void;
+  up: (db: DatabaseInterface) => void;
+  down?: (db: DatabaseInterface) => void;
 }
 
 
@@ -25,13 +26,13 @@ export interface Migration {
  *   const db = new TotalRecallDatabase(':memory:');  // for tests
  */
 export class TotalRecallDatabase {
-  private _db: Database;
+  private _db: DatabaseInterface;
 
   /**
    * Readonly accessor for the underlying Database instance.
    * Prefer using query() and run() proxy methods directly.
    */
-  get db(): Database {
+  get db(): DatabaseInterface {
     return this._db;
   }
 
@@ -84,7 +85,7 @@ export class TotalRecallDatabase {
    * Executes a function within an atomic transaction.
    * If fn() throws an error, the transaction is automatically rolled back.
    */
-  withTransaction<T>(fn: (db: Database) => T): T {
+  withTransaction<T>(fn: (db: DatabaseInterface) => T): T {
     const transaction = this._db.transaction(fn);
     return transaction(this._db);
   }
@@ -101,9 +102,9 @@ export class TotalRecallDatabase {
  * Migration runner for Total Recall
  */
 class MigrationRunner {
-  private db: Database;
+  private db: DatabaseInterface;
 
-  constructor(db: Database) {
+  constructor(db: DatabaseInterface) {
     this.db = db;
   }
 

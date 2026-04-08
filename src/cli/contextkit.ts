@@ -23,9 +23,9 @@ import {
 import { TotalRecallDatabase } from '../services/sqlite/Database.js';
 import { getObservationsByProject } from '../services/sqlite/Observations.js';
 import { createBackup, listBackups, restoreBackup, rotateBackups } from '../services/sqlite/Backup.js';
-import { DB_PATH, BACKUPS_DIR } from '../shared/paths.js';
+import { DB_PATH, BACKUPS_DIR, DATA_DIR, KIRO_CONFIG_DIR } from '../shared/paths.js';
 import { execSync } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir, platform, release } from 'os';
 import { fileURLToPath } from 'url';
@@ -506,11 +506,11 @@ async function installKiro() {
   const distDir = DIST_DIR;
 
   // Destination directories
-  const kiroDir = process.env.KIRO_CONFIG_DIR || join(homedir(), '.kiro');
+  const kiroDir = KIRO_CONFIG_DIR;
   const agentsDir = join(kiroDir, 'agents');
   const settingsDir = join(kiroDir, 'settings');
   const steeringDir = join(kiroDir, 'steering');
-  const dataDir = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.contextkit');
+  const dataDir = DATA_DIR;
 
   console.log('[2/4] Installing Kiro configuration...\n');
 
@@ -679,7 +679,7 @@ async function installClaudeCode() {
 
   const distDir = DIST_DIR;
   const claudeDir = join(homedir(), '.claude');
-  const dataDir = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.totalrecall');
+  const dataDir = DATA_DIR;
 
   console.log('[2/3] Installing Claude Code configuration...\n');
 
@@ -824,7 +824,7 @@ async function installCursor() {
 
   const distDir = DIST_DIR;
   const cursorDir = join(homedir(), '.cursor');
-  const dataDir = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.totalrecall');
+  const dataDir = DATA_DIR;
 
   console.log('[2/3] Installing Cursor configuration...\n');
 
@@ -944,7 +944,7 @@ async function installWindsurf() {
   }
 
   const distDir = DIST_DIR;
-  const dataDir = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.totalrecall');
+  const dataDir = DATA_DIR;
 
   console.log('[2/3] Installing Windsurf configuration...\n');
 
@@ -1023,7 +1023,7 @@ async function installCline() {
   }
 
   const distDir = DIST_DIR;
-  const dataDir = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.totalrecall');
+  const dataDir = DATA_DIR;
 
   console.log('[2/3] Installing Cline configuration...\n');
 
@@ -1086,10 +1086,10 @@ async function runDoctor() {
   const checks = runEnvironmentChecks();
 
   // Additional checks on installation status
-  const kiroDir = process.env.KIRO_CONFIG_DIR || join(homedir(), '.kiro');
+  const kiroDir = KIRO_CONFIG_DIR;
   const agentPath = join(kiroDir, 'agents', 'totalrecall.json');
   const mcpPath = join(kiroDir, 'settings', 'mcp.json');
-  const dataDir = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.contextkit');
+  const dataDir = DATA_DIR;
 
   checks.push({
     name: 'Kiro agent config',
@@ -1325,6 +1325,11 @@ async function main() {
 
   if (command === 'backup') {
     await handleBackup(args.slice(1));
+    return;
+  }
+
+  if (command === 'worker:start' || command === 'worker:stop' || command === 'worker:restart' || command === 'worker:status') {
+    await handleWorker(command);
     return;
   }
 
@@ -2419,6 +2424,152 @@ Sottocomandi:
   process.exit(1);
 }
 
+// ─── Worker command ───
+
+async function handleWorker(commandName: 'worker:start' | 'worker:stop' | 'worker:restart' | 'worker:status'): Promise<void> {
+  const host = String(process.env.TOTALRECALL_WORKER_HOST || process.env.CONTEXTKIT_WORKER_HOST || '127.0.0.1');
+  const port = String(process.env.TOTALRECALL_WORKER_PORT || process.env.CONTEXTKIT_WORKER_PORT || '3001');
+  const pidFile = join(DATA_DIR, 'worker.pid');
+  const workerPath = join(DIST_DIR, 'worker-service.js');
+  const healthUrl = `http://${host}:${port}/health`;
+
+  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  async function isHealthy(): Promise<boolean> {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 1200);
+      const resp = await fetch(healthUrl, { signal: controller.signal });
+      clearTimeout(timeout);
+      return resp.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  function readPid(): number | null {
+    try {
+      if (!existsSync(pidFile)) return null;
+      const raw = readFileSync(pidFile, 'utf8').trim();
+      const pid = Number(raw);
+      return Number.isInteger(pid) && pid > 0 ? pid : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function processExists(pid: number): boolean {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function stopWorker(): Promise<boolean> {
+    const pid = readPid();
+    if (!pid) {
+      if (existsSync(pidFile)) {
+        try { unlinkSync(pidFile); } catch {}
+      }
+      return false;
+    }
+
+    if (!processExists(pid)) {
+      try { unlinkSync(pidFile); } catch {}
+      return false;
+    }
+
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {
+      return false;
+    }
+
+    for (let i = 0; i < 20; i++) {
+      if (!processExists(pid)) {
+        try { if (existsSync(pidFile)) unlinkSync(pidFile); } catch {}
+        return true;
+      }
+      await sleep(250);
+    }
+
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {}
+
+    for (let i = 0; i < 10; i++) {
+      if (!processExists(pid)) {
+        try { if (existsSync(pidFile)) unlinkSync(pidFile); } catch {}
+        return true;
+      }
+      await sleep(100);
+    }
+
+    return false;
+  }
+
+  async function startWorker(): Promise<void> {
+    if (await isHealthy()) {
+      console.log(`\n  Worker already running on ${healthUrl}\n`);
+      return;
+    }
+
+    const stalePid = readPid();
+    if (stalePid && !processExists(stalePid)) {
+      try { unlinkSync(pidFile); } catch {}
+    }
+
+    const child = require('child_process').spawn(process.execPath, [workerPath], {
+      detached: true,
+      stdio: 'ignore',
+      env: { ...process.env }
+    });
+    child.unref();
+
+    for (let i = 0; i < 20; i++) {
+      if (await isHealthy()) {
+        console.log(`\n  Worker started on ${healthUrl}\n`);
+        return;
+      }
+      await sleep(250);
+    }
+
+    console.error(`\n  Worker did not become healthy on ${healthUrl}. Check logs with: npm run worker:logs\n`);
+    process.exit(1);
+  }
+
+  switch (commandName) {
+    case 'worker:start':
+      await startWorker();
+      return;
+    case 'worker:stop': {
+      const stopped = await stopWorker();
+      console.log(stopped ? '\n  Worker stopped.\n' : '\n  Worker is not running.\n');
+      return;
+    }
+    case 'worker:restart':
+      await stopWorker();
+      await startWorker();
+      return;
+    case 'worker:status': {
+      const healthy = await isHealthy();
+      if (healthy) {
+        const pid = readPid();
+        console.log(`\n  Worker is running on ${healthUrl}${pid ? ` (pid ${pid})` : ''}.\n`);
+        return;
+      }
+      const pid = readPid();
+      if (pid && !processExists(pid)) {
+        try { unlinkSync(pidFile); } catch {}
+      }
+      console.log(`\n  Worker is not running on ${healthUrl}.\n`);
+      process.exit(1);
+    }
+  }
+}
+
 // ─── Plugins command ───
 
 /**
@@ -2605,6 +2756,10 @@ Commands:
   backup create             Crea un backup manuale del database
   backup list               Elenca tutti i backup disponibili con metadata
   backup restore <file>     Ripristina il database da un backup (con conferma)
+  worker:start              Start the background worker
+  worker:stop               Stop the background worker
+  worker:restart            Restart the background worker
+  worker:status             Check worker health and PID
   plugins list              Elenca tutti i plugin registrati con stato
   plugins enable <nome>     Abilita un plugin registrato
   plugins disable <nome>    Disabilita un plugin attivo
@@ -2629,6 +2784,9 @@ Examples:
   totalrecall backup create
   totalrecall backup list
   totalrecall backup restore backup-2026-02-27-150000.db
+  totalrecall worker:start
+  totalrecall worker:status
+  totalrecall worker:restart
   totalrecall config list
   totalrecall config get worker.port
   totalrecall config set log.level DEBUG

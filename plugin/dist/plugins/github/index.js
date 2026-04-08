@@ -76,7 +76,7 @@ var GitHubClient = class {
       "Authorization": `token ${this.token}`,
       "Accept": "application/vnd.github.v3+json",
       "Content-Type": "application/json",
-      "User-Agent": "kiro-memory-plugin-github/1.0.0"
+      "User-Agent": "totalrecall-plugin-github/1.0.0"
     };
     let lastError = null;
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
@@ -200,7 +200,7 @@ function hasRefWithNumber(refs, number) {
 
 // src/plugins/github/index.ts
 var GitHubPlugin = class {
-  name = "kiro-memory-plugin-github";
+  name = "totalrecall-plugin-github";
   version = "1.0.0";
   description = "Integrazione GitHub: rileva issue references e commenta a fine sessione";
   minKiroVersion = "2.0.0";
@@ -350,7 +350,7 @@ var GitHubPlugin = class {
    */
   formatComment(issue, session) {
     const lines = [];
-    lines.push(`### \u{1F9E0} Kiro Memory \u2014 Sessione \`${session.id}\``);
+    lines.push(`### \u{1F9E0} Total Recall \u2014 Sessione \`${session.id}\``);
     lines.push("");
     lines.push(`**Progetto:** ${session.project}`);
     lines.push("");
@@ -373,7 +373,7 @@ var GitHubPlugin = class {
     lines.push(session.summary || "_Nessun riepilogo disponibile_");
     lines.push("");
     lines.push("---");
-    lines.push("_Commento generato automaticamente da [kiro-memory](https://github.com/Auriti-Labs/kiro-memory)_");
+    lines.push("_Commento generato automaticamente da [totalrecall](https://github.com/Auriti-Labs/totalrecall)_");
     return lines.join("\n");
   }
   /**

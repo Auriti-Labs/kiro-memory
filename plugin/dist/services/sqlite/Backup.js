@@ -2,8 +2,8 @@ import { createRequire } from 'module';const require = createRequire(import.meta
 
 // src/services/sqlite/Backup.ts
 import {
-  existsSync as existsSync2,
-  mkdirSync as mkdirSync2,
+  existsSync as existsSync3,
+  mkdirSync as mkdirSync3,
   copyFileSync,
   readdirSync,
   statSync,
@@ -11,12 +11,55 @@ import {
   readFileSync as readFileSync2,
   writeFileSync
 } from "fs";
-import { join as join2, basename } from "path";
+import { join as join3, basename as basename2 } from "path";
 
 // src/utils/logger.ts
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "fs";
-import { join } from "path";
+import { appendFileSync, existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync } from "fs";
+import { join as join2 } from "path";
+
+// src/shared/paths.ts
+import { join, dirname, basename } from "path";
 import { homedir } from "os";
+import { existsSync, mkdirSync } from "fs";
+import { fileURLToPath } from "url";
+function getDirname() {
+  if (typeof __dirname !== "undefined") {
+    return __dirname;
+  }
+  return dirname(fileURLToPath(import.meta.url));
+}
+var _dirname = getDirname();
+var _legacyV1Dir = join(homedir(), ".contextkit");
+var _canonicalDir = join(homedir(), ".totalrecall");
+function resolveDataDir() {
+  if (existsSync(_canonicalDir)) return _canonicalDir;
+  if (existsSync(_legacyV1Dir)) return _legacyV1Dir;
+  return _canonicalDir;
+}
+var DATA_DIR = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || resolveDataDir();
+var KIRO_CONFIG_DIR = process.env.KIRO_CONFIG_DIR || join(homedir(), ".kiro");
+var PLUGIN_ROOT = join(KIRO_CONFIG_DIR, "plugins", "totalrecall");
+var ARCHIVES_DIR = join(DATA_DIR, "archives");
+var LOGS_DIR = join(DATA_DIR, "logs");
+var TRASH_DIR = join(DATA_DIR, "trash");
+var BACKUPS_DIR = join(DATA_DIR, "backups");
+var MODES_DIR = join(DATA_DIR, "modes");
+var USER_SETTINGS_PATH = join(DATA_DIR, "settings.json");
+var _legacyDbV1 = join(DATA_DIR, "contextkit.db");
+var _legacyDbV3 = join(DATA_DIR, "totalrecall.db");
+function resolveDbPath() {
+  if (existsSync(join(DATA_DIR, "totalrecall.db"))) return join(DATA_DIR, "totalrecall.db");
+  if (existsSync(_legacyDbV3)) return _legacyDbV3;
+  if (existsSync(_legacyDbV1)) return _legacyDbV1;
+  return join(DATA_DIR, "totalrecall.db");
+}
+var DB_PATH = resolveDbPath();
+var VECTOR_DB_DIR = join(DATA_DIR, "vector-db");
+var OBSERVER_SESSIONS_DIR = join(DATA_DIR, "observer-sessions");
+var KIRO_SETTINGS_PATH = join(KIRO_CONFIG_DIR, "settings.json");
+var KIRO_CONTEXT_PATH = join(KIRO_CONFIG_DIR, "context.md");
+
+// src/utils/logger.ts
 var LogLevel = /* @__PURE__ */ ((LogLevel2) => {
   LogLevel2[LogLevel2["DEBUG"] = 0] = "DEBUG";
   LogLevel2[LogLevel2["INFO"] = 1] = "INFO";
@@ -25,7 +68,6 @@ var LogLevel = /* @__PURE__ */ ((LogLevel2) => {
   LogLevel2[LogLevel2["SILENT"] = 4] = "SILENT";
   return LogLevel2;
 })(LogLevel || {});
-var DEFAULT_DATA_DIR = join(homedir(), ".contextkit");
 var Logger = class {
   level = null;
   useColor;
@@ -41,12 +83,11 @@ var Logger = class {
     if (this.logFileInitialized) return;
     this.logFileInitialized = true;
     try {
-      const logsDir = join(DEFAULT_DATA_DIR, "logs");
-      if (!existsSync(logsDir)) {
-        mkdirSync(logsDir, { recursive: true });
+      if (!existsSync2(LOGS_DIR)) {
+        mkdirSync2(LOGS_DIR, { recursive: true });
       }
       const date = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-      this.logFilePath = join(logsDir, `kiro-memory-${date}.log`);
+      this.logFilePath = join2(LOGS_DIR, `totalrecall-${date}.log`);
     } catch (error) {
       console.error("[LOGGER] Failed to initialize log file:", error);
       this.logFilePath = null;
@@ -58,11 +99,10 @@ var Logger = class {
   getLevel() {
     if (this.level === null) {
       try {
-        const settingsPath = join(DEFAULT_DATA_DIR, "settings.json");
-        if (existsSync(settingsPath)) {
-          const settingsData = readFileSync(settingsPath, "utf-8");
+        if (existsSync2(USER_SETTINGS_PATH)) {
+          const settingsData = readFileSync(USER_SETTINGS_PATH, "utf-8");
           const settings = JSON.parse(settingsData);
-          const envLevel = (settings.KIRO_MEMORY_LOG_LEVEL || settings.CONTEXTKIT_LOG_LEVEL || "INFO").toUpperCase();
+          const envLevel = (settings.TOTALRECALL_LOG_LEVEL || settings.CONTEXTKIT_LOG_LEVEL || "INFO").toUpperCase();
           this.level = LogLevel[envLevel] ?? 1 /* INFO */;
         } else {
           this.level = 1 /* INFO */;
@@ -244,6 +284,19 @@ function formatTimestamp(date) {
   const ms = pad(date.getMilliseconds(), 3);
   return `${year}-${month}-${day}-${hours}${mins}${secs}-${ms}`;
 }
+function resolveUniqueBackupTarget(backupDir, baseDate) {
+  for (let attempt = 0; attempt < 1e4; attempt++) {
+    const date = new Date(baseDate.getTime() + attempt);
+    const ts = formatTimestamp(date);
+    const filename = `backup-${ts}.db`;
+    const filePath = join3(backupDir, filename);
+    const metaPath = join3(backupDir, `backup-${ts}.meta.json`);
+    if (!existsSync3(filePath) && !existsSync3(metaPath)) {
+      return { date, filename, filePath, metaPath };
+    }
+  }
+  throw new Error(`Impossibile risolvere un nome backup univoco in ${backupDir}`);
+}
 function collectStats(db, dbPath) {
   const countTable = (table) => {
     try {
@@ -253,7 +306,7 @@ function collectStats(db, dbPath) {
       return 0;
     }
   };
-  const dbSizeBytes = existsSync2(dbPath) ? statSync(dbPath).size : 0;
+  const dbSizeBytes = existsSync3(dbPath) ? statSync(dbPath).size : 0;
   return {
     observations: countTable("observations"),
     sessions: countTable("sessions"),
@@ -271,25 +324,20 @@ function getSchemaVersion(db) {
   }
 }
 function createBackup(dbPath, backupDir, db) {
-  mkdirSync2(backupDir, { recursive: true });
-  const now = /* @__PURE__ */ new Date();
-  const ts = formatTimestamp(now);
-  const filename = `backup-${ts}.db`;
-  const destPath = join2(backupDir, filename);
-  const metaFilename = `backup-${ts}.meta.json`;
-  const metaPath = join2(backupDir, metaFilename);
-  if (!existsSync2(dbPath)) {
+  mkdirSync3(backupDir, { recursive: true });
+  const { date: now, filename, filePath: destPath, metaPath } = resolveUniqueBackupTarget(backupDir, /* @__PURE__ */ new Date());
+  if (!existsSync3(dbPath)) {
     throw new Error(`Database non trovato: ${dbPath}`);
   }
   copyFileSync(dbPath, destPath);
   logger.info("BACKUP", `File DB copiato: ${dbPath} \u2192 ${destPath}`);
   const walPath = `${dbPath}-wal`;
   const shmPath = `${dbPath}-shm`;
-  if (existsSync2(walPath)) {
+  if (existsSync3(walPath)) {
     copyFileSync(walPath, `${destPath}-wal`);
     logger.debug("BACKUP", "File WAL copiato");
   }
-  if (existsSync2(shmPath)) {
+  if (existsSync3(shmPath)) {
     copyFileSync(shmPath, `${destPath}-shm`);
     logger.debug("BACKUP", "File SHM copiato");
   }
@@ -312,7 +360,7 @@ function createBackup(dbPath, backupDir, db) {
   };
 }
 function listBackups(backupDir) {
-  if (!existsSync2(backupDir)) {
+  if (!existsSync3(backupDir)) {
     return [];
   }
   const entries = [];
@@ -325,9 +373,9 @@ function listBackups(backupDir) {
   }
   const metaFiles = files.filter((f) => f.startsWith("backup-") && f.endsWith(".meta.json"));
   for (const metaFile of metaFiles) {
-    const metaPath = join2(backupDir, metaFile);
+    const metaPath = join3(backupDir, metaFile);
     const dbFilename = metaFile.replace(/\.meta\.json$/, ".db");
-    const filePath = join2(backupDir, dbFilename);
+    const filePath = join3(backupDir, dbFilename);
     let metadata;
     try {
       const raw = readFileSync2(metaPath, "utf8");
@@ -336,7 +384,7 @@ function listBackups(backupDir) {
       logger.warn("BACKUP", `Metadata non leggibile: ${metaPath}`, {}, err);
       continue;
     }
-    if (!existsSync2(filePath)) {
+    if (!existsSync3(filePath)) {
       logger.warn("BACKUP", `File backup mancante per metadata: ${filePath}`);
       continue;
     }
@@ -346,7 +394,7 @@ function listBackups(backupDir) {
   return entries;
 }
 function restoreBackup(backupFile, dbPath) {
-  if (!existsSync2(backupFile)) {
+  if (!existsSync3(backupFile)) {
     throw new Error(`File backup non trovato: ${backupFile}`);
   }
   copyFileSync(backupFile, dbPath);
@@ -355,17 +403,17 @@ function restoreBackup(backupFile, dbPath) {
   const shmBackup = `${backupFile}-shm`;
   const walDest = `${dbPath}-wal`;
   const shmDest = `${dbPath}-shm`;
-  if (existsSync2(walBackup)) {
+  if (existsSync3(walBackup)) {
     copyFileSync(walBackup, walDest);
     logger.debug("BACKUP", "File WAL ripristinato");
-  } else if (existsSync2(walDest)) {
+  } else if (existsSync3(walDest)) {
     unlinkSync(walDest);
     logger.debug("BACKUP", "File WAL corrente rimosso (non presente nel backup)");
   }
-  if (existsSync2(shmBackup)) {
+  if (existsSync3(shmBackup)) {
     copyFileSync(shmBackup, shmDest);
     logger.debug("BACKUP", "File SHM ripristinato");
-  } else if (existsSync2(shmDest)) {
+  } else if (existsSync3(shmDest)) {
     unlinkSync(shmDest);
     logger.debug("BACKUP", "File SHM corrente rimosso (non presente nel backup)");
   }
@@ -383,7 +431,7 @@ function rotateBackups(backupDir, maxKeep) {
   let deleted = 0;
   for (const entry of toDelete) {
     try {
-      if (existsSync2(entry.filePath)) {
+      if (existsSync3(entry.filePath)) {
         unlinkSync(entry.filePath);
       }
     } catch (err) {
@@ -391,18 +439,18 @@ function rotateBackups(backupDir, maxKeep) {
     }
     for (const extra of [`${entry.filePath}-wal`, `${entry.filePath}-shm`]) {
       try {
-        if (existsSync2(extra)) unlinkSync(extra);
+        if (existsSync3(extra)) unlinkSync(extra);
       } catch {
       }
     }
     try {
-      if (existsSync2(entry.metaPath)) {
+      if (existsSync3(entry.metaPath)) {
         unlinkSync(entry.metaPath);
       }
     } catch (err) {
       logger.warn("BACKUP", `Impossibile eliminare metadata: ${entry.metaPath}`, {}, err);
     }
-    logger.info("BACKUP", `Backup rimosso (rotazione): ${basename(entry.filePath)}`);
+    logger.info("BACKUP", `Backup rimosso (rotazione): ${basename2(entry.filePath)}`);
     deleted++;
   }
   logger.info("BACKUP", `Rotazione completata: ${deleted} backup eliminati, ${maxKeep} mantenuti`);

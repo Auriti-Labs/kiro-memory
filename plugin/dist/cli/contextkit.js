@@ -16,14 +16,349 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
-// src/utils/logger.ts
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "fs";
-import { join } from "path";
+// src/shims/bun-sqlite.ts
+import BetterSqlite3 from "better-sqlite3";
+var Database, BunQueryCompat;
+var init_bun_sqlite = __esm({
+  "src/shims/bun-sqlite.ts"() {
+    Database = class {
+      _db;
+      _stmtCache = /* @__PURE__ */ new Map();
+      constructor(path, options) {
+        this._db = new BetterSqlite3(path, {
+          // better-sqlite3 creates the file by default ('create' not needed)
+          readonly: options?.readwrite === false ? true : false
+        });
+      }
+      /**
+       * Execute a SQL query without results.
+       * PRAGMA statements are handled via better-sqlite3's native pragma() method.
+       */
+      run(sql, params) {
+        const trimmed = sql.trim();
+        if (/^PRAGMA\s+/i.test(trimmed)) {
+          const pragmaBody = trimmed.replace(/^PRAGMA\s+/i, "").replace(/;$/, "");
+          this._db.pragma(pragmaBody);
+          return { lastInsertRowid: 0, changes: 0 };
+        }
+        const stmt = this._db.prepare(sql);
+        const result = params ? stmt.run(...params) : stmt.run();
+        return result;
+      }
+      /**
+       * Prepare a query with bun:sqlite-compatible interface.
+       * Returns a cached prepared statement for repeated queries.
+       */
+      query(sql) {
+        let cached = this._stmtCache.get(sql);
+        if (!cached) {
+          cached = new BunQueryCompat(this._db, sql);
+          this._stmtCache.set(sql, cached);
+        }
+        return cached;
+      }
+      /**
+       * Create a transaction
+       */
+      transaction(fn) {
+        return this._db.transaction(fn);
+      }
+      /**
+       * Close the connection
+       */
+      close() {
+        this._stmtCache.clear();
+        this._db.close();
+      }
+    };
+    BunQueryCompat = class {
+      _stmt;
+      constructor(db, sql) {
+        this._stmt = db.prepare(sql);
+      }
+      /**
+       * Adatta parametri named da formato bun:sqlite a better-sqlite3.
+       * bun:sqlite: chiavi CON prefisso (es. { $todayStart: 123 })
+       * better-sqlite3: chiavi SENZA prefisso (es. { todayStart: 123 })
+       */
+      _adaptParams(params) {
+        if (params.length !== 1 || typeof params[0] !== "object" || params[0] === null || Array.isArray(params[0])) {
+          return params;
+        }
+        const obj = params[0];
+        const keys = Object.keys(obj);
+        if (keys.length === 0) return params;
+        if (!keys[0].startsWith("$") && !keys[0].startsWith("@") && !keys[0].startsWith(":")) {
+          return params;
+        }
+        const adapted = {};
+        for (const key of keys) {
+          adapted[key.slice(1)] = obj[key];
+        }
+        return [adapted];
+      }
+      /**
+       * Returns all rows
+       */
+      all(...params) {
+        if (params.length === 0) return this._stmt.all();
+        return this._stmt.all(...this._adaptParams(params));
+      }
+      /**
+       * Returns the first row or null
+       */
+      get(...params) {
+        if (params.length === 0) return this._stmt.get();
+        return this._stmt.get(...this._adaptParams(params));
+      }
+      /**
+       * Execute without results
+       */
+      run(...params) {
+        if (params.length === 0) return this._stmt.run();
+        return this._stmt.run(...this._adaptParams(params));
+      }
+    };
+  }
+});
+
+// src/db/bun-sqlite-adapter.ts
+var bun_sqlite_adapter_exports = {};
+__export(bun_sqlite_adapter_exports, {
+  Database: () => Database2
+});
+var Database2;
+var init_bun_sqlite_adapter = __esm({
+  "src/db/bun-sqlite-adapter.ts"() {
+    "use strict";
+    init_bun_sqlite();
+    Database2 = class {
+      _db;
+      constructor(path, _options) {
+        this._db = new Database(path, { create: true, readwrite: true });
+      }
+      /**
+       * Execute a SQL query without results.
+       */
+      run(sql, params) {
+        const stmt = this._db.query(sql);
+        const result = params ? stmt.run(...params) : stmt.run();
+        return {
+          lastInsertRowid: result?.lastInsertRowid ?? 0,
+          changes: result?.changes ?? 0
+        };
+      }
+      /**
+       * Prepare a query and return a statement wrapper.
+       */
+      query(sql) {
+        const stmt = this._db.query(sql);
+        return {
+          all(...params) {
+            if (params.length === 0) return stmt.all();
+            return stmt.all(...params);
+          },
+          get(...params) {
+            if (params.length === 0) return stmt.get();
+            return stmt.get(...params);
+          },
+          run(...params) {
+            if (params.length === 0) {
+              const r2 = stmt.run();
+              return { lastInsertRowid: r2?.lastInsertRowid ?? 0, changes: r2?.changes ?? 0 };
+            }
+            const r = stmt.run(...params);
+            return { lastInsertRowid: r?.lastInsertRowid ?? 0, changes: r?.changes ?? 0 };
+          }
+        };
+      }
+      /**
+       * Create a transaction
+       */
+      transaction(fn) {
+        return this._db.transaction(fn);
+      }
+      /**
+       * Close the connection
+       */
+      close() {
+        this._db.close();
+      }
+    };
+  }
+});
+
+// src/db/better-sqlite3-adapter.ts
+var better_sqlite3_adapter_exports = {};
+__export(better_sqlite3_adapter_exports, {
+  Database: () => Database3
+});
+import BetterSqlite32 from "better-sqlite3";
+var Database3, PreparedStatement;
+var init_better_sqlite3_adapter = __esm({
+  "src/db/better-sqlite3-adapter.ts"() {
+    "use strict";
+    Database3 = class {
+      _db;
+      _stmtCache = /* @__PURE__ */ new Map();
+      constructor(path, options) {
+        this._db = new BetterSqlite32(path, {
+          // better-sqlite3 creates the file by default ('create' not needed)
+          readonly: options?.readwrite === false ? true : false
+        });
+      }
+      /**
+       * Execute a SQL query without results.
+       * PRAGMA statements are handled via better-sqlite3's native pragma() method.
+       */
+      run(sql, params) {
+        const trimmed = sql.trim();
+        if (/^PRAGMA\s+/i.test(trimmed)) {
+          const pragmaBody = trimmed.replace(/^PRAGMA\s+/i, "").replace(/;$/, "");
+          this._db.pragma(pragmaBody);
+          return { lastInsertRowid: 0, changes: 0 };
+        }
+        const stmt = this._db.prepare(sql);
+        const result = params ? stmt.run(...params) : stmt.run();
+        return result;
+      }
+      /**
+       * Prepare a query and return a cached prepared statement.
+       * Returns a cached prepared statement for repeated queries.
+       */
+      query(sql) {
+        let cached = this._stmtCache.get(sql);
+        if (!cached) {
+          cached = new PreparedStatement(this._db, sql);
+          this._stmtCache.set(sql, cached);
+        }
+        return cached;
+      }
+      /**
+       * Create a transaction
+       */
+      transaction(fn) {
+        return this._db.transaction(fn);
+      }
+      /**
+       * Close the connection
+       */
+      close() {
+        this._stmtCache.clear();
+        this._db.close();
+      }
+    };
+    PreparedStatement = class {
+      _stmt;
+      constructor(db, sql) {
+        this._stmt = db.prepare(sql);
+      }
+      /**
+       * Adapt named parameters from $-prefixed format to plain keys.
+       * Input:  { $todayStart: 123 }
+       * Output: { todayStart: 123 }
+       * (better-sqlite3 expects keys without the $ prefix)
+       */
+      _adaptParams(params) {
+        if (params.length !== 1 || typeof params[0] !== "object" || params[0] === null || Array.isArray(params[0])) {
+          return params;
+        }
+        const obj = params[0];
+        const keys = Object.keys(obj);
+        if (keys.length === 0) return params;
+        if (!keys[0].startsWith("$") && !keys[0].startsWith("@") && !keys[0].startsWith(":")) {
+          return params;
+        }
+        const adapted = {};
+        for (const key of keys) {
+          adapted[key.slice(1)] = obj[key];
+        }
+        return [adapted];
+      }
+      /**
+       * Returns all rows
+       */
+      all(...params) {
+        if (params.length === 0) return this._stmt.all();
+        return this._stmt.all(...this._adaptParams(params));
+      }
+      /**
+       * Returns the first row or null
+       */
+      get(...params) {
+        if (params.length === 0) return this._stmt.get();
+        return this._stmt.get(...this._adaptParams(params));
+      }
+      /**
+       * Execute without results
+       */
+      run(...params) {
+        if (params.length === 0) return this._stmt.run();
+        return this._stmt.run(...this._adaptParams(params));
+      }
+    };
+  }
+});
+
+// src/shared/paths.ts
+import { join, dirname, basename } from "path";
 import { homedir } from "os";
-var LogLevel, DEFAULT_DATA_DIR, Logger, logger;
+import { existsSync, mkdirSync } from "fs";
+import { fileURLToPath } from "url";
+function getDirname() {
+  if (typeof __dirname !== "undefined") {
+    return __dirname;
+  }
+  return dirname(fileURLToPath(import.meta.url));
+}
+function resolveDataDir() {
+  if (existsSync(_canonicalDir)) return _canonicalDir;
+  if (existsSync(_legacyV1Dir)) return _legacyV1Dir;
+  return _canonicalDir;
+}
+function resolveDbPath() {
+  if (existsSync(join(DATA_DIR, "totalrecall.db"))) return join(DATA_DIR, "totalrecall.db");
+  if (existsSync(_legacyDbV3)) return _legacyDbV3;
+  if (existsSync(_legacyDbV1)) return _legacyDbV1;
+  return join(DATA_DIR, "totalrecall.db");
+}
+function ensureDir(dirPath) {
+  mkdirSync(dirPath, { recursive: true });
+}
+var _dirname, _legacyV1Dir, _canonicalDir, DATA_DIR, KIRO_CONFIG_DIR, PLUGIN_ROOT, ARCHIVES_DIR, LOGS_DIR, TRASH_DIR, BACKUPS_DIR, MODES_DIR, USER_SETTINGS_PATH, _legacyDbV1, _legacyDbV3, DB_PATH, VECTOR_DB_DIR, OBSERVER_SESSIONS_DIR, KIRO_SETTINGS_PATH, KIRO_CONTEXT_PATH;
+var init_paths = __esm({
+  "src/shared/paths.ts"() {
+    "use strict";
+    _dirname = getDirname();
+    _legacyV1Dir = join(homedir(), ".contextkit");
+    _canonicalDir = join(homedir(), ".totalrecall");
+    DATA_DIR = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || resolveDataDir();
+    KIRO_CONFIG_DIR = process.env.KIRO_CONFIG_DIR || join(homedir(), ".kiro");
+    PLUGIN_ROOT = join(KIRO_CONFIG_DIR, "plugins", "totalrecall");
+    ARCHIVES_DIR = join(DATA_DIR, "archives");
+    LOGS_DIR = join(DATA_DIR, "logs");
+    TRASH_DIR = join(DATA_DIR, "trash");
+    BACKUPS_DIR = join(DATA_DIR, "backups");
+    MODES_DIR = join(DATA_DIR, "modes");
+    USER_SETTINGS_PATH = join(DATA_DIR, "settings.json");
+    _legacyDbV1 = join(DATA_DIR, "contextkit.db");
+    _legacyDbV3 = join(DATA_DIR, "totalrecall.db");
+    DB_PATH = resolveDbPath();
+    VECTOR_DB_DIR = join(DATA_DIR, "vector-db");
+    OBSERVER_SESSIONS_DIR = join(DATA_DIR, "observer-sessions");
+    KIRO_SETTINGS_PATH = join(KIRO_CONFIG_DIR, "settings.json");
+    KIRO_CONTEXT_PATH = join(KIRO_CONFIG_DIR, "context.md");
+  }
+});
+
+// src/utils/logger.ts
+import { appendFileSync, existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync } from "fs";
+import { join as join2 } from "path";
+var LogLevel, Logger, logger;
 var init_logger = __esm({
   "src/utils/logger.ts"() {
     "use strict";
+    init_paths();
     LogLevel = /* @__PURE__ */ ((LogLevel2) => {
       LogLevel2[LogLevel2["DEBUG"] = 0] = "DEBUG";
       LogLevel2[LogLevel2["INFO"] = 1] = "INFO";
@@ -32,7 +367,6 @@ var init_logger = __esm({
       LogLevel2[LogLevel2["SILENT"] = 4] = "SILENT";
       return LogLevel2;
     })(LogLevel || {});
-    DEFAULT_DATA_DIR = join(homedir(), ".contextkit");
     Logger = class {
       level = null;
       useColor;
@@ -48,12 +382,11 @@ var init_logger = __esm({
         if (this.logFileInitialized) return;
         this.logFileInitialized = true;
         try {
-          const logsDir = join(DEFAULT_DATA_DIR, "logs");
-          if (!existsSync(logsDir)) {
-            mkdirSync(logsDir, { recursive: true });
+          if (!existsSync2(LOGS_DIR)) {
+            mkdirSync2(LOGS_DIR, { recursive: true });
           }
           const date = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-          this.logFilePath = join(logsDir, `kiro-memory-${date}.log`);
+          this.logFilePath = join2(LOGS_DIR, `totalrecall-${date}.log`);
         } catch (error) {
           console.error("[LOGGER] Failed to initialize log file:", error);
           this.logFilePath = null;
@@ -65,11 +398,10 @@ var init_logger = __esm({
       getLevel() {
         if (this.level === null) {
           try {
-            const settingsPath = join(DEFAULT_DATA_DIR, "settings.json");
-            if (existsSync(settingsPath)) {
-              const settingsData = readFileSync(settingsPath, "utf-8");
+            if (existsSync2(USER_SETTINGS_PATH)) {
+              const settingsData = readFileSync(USER_SETTINGS_PATH, "utf-8");
               const settings = JSON.parse(settingsData);
-              const envLevel = (settings.KIRO_MEMORY_LOG_LEVEL || settings.CONTEXTKIT_LOG_LEVEL || "INFO").toUpperCase();
+              const envLevel = (settings.TOTALRECALL_LOG_LEVEL || settings.CONTEXTKIT_LOG_LEVEL || "INFO").toUpperCase();
               this.level = LogLevel[envLevel] ?? 1 /* INFO */;
             } else {
               this.level = 1 /* INFO */;
@@ -1443,12 +1775,12 @@ var init_EmbeddingService = __esm({
       config;
       configName;
       constructor() {
-        const envModel = process.env.KIRO_MEMORY_EMBEDDING_MODEL || "all-MiniLM-L6-v2";
+        const envModel = process.env.TOTALRECALL_EMBEDDING_MODEL || "all-MiniLM-L6-v2";
         this.configName = envModel;
         if (MODEL_CONFIGS[envModel]) {
           this.config = MODEL_CONFIGS[envModel];
         } else if (envModel.includes("/")) {
-          const dimensions = parseInt(process.env.KIRO_MEMORY_EMBEDDING_DIMENSIONS || "384", 10);
+          const dimensions = parseInt(process.env.TOTALRECALL_EMBEDDING_DIMENSIONS || "384", 10);
           this.config = {
             modelId: envModel,
             dimensions: isNaN(dimensions) ? 384 : dimensions
@@ -1693,7 +2025,6 @@ __export(cli_utils_exports, {
 });
 import { existsSync as existsSync5, statSync as statSync3, readFileSync as readFileSync3, writeFileSync as writeFileSync2, mkdirSync as mkdirSync4 } from "fs";
 import { join as join4 } from "path";
-import { homedir as homedir3 } from "os";
 function observationToJsonl(obs) {
   return JSON.stringify(obs);
 }
@@ -1734,7 +2065,7 @@ function observationToMarkdown(obs) {
 function generateMarkdownOutput(observations) {
   if (observations.length === 0) return "# Nessuna observation trovata\n";
   const header = [
-    "# Kiro Memory \u2014 Export Observations",
+    "# Total Recall \u2014 Export Observations",
     "",
     `> Progetto: ${observations[0].project} | Totale: ${observations.length}`,
     "",
@@ -1801,8 +2132,7 @@ function parseJsonlFile(content) {
   return results;
 }
 function getConfigPath() {
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join4(homedir3(), ".contextkit");
-  return join4(dataDir, "config.json");
+  return join4(DATA_DIR, "config.json");
 }
 function readConfig(configPath) {
   const path = configPath || getConfigPath();
@@ -1866,7 +2196,7 @@ function getDbFileSize(dbPath) {
 function formatStatsOutput(stats) {
   const lines = [
     "",
-    "=== Kiro Memory \u2014 Statistiche Database ===",
+    "=== Total Recall \u2014 Statistiche Database ===",
     "",
     `  Observations totali:   ${stats.totalObservations}`,
     `  Sessioni totali:       ${stats.totalSessions}`,
@@ -1891,7 +2221,7 @@ function formatImportResult(result) {
   const prefix = result.dryRun ? "[DRY RUN] " : "";
   const lines = [
     "",
-    `=== ${prefix}Kiro Memory \u2014 Import JSONL ===`,
+    `=== ${prefix}Total Recall \u2014 Import JSONL ===`,
     "",
     `  Record totali analizzati: ${result.total}`,
     `  Importati:                ${result.imported}`,
@@ -1954,6 +2284,7 @@ var CONFIG_DEFAULTS;
 var init_cli_utils = __esm({
   "src/cli/cli-utils.ts"() {
     "use strict";
+    init_paths();
     CONFIG_DEFAULTS = {
       "worker.port": 3001,
       "worker.host": "127.0.0.1",
@@ -1978,146 +2309,24 @@ var init_cli_utils = __esm({
   }
 });
 
-// src/shims/bun-sqlite.ts
-import BetterSqlite3 from "better-sqlite3";
-var Database = class {
-  _db;
-  _stmtCache = /* @__PURE__ */ new Map();
-  constructor(path, options) {
-    this._db = new BetterSqlite3(path, {
-      // better-sqlite3 creates the file by default ('create' not needed)
-      readonly: options?.readwrite === false ? true : false
-    });
-  }
-  /**
-   * Execute a SQL query without results.
-   * PRAGMA statements are handled via better-sqlite3's native pragma() method.
-   */
-  run(sql, params) {
-    const trimmed = sql.trim();
-    if (/^PRAGMA\s+/i.test(trimmed)) {
-      const pragmaBody = trimmed.replace(/^PRAGMA\s+/i, "").replace(/;$/, "");
-      this._db.pragma(pragmaBody);
-      return { lastInsertRowid: 0, changes: 0 };
-    }
-    const stmt = this._db.prepare(sql);
-    const result = params ? stmt.run(...params) : stmt.run();
-    return result;
-  }
-  /**
-   * Prepare a query with bun:sqlite-compatible interface.
-   * Returns a cached prepared statement for repeated queries.
-   */
-  query(sql) {
-    let cached = this._stmtCache.get(sql);
-    if (!cached) {
-      cached = new BunQueryCompat(this._db, sql);
-      this._stmtCache.set(sql, cached);
-    }
-    return cached;
-  }
-  /**
-   * Create a transaction
-   */
-  transaction(fn) {
-    return this._db.transaction(fn);
-  }
-  /**
-   * Close the connection
-   */
-  close() {
-    this._stmtCache.clear();
-    this._db.close();
-  }
-};
-var BunQueryCompat = class {
-  _stmt;
-  constructor(db, sql) {
-    this._stmt = db.prepare(sql);
-  }
-  /**
-   * Adatta parametri named da formato bun:sqlite a better-sqlite3.
-   * bun:sqlite: chiavi CON prefisso (es. { $todayStart: 123 })
-   * better-sqlite3: chiavi SENZA prefisso (es. { todayStart: 123 })
-   */
-  _adaptParams(params) {
-    if (params.length !== 1 || typeof params[0] !== "object" || params[0] === null || Array.isArray(params[0])) {
-      return params;
-    }
-    const obj = params[0];
-    const keys = Object.keys(obj);
-    if (keys.length === 0) return params;
-    if (!keys[0].startsWith("$") && !keys[0].startsWith("@") && !keys[0].startsWith(":")) {
-      return params;
-    }
-    const adapted = {};
-    for (const key of keys) {
-      adapted[key.slice(1)] = obj[key];
-    }
-    return [adapted];
-  }
-  /**
-   * Returns all rows
-   */
-  all(...params) {
-    if (params.length === 0) return this._stmt.all();
-    return this._stmt.all(...this._adaptParams(params));
-  }
-  /**
-   * Returns the first row or null
-   */
-  get(...params) {
-    if (params.length === 0) return this._stmt.get();
-    return this._stmt.get(...this._adaptParams(params));
-  }
-  /**
-   * Execute without results
-   */
-  run(...params) {
-    if (params.length === 0) return this._stmt.run();
-    return this._stmt.run(...this._adaptParams(params));
-  }
-};
-
-// src/shared/paths.ts
-import { join as join2, dirname, basename } from "path";
-import { homedir as homedir2 } from "os";
-import { existsSync as existsSync2, mkdirSync as mkdirSync2 } from "fs";
-init_logger();
-import { fileURLToPath } from "url";
-function getDirname() {
-  if (typeof __dirname !== "undefined") {
-    return __dirname;
-  }
-  return dirname(fileURLToPath(import.meta.url));
+// src/db/index.ts
+var isBun = "Bun" in globalThis;
+var DatabaseClass;
+if (isBun) {
+  const mod = await Promise.resolve().then(() => (init_bun_sqlite_adapter(), bun_sqlite_adapter_exports));
+  DatabaseClass = mod.Database;
+} else {
+  const mod = await Promise.resolve().then(() => (init_better_sqlite3_adapter(), better_sqlite3_adapter_exports));
+  DatabaseClass = mod.Database;
 }
-var _dirname = getDirname();
-var _legacyDir = join2(homedir2(), ".contextkit");
-var _defaultDir = existsSync2(_legacyDir) ? _legacyDir : join2(homedir2(), ".kiro-memory");
-var DATA_DIR = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || _defaultDir;
-var KIRO_CONFIG_DIR = process.env.KIRO_CONFIG_DIR || join2(homedir2(), ".kiro");
-var PLUGIN_ROOT = join2(KIRO_CONFIG_DIR, "plugins", "kiro-memory");
-var ARCHIVES_DIR = join2(DATA_DIR, "archives");
-var LOGS_DIR = join2(DATA_DIR, "logs");
-var TRASH_DIR = join2(DATA_DIR, "trash");
-var BACKUPS_DIR = join2(DATA_DIR, "backups");
-var MODES_DIR = join2(DATA_DIR, "modes");
-var USER_SETTINGS_PATH = join2(DATA_DIR, "settings.json");
-var _legacyDb = join2(DATA_DIR, "contextkit.db");
-var DB_PATH = existsSync2(_legacyDb) ? _legacyDb : join2(DATA_DIR, "kiro-memory.db");
-var VECTOR_DB_DIR = join2(DATA_DIR, "vector-db");
-var OBSERVER_SESSIONS_DIR = join2(DATA_DIR, "observer-sessions");
-var KIRO_SETTINGS_PATH = join2(KIRO_CONFIG_DIR, "settings.json");
-var KIRO_CONTEXT_PATH = join2(KIRO_CONFIG_DIR, "context.md");
-function ensureDir(dirPath) {
-  mkdirSync2(dirPath, { recursive: true });
-}
+var Database4 = DatabaseClass;
 
 // src/services/sqlite/Database.ts
+init_paths();
 init_logger();
 var SQLITE_MMAP_SIZE_BYTES = 256 * 1024 * 1024;
 var SQLITE_CACHE_SIZE_PAGES = 1e4;
-var KiroMemoryDatabase = class {
+var TotalRecallDatabase = class {
   _db;
   /**
    * Readonly accessor for the underlying Database instance.
@@ -2134,7 +2343,7 @@ var KiroMemoryDatabase = class {
     if (dbPath !== ":memory:") {
       ensureDir(DATA_DIR);
     }
-    this._db = new Database(dbPath, { create: true, readwrite: true });
+    this._db = new Database4(dbPath, { create: true, readwrite: true });
     this._db.run("PRAGMA journal_mode = WAL");
     this._db.run("PRAGMA busy_timeout = 5000");
     this._db.run("PRAGMA synchronous = NORMAL");
@@ -2781,6 +2990,19 @@ function formatTimestamp(date) {
   const ms = pad(date.getMilliseconds(), 3);
   return `${year}-${month}-${day}-${hours}${mins}${secs}-${ms}`;
 }
+function resolveUniqueBackupTarget(backupDir, baseDate) {
+  for (let attempt = 0; attempt < 1e4; attempt++) {
+    const date = new Date(baseDate.getTime() + attempt);
+    const ts = formatTimestamp(date);
+    const filename = `backup-${ts}.db`;
+    const filePath = join3(backupDir, filename);
+    const metaPath = join3(backupDir, `backup-${ts}.meta.json`);
+    if (!existsSync4(filePath) && !existsSync4(metaPath)) {
+      return { date, filename, filePath, metaPath };
+    }
+  }
+  throw new Error(`Impossibile risolvere un nome backup univoco in ${backupDir}`);
+}
 function collectStats(db, dbPath) {
   const countTable = (table) => {
     try {
@@ -2809,12 +3031,7 @@ function getSchemaVersion(db) {
 }
 function createBackup(dbPath, backupDir, db) {
   mkdirSync3(backupDir, { recursive: true });
-  const now = /* @__PURE__ */ new Date();
-  const ts = formatTimestamp(now);
-  const filename = `backup-${ts}.db`;
-  const destPath = join3(backupDir, filename);
-  const metaFilename = `backup-${ts}.meta.json`;
-  const metaPath = join3(backupDir, metaFilename);
+  const { date: now, filename, filePath: destPath, metaPath } = resolveUniqueBackupTarget(backupDir, /* @__PURE__ */ new Date());
   if (!existsSync4(dbPath)) {
     throw new Error(`Database non trovato: ${dbPath}`);
   }
@@ -3310,11 +3527,11 @@ function getHybridSearch() {
 // src/sdk/index.ts
 init_EmbeddingService();
 init_logger();
-var KiroMemorySDK = class {
+var TotalRecallSDK = class {
   db;
   project;
   constructor(config = {}) {
-    this.db = new KiroMemoryDatabase(config.dataDir, config.skipMigrations || false);
+    this.db = new TotalRecallDatabase(config.dataDir, config.skipMigrations || false);
     this.project = config.project || this.detectProject();
   }
   detectProject() {
@@ -3708,7 +3925,7 @@ var KiroMemorySDK = class {
    * If no query: ranking by recency + project match (CONTEXT_WEIGHTS).
    */
   async getSmartContext(options = {}) {
-    const tokenBudget = options.tokenBudget || parseInt(process.env.KIRO_MEMORY_CONTEXT_TOKENS || "0", 10) || 2e3;
+    const tokenBudget = options.tokenBudget || parseInt(process.env.TOTALRECALL_CONTEXT_TOKENS || "0", 10) || 2e3;
     const summaries = getSummariesByProject(this.db.db, this.project, 5);
     let items;
     if (options.query) {
@@ -3938,15 +4155,15 @@ var KiroMemorySDK = class {
     this.db.close();
   }
 };
-function createKiroMemory(config) {
-  return new KiroMemorySDK(config);
+function createTotalRecall(config) {
+  return new TotalRecallSDK(config);
 }
 
 // src/services/report-formatter.ts
 function formatReportText(data) {
   const lines = [];
   lines.push("");
-  lines.push(`  \x1B[36m\u2550\u2550\u2550 Kiro Memory Report \u2014 ${data.period.label} \u2550\u2550\u2550\x1B[0m`);
+  lines.push(`  \x1B[36m\u2550\u2550\u2550 Total Recall Report \u2014 ${data.period.label} \u2550\u2550\u2550\x1B[0m`);
   lines.push(`  \x1B[2m${data.period.start} \u2192 ${data.period.end} (${data.period.days} days)\x1B[0m`);
   lines.push("");
   lines.push(`  \x1B[1mOverview\x1B[0m`);
@@ -4019,7 +4236,7 @@ function formatReportText(data) {
 }
 function formatReportMarkdown(data) {
   const lines = [];
-  lines.push(`# Kiro Memory Report \u2014 ${data.period.label}`);
+  lines.push(`# Total Recall Report \u2014 ${data.period.label}`);
   lines.push("");
   lines.push(`**Period**: ${data.period.start} \u2192 ${data.period.end} (${data.period.days} days)`);
   lines.push("");
@@ -4127,14 +4344,14 @@ var U = "\x1B[4m";
 var GRN = "\x1B[32m";
 var CYN = "\x1B[36m";
 var LOGO = [
-  " \u2588\u2588\u2557  \u2588\u2588\u2557\u2588\u2588\u2557\u2588\u2588\u2588\u2588\u2588\u2588\u2557  \u2588\u2588\u2588\u2588\u2588\u2588\u2557 ",
-  " \u2588\u2588\u2551 \u2588\u2588\u2554\u255D\u2588\u2588\u2551\u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557\u2588\u2588\u2554\u2550\u2550\u2550\u2588\u2588\u2557",
-  " \u2588\u2588\u2588\u2588\u2588\u2554\u255D \u2588\u2588\u2551\u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255D\u2588\u2588\u2551   \u2588\u2588\u2551",
-  " \u2588\u2588\u2554\u2550\u2588\u2588\u2557 \u2588\u2588\u2551\u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557\u2588\u2588\u2551   \u2588\u2588\u2551",
-  " \u2588\u2588\u2551  \u2588\u2588\u2557\u2588\u2588\u2551\u2588\u2588\u2551  \u2588\u2588\u2551\u255A\u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255D",
-  " \u255A\u2550\u255D  \u255A\u2550\u255D\u255A\u2550\u255D\u255A\u2550\u255D  \u255A\u2550\u255D \u255A\u2550\u2550\u2550\u2550\u2550\u255D"
+  " \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2557     ",
+  " \u255A\u2550\u2550\u2588\u2588\u2554\u2550\u2550\u255D\u2588\u2588\u2554\u2550\u2550\u2550\u2588\u2588\u2557\u255A\u2550\u2550\u2588\u2588\u2554\u2550\u2550\u255D\u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557\u2588\u2588\u2551     ",
+  "    \u2588\u2588\u2551   \u2588\u2588\u2551   \u2588\u2588\u2551   \u2588\u2588\u2551   \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2551\u2588\u2588\u2551     ",
+  "    \u2588\u2588\u2551   \u2588\u2588\u2551   \u2588\u2588\u2551   \u2588\u2588\u2551   \u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2551\u2588\u2588\u2551     ",
+  "    \u2588\u2588\u2551   \u255A\u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255D   \u2588\u2588\u2551   \u2588\u2588\u2551  \u2588\u2588\u2551\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557",
+  "    \u255A\u2550\u255D    \u255A\u2550\u2550\u2550\u2550\u2550\u255D    \u255A\u2550\u255D   \u255A\u2550\u255D  \u255A\u2550\u255D\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u255D"
 ];
-var MEMORY_TAG = "          M E M O R Y";
+var MEMORY_TAG = "         R E C A L L";
 var LINE = "\u2500".repeat(48);
 function supportsColor() {
   if (process.env.NO_COLOR || process.env.TERM === "dumb") return false;
@@ -4161,7 +4378,7 @@ function printBanner(opts) {
   console.log(`    ${c(D, "\u2192")} Data: ${opts.dataDir}`);
   console.log("");
   console.log(`  ${c(`${CYN}${B}`, "Dashboard:")}  ${c(U, opts.dashboardUrl)}`);
-  console.log(`  ${c(D, "Docs:       https://auritidesign.it/docs/kiro-memory/")}`);
+  console.log(`  ${c(D, "Docs:       https://auritidesign.it/docs/totalrecall/")}`);
   console.log("");
   console.log(`  ${c(D, LINE)}`);
   console.log(`  ${c(G[2], "Your AI assistant now has persistent memory.")}`);
@@ -4173,10 +4390,11 @@ function printBanner(opts) {
 // src/cli/contextkit.ts
 init_cli_utils();
 init_Observations();
+init_paths();
 import { execSync } from "child_process";
-import { existsSync as existsSync6, mkdirSync as mkdirSync5, readFileSync as readFileSync4, writeFileSync as writeFileSync3, appendFileSync as appendFileSync2 } from "fs";
+import { existsSync as existsSync6, mkdirSync as mkdirSync5, readFileSync as readFileSync4, writeFileSync as writeFileSync3, appendFileSync as appendFileSync2, unlinkSync as unlinkSync2 } from "fs";
 import { join as join5, dirname as dirname2 } from "path";
-import { homedir as homedir4, platform, release } from "os";
+import { homedir as homedir2, platform, release } from "os";
 import { fileURLToPath as fileURLToPath2 } from "url";
 import { createInterface } from "readline";
 import * as http from "http";
@@ -4192,12 +4410,12 @@ try {
 } catch {
 }
 var AGENT_TEMPLATE = JSON.stringify({
-  name: "kiro-memory",
-  description: "Agent with persistent cross-session memory. Uses Kiro Memory to remember context from previous sessions and automatically save what it learns.",
+  name: "totalrecall",
+  description: "Agent with persistent cross-session memory. Uses Total Recall to remember context from previous sessions and automatically save what it learns.",
   model: "claude-sonnet-4",
-  tools: ["read", "write", "shell", "glob", "grep", "web_search", "web_fetch", "@kiro-memory"],
+  tools: ["read", "write", "shell", "glob", "grep", "web_search", "web_fetch", "@totalrecall"],
   mcpServers: {
-    "kiro-memory": {
+    "totalrecall": {
       command: "node",
       args: ["__DIST_DIR__/servers/mcp-server.js"]
     }
@@ -4208,27 +4426,27 @@ var AGENT_TEMPLATE = JSON.stringify({
     postToolUse: [{ command: "node __DIST_DIR__/hooks/postToolUse.js", matcher: "*", timeout_ms: 5e3 }],
     stop: [{ command: "node __DIST_DIR__/hooks/stop.js", timeout_ms: 1e4 }]
   },
-  resources: ["file://.kiro/steering/kiro-memory.md"]
+  resources: ["file://.kiro/steering/totalrecall.md"]
 }, null, 2);
-var STEERING_CONTENT = `# Kiro Memory - Persistent Memory
+var STEERING_CONTENT = `# Total Recall - Persistent Memory
 
-You have access to Kiro Memory, a persistent cross-session memory system.
+You have access to Total Recall, a persistent cross-session memory system.
 
 ## Available MCP Tools
 
-### @kiro-memory/search
+### @totalrecall/search
 Search previous session memory. Use when:
 - The user mentions past work
 - You need context on previous decisions
 - You want to check if a problem was already addressed
 
-### @kiro-memory/get_context
+### @totalrecall/get_context
 Retrieve recent context for the current project. Use at the start of complex tasks to understand what was done before.
 
-### @kiro-memory/timeline
+### @totalrecall/timeline
 Show chronological context around an observation. Use to understand the sequence of events.
 
-### @kiro-memory/get_observations
+### @totalrecall/get_observations
 Retrieve full details of specific observations. Use after \`search\` to drill down.
 
 ## Behavior
@@ -4292,7 +4510,7 @@ function runEnvironmentChecks() {
   npm config set prefix ~/.npm-global
   echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.bashrc
   source ~/.bashrc
-  Then reinstall: npm install -g kiro-memory` : void 0
+  Then reinstall: npm install -g totalrecall` : void 0
       });
     } catch {
       checks.push({
@@ -4333,7 +4551,7 @@ function runEnvironmentChecks() {
     name: "better-sqlite3",
     ok: sqliteOk,
     message: sqliteMsg,
-    fix: !sqliteOk ? wsl ? "In WSL, rebuild the native module:\n  npm rebuild better-sqlite3\n  If that fails, reinstall:\n  npm install -g kiro-memory --build-from-source" : "Rebuild the native module:\n  npm rebuild better-sqlite3" : void 0
+    fix: !sqliteOk ? wsl ? "In WSL, rebuild the native module:\n  npm rebuild better-sqlite3\n  If that fails, reinstall:\n  npm install -g totalrecall --build-from-source" : "Rebuild the native module:\n  npm rebuild better-sqlite3" : void 0
   });
   if (os === "linux") {
     const hasMake = commandExists("make");
@@ -4349,7 +4567,7 @@ function runEnvironmentChecks() {
       message: allPresent ? "make, g++, python3 available" : `Missing: ${missing.join(", ")}`,
       fix: !allPresent ? `Install required packages:
   sudo apt-get update && sudo apt-get install -y ${missing.join(" ")}
-  Then reinstall: npm install -g kiro-memory --build-from-source` : void 0
+  Then reinstall: npm install -g totalrecall --build-from-source` : void 0
     });
   }
   return checks;
@@ -4382,9 +4600,9 @@ function askUser(question) {
 }
 function detectShellRc() {
   const shell = process.env.SHELL || "/bin/bash";
-  if (shell.includes("zsh")) return { name: "zsh", rcFile: join5(homedir4(), ".zshrc") };
-  if (shell.includes("fish")) return { name: "fish", rcFile: join5(homedir4(), ".config/fish/config.fish") };
-  return { name: "bash", rcFile: join5(homedir4(), ".bashrc") };
+  if (shell.includes("zsh")) return { name: "zsh", rcFile: join5(homedir2(), ".zshrc") };
+  if (shell.includes("fish")) return { name: "fish", rcFile: join5(homedir2(), ".config/fish/config.fish") };
+  return { name: "bash", rcFile: join5(homedir2(), ".bashrc") };
 }
 var AUTOFIXABLE_CHECKS = /* @__PURE__ */ new Set([
   "WSL: npm global prefix",
@@ -4406,7 +4624,7 @@ async function tryAutoFix(failedChecks) {
   console.log("");
   const answer = await askUser("  Fix automatically? [Y/n] ");
   if (answer !== "" && answer !== "y" && answer !== "yes") {
-    console.log("\n  Skipped auto-fix. Fix manually and run: kiro-memory install\n");
+    console.log("\n  Skipped auto-fix. Fix manually and run: totalrecall install\n");
     return { fixed: false, needsRestart: false };
   }
   console.log("");
@@ -4414,7 +4632,7 @@ async function tryAutoFix(failedChecks) {
   if (prefixCheck) {
     console.log("  Fixing npm global prefix...");
     try {
-      const npmGlobalDir = join5(homedir4(), ".npm-global");
+      const npmGlobalDir = join5(homedir2(), ".npm-global");
       mkdirSync5(npmGlobalDir, { recursive: true });
       const { spawnSync: spawnNpmConfig } = __require("child_process");
       spawnNpmConfig("npm", ["config", "set", "prefix", npmGlobalDir], { stdio: "ignore" });
@@ -4426,7 +4644,7 @@ async function tryAutoFix(failedChecks) {
       }
       if (!alreadyInRc) {
         appendFileSync2(rcFile, `
-# npm global prefix (added by kiro-memory)
+# npm global prefix (added by totalrecall)
 ${exportLine}
 `);
       }
@@ -4441,7 +4659,7 @@ ${exportLine}
   const npmBinaryCheck = fixable.find((c) => c.name === "WSL: npm binary");
   if (npmBinaryCheck) {
     console.log("\n  Fixing npm binary (installing nvm + Node.js 22)...");
-    const nvmDir = join5(homedir4(), ".nvm");
+    const nvmDir = join5(homedir2(), ".nvm");
     try {
       if (existsSync6(nvmDir)) {
         console.log(`  nvm already installed at ${nvmDir}`);
@@ -4491,7 +4709,7 @@ ${exportLine}
       const { spawnSync: spawnRebuild } = __require("child_process");
       const globalDirResult = spawnRebuild("npm", ["prefix", "-g"], { encoding: "utf8", stdio: ["pipe", "pipe", "ignore"] });
       const globalDir = (globalDirResult.stdout || "").trim();
-      const sqlitePkg = join5(globalDir, "lib", "node_modules", "kiro-memory");
+      const sqlitePkg = join5(globalDir, "lib", "node_modules", "totalrecall");
       if (existsSync6(sqlitePkg)) {
         spawnRebuild("npm", ["rebuild", "better-sqlite3"], {
           cwd: sqlitePkg,
@@ -4505,14 +4723,14 @@ ${exportLine}
       anyFixed = true;
     } catch (err) {
       console.log(`  \x1B[31m\u2717\x1B[0m Could not rebuild: ${err.message}`);
-      console.log("  Try: npm install -g kiro-memory --build-from-source");
+      console.log("  Try: npm install -g totalrecall --build-from-source");
     }
   }
   console.log("");
   return { fixed: anyFixed, needsRestart };
 }
 async function installKiro() {
-  console.log("\n=== Kiro Memory - Installation ===\n");
+  console.log("\n=== Total Recall - Installation ===\n");
   console.log("[1/4] Running environment checks...");
   let checks = runEnvironmentChecks();
   let { hasErrors } = printChecks(checks);
@@ -4523,8 +4741,8 @@ async function installKiro() {
       console.log("  \x1B[33m\u2502\x1B[0m  Node.js was installed via nvm. To activate it:         \x1B[33m\u2502\x1B[0m");
       console.log("  \x1B[33m\u2502\x1B[0m                                                         \x1B[33m\u2502\x1B[0m");
       console.log("  \x1B[33m\u2502\x1B[0m  1. Close and reopen your terminal                      \x1B[33m\u2502\x1B[0m");
-      console.log("  \x1B[33m\u2502\x1B[0m  2. Run: \x1B[1mnpm install -g kiro-memory\x1B[0m                     \x1B[33m\u2502\x1B[0m");
-      console.log("  \x1B[33m\u2502\x1B[0m  3. Run: \x1B[1mkiro-memory install\x1B[0m                            \x1B[33m\u2502\x1B[0m");
+      console.log("  \x1B[33m\u2502\x1B[0m  2. Run: \x1B[1mnpm install -g totalrecall\x1B[0m                     \x1B[33m\u2502\x1B[0m");
+      console.log("  \x1B[33m\u2502\x1B[0m  3. Run: \x1B[1mtotalrecall install\x1B[0m                            \x1B[33m\u2502\x1B[0m");
       console.log("  \x1B[33m\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\x1B[0m\n");
       process.exit(0);
     }
@@ -4535,22 +4753,22 @@ async function installKiro() {
     }
     if (hasErrors) {
       console.log("\x1B[31mInstallation aborted.\x1B[0m Fix the remaining issues and retry.");
-      console.log("After fixing, run: kiro-memory install\n");
+      console.log("After fixing, run: totalrecall install\n");
       process.exit(1);
     }
   }
   const distDir = DIST_DIR;
-  const kiroDir = process.env.KIRO_CONFIG_DIR || join5(homedir4(), ".kiro");
+  const kiroDir = KIRO_CONFIG_DIR;
   const agentsDir = join5(kiroDir, "agents");
   const settingsDir = join5(kiroDir, "settings");
   const steeringDir = join5(kiroDir, "steering");
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join5(homedir4(), ".contextkit");
+  const dataDir = DATA_DIR;
   console.log("[2/4] Installing Kiro configuration...\n");
   for (const dir of [agentsDir, settingsDir, steeringDir, dataDir]) {
     mkdirSync5(dir, { recursive: true });
   }
   const agentConfig = AGENT_TEMPLATE.replace(/__DIST_DIR__/g, distDir);
-  const agentDestPath = join5(agentsDir, "kiro-memory.json");
+  const agentDestPath = join5(agentsDir, "totalrecall.json");
   writeFileSync3(agentDestPath, agentConfig, "utf8");
   console.log(`  \u2192 Agent config: ${agentDestPath}`);
   const mcpFilePath = join5(settingsDir, "mcp.json");
@@ -4562,30 +4780,30 @@ async function installKiro() {
     } catch {
     }
   }
-  mcpConfig.mcpServers["kiro-memory"] = {
+  mcpConfig.mcpServers["totalrecall"] = {
     command: "node",
     args: [join5(distDir, "servers", "mcp-server.js")]
   };
   writeFileSync3(mcpFilePath, JSON.stringify(mcpConfig, null, 2), "utf8");
   console.log(`  \u2192 MCP config:   ${mcpFilePath}`);
-  const steeringDestPath = join5(steeringDir, "kiro-memory.md");
+  const steeringDestPath = join5(steeringDir, "totalrecall.md");
   writeFileSync3(steeringDestPath, STEERING_CONTENT, "utf8");
   console.log(`  \u2192 Steering:     ${steeringDestPath}`);
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/4] Shell alias setup\n");
   const { rcFile } = detectShellRc();
-  const aliasLine = 'alias kiro="kiro-cli --agent kiro-memory"';
+  const aliasLine = 'alias kiro="kiro-cli --agent totalrecall"';
   let aliasAlreadySet = false;
   if (existsSync6(rcFile)) {
     const rcContent = readFileSync4(rcFile, "utf8");
-    aliasAlreadySet = rcContent.includes("alias kiro=") && rcContent.includes("kiro-memory");
+    aliasAlreadySet = rcContent.includes("alias kiro=") && rcContent.includes("totalrecall");
   }
   if (aliasAlreadySet) {
     console.log(`  \x1B[32m\u2713\x1B[0m Alias already configured in ${rcFile}`);
   } else {
     console.log("  \x1B[36m\u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\x1B[0m");
     console.log("  \x1B[36m\u2502\x1B[0m  Without an alias, you must type every time:            \x1B[36m\u2502\x1B[0m");
-    console.log("  \x1B[36m\u2502\x1B[0m    \x1B[2mkiro-cli --agent kiro-memory\x1B[0m                          \x1B[36m\u2502\x1B[0m");
+    console.log("  \x1B[36m\u2502\x1B[0m    \x1B[2mkiro-cli --agent totalrecall\x1B[0m                          \x1B[36m\u2502\x1B[0m");
     console.log("  \x1B[36m\u2502\x1B[0m                                                         \x1B[36m\u2502\x1B[0m");
     console.log("  \x1B[36m\u2502\x1B[0m  With the alias, just type:                              \x1B[36m\u2502\x1B[0m");
     console.log("  \x1B[36m\u2502\x1B[0m    \x1B[1m\x1B[32mkiro\x1B[0m                                                 \x1B[36m\u2502\x1B[0m");
@@ -4595,7 +4813,7 @@ async function installKiro() {
     if (answer === "" || answer === "y" || answer === "yes") {
       try {
         appendFileSync2(rcFile, `
-# Kiro Memory \u2014 persistent memory alias
+# Total Recall \u2014 persistent memory alias
 ${aliasLine}
 `);
         console.log(`
@@ -4628,28 +4846,28 @@ ${aliasLine}
   if (aliasAlreadySet) {
     console.log("    \x1B[1mkiro\x1B[0m\n");
   } else {
-    console.log("    \x1B[1mkiro-cli --agent kiro-memory\x1B[0m\n");
+    console.log("    \x1B[1mkiro-cli --agent totalrecall\x1B[0m\n");
   }
 }
-var CLAUDE_CODE_STEERING = `# Kiro Memory - Persistent Cross-Session Memory
+var CLAUDE_CODE_STEERING = `# Total Recall - Persistent Cross-Session Memory
 
-You have access to Kiro Memory, a persistent cross-session memory system that remembers context across sessions.
+You have access to Total Recall, a persistent cross-session memory system that remembers context across sessions.
 
 ## Available MCP Tools
 
-### kiro-memory/search
+### totalrecall/search
 Search previous session memory. Use when:
 - The user mentions past work or previous sessions
 - You need context on previous decisions
 - You want to check if a problem was already addressed
 
-### kiro-memory/get_context
+### totalrecall/get_context
 Retrieve recent context for the current project. Use at the start of complex tasks.
 
-### kiro-memory/timeline
+### totalrecall/timeline
 Show chronological context around an observation. Use to understand sequences of events.
 
-### kiro-memory/get_observations
+### totalrecall/get_observations
 Retrieve full details of specific observations by ID. Use after search to drill down.
 
 ## Behavior
@@ -4660,14 +4878,14 @@ Retrieve full details of specific observations by ID. Use after search to drill 
 - No manual saving needed: the system is fully automatic
 `;
 async function installClaudeCode() {
-  console.log("\n=== Kiro Memory - Claude Code Installation ===\n");
+  console.log("\n=== Total Recall - Claude Code Installation ===\n");
   console.log("[1/3] Running environment checks...");
   const checks = runEnvironmentChecks();
   const { hasErrors } = printChecks(checks);
   if (hasErrors) {
     const { fixed, needsRestart } = await tryAutoFix(checks);
     if (needsRestart) {
-      console.log("  \x1B[33mRestart your terminal and re-run: kiro-memory install --claude-code\x1B[0m\n");
+      console.log("  \x1B[33mRestart your terminal and re-run: totalrecall install --claude-code\x1B[0m\n");
       process.exit(0);
     }
     if (fixed) {
@@ -4684,8 +4902,8 @@ async function installClaudeCode() {
     }
   }
   const distDir = DIST_DIR;
-  const claudeDir = join5(homedir4(), ".claude");
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join5(homedir4(), ".kiro-memory");
+  const claudeDir = join5(homedir2(), ".claude");
+  const dataDir = DATA_DIR;
   console.log("[2/3] Installing Claude Code configuration...\n");
   mkdirSync5(claudeDir, { recursive: true });
   mkdirSync5(dataDir, { recursive: true });
@@ -4717,7 +4935,7 @@ async function installClaudeCode() {
     } else if (Array.isArray(settings[event])) {
       settings[event] = settings[event].filter(
         (h) => !h.hooks?.some(
-          (hk) => hk.command?.includes("kiro-memory") || hk.command?.includes("contextkit")
+          (hk) => hk.command?.includes("totalrecall") || hk.command?.includes("contextkit")
         )
       );
       settings[event].push(hookEntry);
@@ -4725,7 +4943,7 @@ async function installClaudeCode() {
   }
   writeFileSync3(settingsPath, JSON.stringify(settings, null, 2), "utf8");
   console.log(`  \u2192 Hooks config: ${settingsPath}`);
-  const mcpPath = join5(homedir4(), ".mcp.json");
+  const mcpPath = join5(homedir2(), ".mcp.json");
   let mcpConfig = {};
   if (existsSync6(mcpPath)) {
     try {
@@ -4734,7 +4952,7 @@ async function installClaudeCode() {
     }
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
-  mcpConfig.mcpServers["kiro-memory"] = {
+  mcpConfig.mcpServers["totalrecall"] = {
     command: "node",
     args: [join5(distDir, "servers", "mcp-server.js")]
   };
@@ -4745,7 +4963,7 @@ async function installClaudeCode() {
   if (existsSync6(steeringPath)) {
     existingSteering = readFileSync4(steeringPath, "utf8");
   }
-  if (!existingSteering.includes("Kiro Memory")) {
+  if (!existingSteering.includes("Total Recall")) {
     const separator = existingSteering.length > 0 ? "\n\n---\n\n" : "";
     writeFileSync3(steeringPath, existingSteering + separator + CLAUDE_CODE_STEERING, "utf8");
     console.log(`  \u2192 Steering:     ${steeringPath}`);
@@ -4767,14 +4985,14 @@ async function installClaudeCode() {
   });
 }
 async function installCursor() {
-  console.log("\n=== Kiro Memory - Cursor Installation ===\n");
+  console.log("\n=== Total Recall - Cursor Installation ===\n");
   console.log("[1/3] Running environment checks...");
   const checks = runEnvironmentChecks();
   const { hasErrors } = printChecks(checks);
   if (hasErrors) {
     const { fixed, needsRestart } = await tryAutoFix(checks);
     if (needsRestart) {
-      console.log("  \x1B[33mRestart your terminal and re-run: kiro-memory install --cursor\x1B[0m\n");
+      console.log("  \x1B[33mRestart your terminal and re-run: totalrecall install --cursor\x1B[0m\n");
       process.exit(0);
     }
     if (fixed) {
@@ -4791,8 +5009,8 @@ async function installCursor() {
     }
   }
   const distDir = DIST_DIR;
-  const cursorDir = join5(homedir4(), ".cursor");
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join5(homedir4(), ".kiro-memory");
+  const cursorDir = join5(homedir2(), ".cursor");
+  const dataDir = DATA_DIR;
   console.log("[2/3] Installing Cursor configuration...\n");
   mkdirSync5(cursorDir, { recursive: true });
   mkdirSync5(dataDir, { recursive: true });
@@ -4822,7 +5040,7 @@ async function installCursor() {
       hooksConfig.hooks[event] = [hookEntry];
     } else if (Array.isArray(hooksConfig.hooks[event])) {
       hooksConfig.hooks[event] = hooksConfig.hooks[event].filter(
-        (h) => !h.command?.includes("kiro-memory") && !h.command?.includes("contextkit")
+        (h) => !h.command?.includes("totalrecall") && !h.command?.includes("contextkit")
       );
       hooksConfig.hooks[event].push(hookEntry);
     }
@@ -4838,7 +5056,7 @@ async function installCursor() {
     }
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
-  mcpConfig.mcpServers["kiro-memory"] = {
+  mcpConfig.mcpServers["totalrecall"] = {
     command: "node",
     args: [join5(distDir, "servers", "mcp-server.js")]
   };
@@ -4858,14 +5076,14 @@ async function installCursor() {
   });
 }
 async function installWindsurf() {
-  console.log("\n=== Kiro Memory - Windsurf Installation ===\n");
+  console.log("\n=== Total Recall - Windsurf Installation ===\n");
   console.log("[1/3] Running environment checks...");
   const checks = runEnvironmentChecks();
   const { hasErrors } = printChecks(checks);
   if (hasErrors) {
     const { fixed, needsRestart } = await tryAutoFix(checks);
     if (needsRestart) {
-      console.log("  \x1B[33mRestart your terminal and re-run: kiro-memory install --windsurf\x1B[0m\n");
+      console.log("  \x1B[33mRestart your terminal and re-run: totalrecall install --windsurf\x1B[0m\n");
       process.exit(0);
     }
     if (fixed) {
@@ -4882,10 +5100,10 @@ async function installWindsurf() {
     }
   }
   const distDir = DIST_DIR;
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join5(homedir4(), ".kiro-memory");
+  const dataDir = DATA_DIR;
   console.log("[2/3] Installing Windsurf configuration...\n");
   mkdirSync5(dataDir, { recursive: true });
-  const windsurfDir = join5(homedir4(), ".codeium", "windsurf");
+  const windsurfDir = join5(homedir2(), ".codeium", "windsurf");
   mkdirSync5(windsurfDir, { recursive: true });
   const mcpPath = join5(windsurfDir, "mcp_config.json");
   let mcpConfig = {};
@@ -4896,7 +5114,7 @@ async function installWindsurf() {
     }
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
-  mcpConfig.mcpServers["kiro-memory"] = {
+  mcpConfig.mcpServers["totalrecall"] = {
     command: "node",
     args: [join5(distDir, "servers", "mcp-server.js")]
   };
@@ -4914,17 +5132,17 @@ async function installWindsurf() {
     ]
   });
   console.log("  \x1B[2mTip: Add a .windsurfrules file to your project with instructions");
-  console.log("  to use the kiro-memory MCP tools for persistent context.\x1B[0m\n");
+  console.log("  to use the totalrecall MCP tools for persistent context.\x1B[0m\n");
 }
 async function installCline() {
-  console.log("\n=== Kiro Memory - Cline Installation ===\n");
+  console.log("\n=== Total Recall - Cline Installation ===\n");
   console.log("[1/3] Running environment checks...");
   const checks = runEnvironmentChecks();
   const { hasErrors } = printChecks(checks);
   if (hasErrors) {
     const { fixed, needsRestart } = await tryAutoFix(checks);
     if (needsRestart) {
-      console.log("  \x1B[33mRestart your terminal and re-run: kiro-memory install --cline\x1B[0m\n");
+      console.log("  \x1B[33mRestart your terminal and re-run: totalrecall install --cline\x1B[0m\n");
       process.exit(0);
     }
     if (fixed) {
@@ -4941,15 +5159,15 @@ async function installCline() {
     }
   }
   const distDir = DIST_DIR;
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join5(homedir4(), ".kiro-memory");
+  const dataDir = DATA_DIR;
   console.log("[2/3] Installing Cline configuration...\n");
   mkdirSync5(dataDir, { recursive: true });
   const platform2 = process.platform;
   let clineSettingsDir;
   if (platform2 === "darwin") {
-    clineSettingsDir = join5(homedir4(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
+    clineSettingsDir = join5(homedir2(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
   } else {
-    clineSettingsDir = join5(homedir4(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
+    clineSettingsDir = join5(homedir2(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
   }
   mkdirSync5(clineSettingsDir, { recursive: true });
   const mcpPath = join5(clineSettingsDir, "cline_mcp_settings.json");
@@ -4961,7 +5179,7 @@ async function installCline() {
     }
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
-  mcpConfig.mcpServers["kiro-memory"] = {
+  mcpConfig.mcpServers["totalrecall"] = {
     command: "node",
     args: [join5(distDir, "servers", "mcp-server.js")]
   };
@@ -4979,41 +5197,41 @@ async function installCline() {
     ]
   });
   console.log("  \x1B[2mTip: Add a .clinerules file to your project with instructions");
-  console.log("  to use the kiro-memory MCP tools for persistent context.\x1B[0m\n");
+  console.log("  to use the totalrecall MCP tools for persistent context.\x1B[0m\n");
 }
 async function runDoctor() {
-  console.log("\n=== Kiro Memory - Diagnostics ===");
+  console.log("\n=== Total Recall - Diagnostics ===");
   const checks = runEnvironmentChecks();
-  const kiroDir = process.env.KIRO_CONFIG_DIR || join5(homedir4(), ".kiro");
-  const agentPath = join5(kiroDir, "agents", "kiro-memory.json");
+  const kiroDir = KIRO_CONFIG_DIR;
+  const agentPath = join5(kiroDir, "agents", "totalrecall.json");
   const mcpPath = join5(kiroDir, "settings", "mcp.json");
-  const dataDir = process.env.KIRO_MEMORY_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join5(homedir4(), ".contextkit");
+  const dataDir = DATA_DIR;
   checks.push({
     name: "Kiro agent config",
     ok: existsSync6(agentPath),
     message: existsSync6(agentPath) ? agentPath : "Not found",
-    fix: !existsSync6(agentPath) ? "Run: kiro-memory install" : void 0
+    fix: !existsSync6(agentPath) ? "Run: totalrecall install" : void 0
   });
   let mcpOk = false;
   if (existsSync6(mcpPath)) {
     try {
       const mcp = JSON.parse(readFileSync4(mcpPath, "utf8"));
-      mcpOk = !!mcp.mcpServers?.["kiro-memory"] || !!mcp.mcpServers?.contextkit;
+      mcpOk = !!mcp.mcpServers?.["totalrecall"] || !!mcp.mcpServers?.contextkit;
     } catch {
     }
   }
   checks.push({
     name: "MCP server configured",
     ok: mcpOk,
-    message: mcpOk ? "kiro-memory registered in mcp.json" : "Not configured",
-    fix: !mcpOk ? "Run: kiro-memory install" : void 0
+    message: mcpOk ? "totalrecall registered in mcp.json" : "Not configured",
+    fix: !mcpOk ? "Run: totalrecall install" : void 0
   });
   checks.push({
     name: "Data directory",
     ok: existsSync6(dataDir),
     message: existsSync6(dataDir) ? dataDir : "Not created (will be created on first use)"
   });
-  const claudeDir = join5(homedir4(), ".claude");
+  const claudeDir = join5(homedir2(), ".claude");
   const claudeSettingsPath = join5(claudeDir, "settings.json");
   let claudeHooksOk = false;
   if (existsSync6(claudeSettingsPath)) {
@@ -5022,17 +5240,17 @@ async function runDoctor() {
       claudeHooksOk = !!(claudeSettings?.SessionStart || claudeSettings?.PostToolUse);
       if (claudeHooksOk) {
         const allSettings = JSON.stringify(claudeSettings);
-        claudeHooksOk = allSettings.includes("kiro-memory") || allSettings.includes("agentSpawn");
+        claudeHooksOk = allSettings.includes("totalrecall") || allSettings.includes("agentSpawn");
       }
     } catch {
     }
   }
-  const claudeMcpPath = join5(homedir4(), ".mcp.json");
+  const claudeMcpPath = join5(homedir2(), ".mcp.json");
   let claudeMcpOk = false;
   if (existsSync6(claudeMcpPath)) {
     try {
       const claudeMcp = JSON.parse(readFileSync4(claudeMcpPath, "utf8"));
-      claudeMcpOk = !!claudeMcp.mcpServers?.["kiro-memory"];
+      claudeMcpOk = !!claudeMcp.mcpServers?.["totalrecall"];
     } catch {
     }
   }
@@ -5040,15 +5258,15 @@ async function runDoctor() {
     name: "Claude Code hooks",
     ok: true,
     // Non-blocking: optional installation
-    message: claudeHooksOk ? "Configured in ~/.claude/settings.json" : "Not configured (optional: run kiro-memory install --claude-code)"
+    message: claudeHooksOk ? "Configured in ~/.claude/settings.json" : "Not configured (optional: run totalrecall install --claude-code)"
   });
   checks.push({
     name: "Claude Code MCP",
     ok: true,
     // Non-blocking: optional installation
-    message: claudeMcpOk ? "kiro-memory registered in ~/.mcp.json" : "Not configured (optional: run kiro-memory install --claude-code)"
+    message: claudeMcpOk ? "totalrecall registered in ~/.mcp.json" : "Not configured (optional: run totalrecall install --claude-code)"
   });
-  const cursorDir = join5(homedir4(), ".cursor");
+  const cursorDir = join5(homedir2(), ".cursor");
   const cursorHooksPath = join5(cursorDir, "hooks.json");
   let cursorHooksOk = false;
   if (existsSync6(cursorHooksPath)) {
@@ -5057,7 +5275,7 @@ async function runDoctor() {
       cursorHooksOk = !!(cursorHooks.hooks?.sessionStart || cursorHooks.hooks?.afterFileEdit);
       if (cursorHooksOk) {
         const allHooks = JSON.stringify(cursorHooks.hooks);
-        cursorHooksOk = allHooks.includes("kiro-memory") || allHooks.includes("agentSpawn");
+        cursorHooksOk = allHooks.includes("totalrecall") || allHooks.includes("agentSpawn");
       }
     } catch {
     }
@@ -5067,7 +5285,7 @@ async function runDoctor() {
   if (existsSync6(cursorMcpPath)) {
     try {
       const cursorMcp = JSON.parse(readFileSync4(cursorMcpPath, "utf8"));
-      cursorMcpOk = !!cursorMcp.mcpServers?.["kiro-memory"];
+      cursorMcpOk = !!cursorMcp.mcpServers?.["totalrecall"];
     } catch {
     }
   }
@@ -5075,20 +5293,20 @@ async function runDoctor() {
     name: "Cursor hooks",
     ok: true,
     // Non-blocking: optional installation
-    message: cursorHooksOk ? "Configured in ~/.cursor/hooks.json" : "Not configured (optional: run kiro-memory install --cursor)"
+    message: cursorHooksOk ? "Configured in ~/.cursor/hooks.json" : "Not configured (optional: run totalrecall install --cursor)"
   });
   checks.push({
     name: "Cursor MCP",
     ok: true,
     // Non-blocking: optional installation
-    message: cursorMcpOk ? "kiro-memory registered in ~/.cursor/mcp.json" : "Not configured (optional: run kiro-memory install --cursor)"
+    message: cursorMcpOk ? "totalrecall registered in ~/.cursor/mcp.json" : "Not configured (optional: run totalrecall install --cursor)"
   });
-  const windsurfMcpPath = join5(homedir4(), ".codeium", "windsurf", "mcp_config.json");
+  const windsurfMcpPath = join5(homedir2(), ".codeium", "windsurf", "mcp_config.json");
   let windsurfMcpOk = false;
   if (existsSync6(windsurfMcpPath)) {
     try {
       const windsurfMcp = JSON.parse(readFileSync4(windsurfMcpPath, "utf8"));
-      windsurfMcpOk = !!windsurfMcp.mcpServers?.["kiro-memory"];
+      windsurfMcpOk = !!windsurfMcp.mcpServers?.["totalrecall"];
     } catch {
     }
   }
@@ -5096,21 +5314,21 @@ async function runDoctor() {
     name: "Windsurf MCP",
     ok: true,
     // Non-blocking: optional installation
-    message: windsurfMcpOk ? "kiro-memory registered in ~/.codeium/windsurf/mcp_config.json" : "Not configured (optional: run kiro-memory install --windsurf)"
+    message: windsurfMcpOk ? "totalrecall registered in ~/.codeium/windsurf/mcp_config.json" : "Not configured (optional: run totalrecall install --windsurf)"
   });
   const clinePlatform = process.platform;
   let clineSettingsBase;
   if (clinePlatform === "darwin") {
-    clineSettingsBase = join5(homedir4(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
+    clineSettingsBase = join5(homedir2(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
   } else {
-    clineSettingsBase = join5(homedir4(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
+    clineSettingsBase = join5(homedir2(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
   }
   const clineMcpPath = join5(clineSettingsBase, "cline_mcp_settings.json");
   let clineMcpOk = false;
   if (existsSync6(clineMcpPath)) {
     try {
       const clineMcp = JSON.parse(readFileSync4(clineMcpPath, "utf8"));
-      clineMcpOk = !!clineMcp.mcpServers?.["kiro-memory"];
+      clineMcpOk = !!clineMcp.mcpServers?.["totalrecall"];
     } catch {
     }
   }
@@ -5118,11 +5336,11 @@ async function runDoctor() {
     name: "Cline MCP",
     ok: true,
     // Non-blocking: optional installation
-    message: clineMcpOk ? `kiro-memory registered in cline_mcp_settings.json` : "Not configured (optional: run kiro-memory install --cline)"
+    message: clineMcpOk ? `totalrecall registered in cline_mcp_settings.json` : "Not configured (optional: run totalrecall install --cline)"
   });
   let workerOk = false;
   try {
-    const port = process.env.KIRO_MEMORY_WORKER_PORT || "3001";
+    const port = process.env.TOTALRECALL_WORKER_PORT || "3001";
     execSync(`curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${port}/health`, {
       timeout: 2e3,
       encoding: "utf8"
@@ -5141,7 +5359,7 @@ async function runDoctor() {
     console.log("Some checks failed. Fix the issues listed above.\n");
     process.exit(1);
   } else {
-    console.log("All good! Kiro Memory is ready.\n");
+    console.log("All good! Total Recall is ready.\n");
   }
 }
 async function main() {
@@ -5168,7 +5386,7 @@ async function main() {
     return;
   }
   if (command === "export") {
-    const sdk2 = createKiroMemory();
+    const sdk2 = createTotalRecall();
     try {
       await exportObservations(sdk2, args.slice(1));
     } finally {
@@ -5192,11 +5410,15 @@ async function main() {
     await handleBackup(args.slice(1));
     return;
   }
+  if (command === "worker:start" || command === "worker:stop" || command === "worker:restart" || command === "worker:status") {
+    await handleWorker(command);
+    return;
+  }
   if (command === "plugins") {
     await handlePlugins(args.slice(1));
     return;
   }
-  const sdk = createKiroMemory();
+  const sdk = createTotalRecall();
   try {
     switch (command) {
       case "context":
@@ -5253,7 +5475,7 @@ async function main() {
         showHelp();
         break;
       default:
-        console.log("Kiro Memory CLI\n");
+        console.log("Total Recall CLI\n");
         showHelp();
         process.exit(1);
     }
@@ -5431,7 +5653,7 @@ async function handleEmbeddings(sdk, subcommand) {
       console.log(`  Available:           ${embService.isAvailable() ? "yes" : "no"}`);
       if (stats.percentage < 100 && stats.total > 0) {
         console.log(`
-  Run 'kiro-memory embeddings backfill' to generate missing embeddings.`);
+  Run 'totalrecall embeddings backfill' to generate missing embeddings.`);
       }
       console.log("");
       break;
@@ -5458,7 +5680,7 @@ Generating embeddings (batch size: ${batchSize})...
       break;
     }
     default:
-      console.log("\nUsage: kiro-memory embeddings <subcommand>\n");
+      console.log("\nUsage: totalrecall embeddings <subcommand>\n");
       console.log("Subcommands:");
       console.log("  stats              Show embedding statistics");
       console.log("  backfill [size]    Generate embeddings for observations without them (default: 50)\n");
@@ -5535,7 +5757,7 @@ ${dryRun ? "[DRY RUN] " : ""}Consolidating duplicate observations...
       break;
     }
     default:
-      console.log("\nUsage: kiro-memory decay <subcommand>\n");
+      console.log("\nUsage: totalrecall decay <subcommand>\n");
       console.log("Subcommands:");
       console.log("  stats                Show decay statistics (stale, never accessed, etc.)");
       console.log("  detect-stale         Detect and mark stale observations (files changed)");
@@ -5637,7 +5859,7 @@ Risultati per: "${queryArg}"
   const bold = (s) => useColor ? `\x1B[1m${s}\x1B[0m` : s;
   const dim = (s) => useColor ? `\x1B[2m${s}\x1B[0m` : s;
   console.log(`
-${cyan("=== Kiro Memory \u2014 Ricerca Interattiva ===")}`);
+${cyan("=== Total Recall \u2014 Ricerca Interattiva ===")}`);
   if (projectArg) console.log(dim(`  Filtro progetto: ${projectArg}`));
   console.log(dim('  Premi Ctrl+C o digita "exit" per uscire.\n'));
   while (true) {
@@ -5700,7 +5922,7 @@ async function exportObservations(sdk, cliArgs) {
       console.error("Errore: --project <nome> \xE8 obbligatorio per il formato json/md");
       process.exit(1);
     }
-    const kmDb2 = new KiroMemoryDatabase();
+    const kmDb2 = new TotalRecallDatabase();
     let observations;
     try {
       observations = getObservationsByProject(kmDb2.db, projectArg, 1e4);
@@ -5728,7 +5950,7 @@ async function exportObservations(sdk, cliArgs) {
   if (typeArg) filters.type = typeArg;
   if (fromArg) filters.from = fromArg;
   if (toArg) filters.to = toArg;
-  const kmDb = new KiroMemoryDatabase();
+  const kmDb = new TotalRecallDatabase();
   try {
     if (outputArg) {
       const { createWriteStream } = await import("fs");
@@ -5770,7 +5992,7 @@ async function importObservations(cliArgs) {
   const filePath = cliArgs.find((a) => !a.startsWith("-"));
   const dryRun = cliArgs.includes("--dry-run");
   if (!filePath) {
-    console.error("Errore: specifica il percorso del file JSONL\n  kiro-memory import <file.jsonl> [--dry-run]");
+    console.error("Errore: specifica il percorso del file JSONL\n  totalrecall import <file.jsonl> [--dry-run]");
     process.exit(1);
   }
   if (!existsSync6(filePath)) {
@@ -5795,7 +6017,7 @@ async function importObservations(cliArgs) {
   }
   const { importJsonl: importJsonl2 } = await Promise.resolve().then(() => (init_ImportExport(), ImportExport_exports));
   const { formatImportResult: formatImportResult2 } = await Promise.resolve().then(() => (init_cli_utils(), cli_utils_exports));
-  const kmDb = new KiroMemoryDatabase();
+  const kmDb = new TotalRecallDatabase();
   let result;
   try {
     result = importJsonl2(kmDb.db, content, dryRun);
@@ -5816,8 +6038,8 @@ async function importObservations(cliArgs) {
   }
 }
 async function runDoctorFix() {
-  console.log("\n=== Kiro Memory \u2014 Riparazione Database ===\n");
-  const kmDb = new KiroMemoryDatabase();
+  console.log("\n=== Total Recall \u2014 Riparazione Database ===\n");
+  const kmDb = new TotalRecallDatabase();
   const db = kmDb.db;
   const messages = [];
   try {
@@ -5853,7 +6075,7 @@ async function runDoctorFix() {
   console.log("");
 }
 async function showStats() {
-  const kmDb = new KiroMemoryDatabase();
+  const kmDb = new TotalRecallDatabase();
   const db = kmDb.db;
   try {
     const obsRow = db.query(
@@ -5905,7 +6127,7 @@ async function handleConfig(subArgs) {
   switch (subcommand) {
     case "list": {
       const config = listConfig(configPath);
-      console.log("\n=== Configurazione Kiro Memory ===\n");
+      console.log("\n=== Configurazione Total Recall ===\n");
       console.log(`  File: ${configPath}
 `);
       for (const [key, value] of Object.entries(config)) {
@@ -5918,7 +6140,7 @@ async function handleConfig(subArgs) {
     case "get": {
       const key = subArgs[1];
       if (!key) {
-        console.error("Errore: specifica una chiave\n  kiro-memory config get <chiave>");
+        console.error("Errore: specifica una chiave\n  totalrecall config get <chiave>");
         process.exit(1);
       }
       const val = getConfigValue(key, configPath);
@@ -5937,12 +6159,12 @@ async function handleConfig(subArgs) {
       const key = subArgs[1];
       const rawValue = subArgs[2];
       if (!key) {
-        console.error("Errore: specifica chiave e valore\n  kiro-memory config set <chiave> <valore>");
+        console.error("Errore: specifica chiave e valore\n  totalrecall config set <chiave> <valore>");
         process.exit(1);
       }
       if (rawValue === void 0) {
         console.error(`Errore: valore mancante per "${key}"
-  kiro-memory config set ${key} <valore>`);
+  totalrecall config set ${key} <valore>`);
         process.exit(1);
       }
       const saved = setConfigValue(key, rawValue, configPath);
@@ -5952,22 +6174,22 @@ async function handleConfig(subArgs) {
       break;
     }
     default:
-      console.log("\nUtilizzo: kiro-memory config <subcommand>\n");
+      console.log("\nUtilizzo: totalrecall config <subcommand>\n");
       console.log("Subcommands:");
       console.log("  list                         Mostra tutte le impostazioni");
       console.log("  get <chiave>                 Legge un valore");
       console.log("  set <chiave> <valore>        Imposta un valore\n");
       console.log("Esempio:");
-      console.log("  kiro-memory config list");
-      console.log("  kiro-memory config get worker.port");
-      console.log("  kiro-memory config set log.level DEBUG\n");
+      console.log("  totalrecall config list");
+      console.log("  totalrecall config get worker.port");
+      console.log("  totalrecall config set log.level DEBUG\n");
   }
 }
 async function handleBackup(subArgs) {
   const subCommand = subArgs[0];
   if (!subCommand || subCommand === "help") {
     console.log(`
-Uso: kiro-memory backup <sottocomando>
+Uso: totalrecall backup <sottocomando>
 
 Sottocomandi:
   create              Crea un backup manuale del database
@@ -5978,12 +6200,12 @@ Sottocomandi:
   }
   if (subCommand === "create") {
     const maxKeep = Number(getConfigValue("backup.maxKeep")) || 7;
-    const db = new KiroMemoryDatabase(DB_PATH, true);
+    const db = new TotalRecallDatabase(DB_PATH, true);
     try {
       const entry = createBackup(DB_PATH, BACKUPS_DIR, db.db);
       const deleted = rotateBackups(BACKUPS_DIR, maxKeep);
       console.log(`
-=== Kiro Memory \u2014 Backup Creato ===
+=== Total Recall \u2014 Backup Creato ===
 `);
       console.log(`  File:        ${entry.metadata.filename}`);
       console.log(`  Timestamp:   ${entry.metadata.timestamp}`);
@@ -6009,7 +6231,7 @@ Sottocomandi:
       return;
     }
     console.log(`
-=== Kiro Memory \u2014 Backup Disponibili ===
+=== Total Recall \u2014 Backup Disponibili ===
 `);
     console.log(`  Directory: ${BACKUPS_DIR}
 `);
@@ -6030,7 +6252,7 @@ Sottocomandi:
     const file = subArgs[1];
     if (!file) {
       console.error("\n  Errore: specifica il nome del file backup da ripristinare.");
-      console.error("  Esempio: kiro-memory backup restore backup-2026-02-27-150000.db\n");
+      console.error("  Esempio: totalrecall backup restore backup-2026-02-27-150000.db\n");
       process.exit(1);
     }
     const backupPattern = /^backup-\d{4}-\d{2}-\d{2}-\d{6}(-\d{3})?\.db$/;
@@ -6045,7 +6267,7 @@ Sottocomandi:
     if (!found) {
       console.error(`
   Errore: backup non trovato: ${file}`);
-      console.error(`  Usa "kiro-memory backup list" per vedere i backup disponibili.
+      console.error(`  Usa "totalrecall backup list" per vedere i backup disponibili.
 `);
       process.exit(1);
     }
@@ -6078,9 +6300,164 @@ Sottocomandi:
   console.error("  Usa: create | list | restore\n");
   process.exit(1);
 }
+async function handleWorker(commandName) {
+  const host = String(process.env.TOTALRECALL_WORKER_HOST || process.env.CONTEXTKIT_WORKER_HOST || "127.0.0.1");
+  const port = String(process.env.TOTALRECALL_WORKER_PORT || process.env.CONTEXTKIT_WORKER_PORT || "3001");
+  const pidFile = join5(DATA_DIR, "worker.pid");
+  const workerPath = join5(DIST_DIR, "worker-service.js");
+  const healthUrl = `http://${host}:${port}/health`;
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  async function isHealthy() {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 1200);
+      const resp = await fetch(healthUrl, { signal: controller.signal });
+      clearTimeout(timeout);
+      return resp.ok;
+    } catch {
+      return false;
+    }
+  }
+  function readPid() {
+    try {
+      if (!existsSync6(pidFile)) return null;
+      const raw = readFileSync4(pidFile, "utf8").trim();
+      const pid = Number(raw);
+      return Number.isInteger(pid) && pid > 0 ? pid : null;
+    } catch {
+      return null;
+    }
+  }
+  function processExists(pid) {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  async function stopWorker() {
+    const pid = readPid();
+    if (!pid) {
+      if (existsSync6(pidFile)) {
+        try {
+          unlinkSync2(pidFile);
+        } catch {
+        }
+      }
+      return false;
+    }
+    if (!processExists(pid)) {
+      try {
+        unlinkSync2(pidFile);
+      } catch {
+      }
+      return false;
+    }
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      return false;
+    }
+    for (let i = 0; i < 20; i++) {
+      if (!processExists(pid)) {
+        try {
+          if (existsSync6(pidFile)) unlinkSync2(pidFile);
+        } catch {
+        }
+        return true;
+      }
+      await sleep(250);
+    }
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+    }
+    for (let i = 0; i < 10; i++) {
+      if (!processExists(pid)) {
+        try {
+          if (existsSync6(pidFile)) unlinkSync2(pidFile);
+        } catch {
+        }
+        return true;
+      }
+      await sleep(100);
+    }
+    return false;
+  }
+  async function startWorker() {
+    if (await isHealthy()) {
+      console.log(`
+  Worker already running on ${healthUrl}
+`);
+      return;
+    }
+    const stalePid = readPid();
+    if (stalePid && !processExists(stalePid)) {
+      try {
+        unlinkSync2(pidFile);
+      } catch {
+      }
+    }
+    const child = __require("child_process").spawn(process.execPath, [workerPath], {
+      detached: true,
+      stdio: "ignore",
+      env: { ...process.env }
+    });
+    child.unref();
+    for (let i = 0; i < 20; i++) {
+      if (await isHealthy()) {
+        console.log(`
+  Worker started on ${healthUrl}
+`);
+        return;
+      }
+      await sleep(250);
+    }
+    console.error(`
+  Worker did not become healthy on ${healthUrl}. Check logs with: npm run worker:logs
+`);
+    process.exit(1);
+  }
+  switch (commandName) {
+    case "worker:start":
+      await startWorker();
+      return;
+    case "worker:stop": {
+      const stopped = await stopWorker();
+      console.log(stopped ? "\n  Worker stopped.\n" : "\n  Worker is not running.\n");
+      return;
+    }
+    case "worker:restart":
+      await stopWorker();
+      await startWorker();
+      return;
+    case "worker:status": {
+      const healthy = await isHealthy();
+      if (healthy) {
+        const pid2 = readPid();
+        console.log(`
+  Worker is running on ${healthUrl}${pid2 ? ` (pid ${pid2})` : ""}.
+`);
+        return;
+      }
+      const pid = readPid();
+      if (pid && !processExists(pid)) {
+        try {
+          unlinkSync2(pidFile);
+        } catch {
+        }
+      }
+      console.log(`
+  Worker is not running on ${healthUrl}.
+`);
+      process.exit(1);
+    }
+  }
+}
 async function handlePlugins(subArgs) {
   const subCommand = subArgs[0];
-  const port = process.env.KIRO_MEMORY_WORKER_PORT || process.env.CONTEXTKIT_WORKER_PORT || "3001";
+  const port = process.env.TOTALRECALL_WORKER_PORT || process.env.CONTEXTKIT_WORKER_PORT || "3001";
   const baseUrl = `http://127.0.0.1:${port}`;
   async function apiGet(path) {
     return new Promise((resolve, reject) => {
@@ -6136,7 +6513,7 @@ async function handlePlugins(subArgs) {
     try {
       const result = await apiGet("/api/plugins");
       const { plugins } = result.data;
-      console.log("\n=== Kiro Memory \u2014 Plugin ===\n");
+      console.log("\n=== Total Recall \u2014 Plugin ===\n");
       if (!plugins || plugins.length === 0) {
         console.log("  Nessun plugin registrato.\n");
         return;
@@ -6150,7 +6527,7 @@ async function handlePlugins(subArgs) {
         console.log("");
       }
     } catch {
-      console.error("\n  Errore: impossibile contattare il worker. Avvialo con: kiro-memory worker start\n");
+      console.error("\n  Errore: impossibile contattare il worker. Avvialo con: totalrecall worker start\n");
       process.exit(1);
     }
     return;
@@ -6158,7 +6535,7 @@ async function handlePlugins(subArgs) {
   if (subCommand === "enable") {
     const name = subArgs[1];
     if (!name) {
-      console.error("\n  Errore: specifica il nome del plugin.\n  Esempio: kiro-memory plugins enable mio-plugin\n");
+      console.error("\n  Errore: specifica il nome del plugin.\n  Esempio: totalrecall plugins enable mio-plugin\n");
       process.exit(1);
     }
     try {
@@ -6185,7 +6562,7 @@ async function handlePlugins(subArgs) {
   if (subCommand === "disable") {
     const name = subArgs[1];
     if (!name) {
-      console.error("\n  Errore: specifica il nome del plugin.\n  Esempio: kiro-memory plugins disable mio-plugin\n");
+      console.error("\n  Errore: specifica il nome del plugin.\n  Esempio: totalrecall plugins disable mio-plugin\n");
       process.exit(1);
     }
     try {
@@ -6212,7 +6589,7 @@ async function handlePlugins(subArgs) {
   process.exit(1);
 }
 function showHelp() {
-  console.log(`Usage: kiro-memory <command> [options]
+  console.log(`Usage: totalrecall <command> [options]
 
 Setup:
   install                   Install for Kiro CLI (default)
@@ -6259,41 +6636,48 @@ Commands:
   backup create             Crea un backup manuale del database
   backup list               Elenca tutti i backup disponibili con metadata
   backup restore <file>     Ripristina il database da un backup (con conferma)
+  worker:start              Start the background worker
+  worker:stop               Stop the background worker
+  worker:restart            Restart the background worker
+  worker:status             Check worker health and PID
   plugins list              Elenca tutti i plugin registrati con stato
   plugins enable <nome>     Abilita un plugin registrato
   plugins disable <nome>    Disabilita un plugin attivo
   help                      Show this help message
 
 Examples:
-  kiro-memory install
-  kiro-memory doctor
-  kiro-memory doctor --fix
-  kiro-memory stats
-  kiro-memory context
-  kiro-memory resume
-  kiro-memory resume 42
-  kiro-memory report
-  kiro-memory report --period=monthly --format=md --output=report.md
-  kiro-memory search "authentication"
-  kiro-memory search --interactive --project myapp
-  kiro-memory semantic-search "how did I fix the auth bug"
-  kiro-memory export --project myapp --format jsonl --output backup.jsonl
-  kiro-memory export --project myapp --format md > notes.md
-  kiro-memory import backup.jsonl
-  kiro-memory backup create
-  kiro-memory backup list
-  kiro-memory backup restore backup-2026-02-27-150000.db
-  kiro-memory config list
-  kiro-memory config get worker.port
-  kiro-memory config set log.level DEBUG
-  kiro-memory add-knowledge constraint "No any in TypeScript" "Never use any type" --severity=hard
-  kiro-memory add-knowledge decision "PostgreSQL over MongoDB" "Chosen for ACID" --alternatives=MongoDB,DynamoDB
-  kiro-memory embeddings stats
-  kiro-memory embeddings backfill 100
-  kiro-memory decay stats
-  kiro-memory decay detect-stale
-  kiro-memory decay consolidate --dry-run
-  kiro-memory observations 20
+  totalrecall install
+  totalrecall doctor
+  totalrecall doctor --fix
+  totalrecall stats
+  totalrecall context
+  totalrecall resume
+  totalrecall resume 42
+  totalrecall report
+  totalrecall report --period=monthly --format=md --output=report.md
+  totalrecall search "authentication"
+  totalrecall search --interactive --project myapp
+  totalrecall semantic-search "how did I fix the auth bug"
+  totalrecall export --project myapp --format jsonl --output backup.jsonl
+  totalrecall export --project myapp --format md > notes.md
+  totalrecall import backup.jsonl
+  totalrecall backup create
+  totalrecall backup list
+  totalrecall backup restore backup-2026-02-27-150000.db
+  totalrecall worker:start
+  totalrecall worker:status
+  totalrecall worker:restart
+  totalrecall config list
+  totalrecall config get worker.port
+  totalrecall config set log.level DEBUG
+  totalrecall add-knowledge constraint "No any in TypeScript" "Never use any type" --severity=hard
+  totalrecall add-knowledge decision "PostgreSQL over MongoDB" "Chosen for ACID" --alternatives=MongoDB,DynamoDB
+  totalrecall embeddings stats
+  totalrecall embeddings backfill 100
+  totalrecall decay stats
+  totalrecall decay detect-stale
+  totalrecall decay consolidate --dry-run
+  totalrecall observations 20
 `);
 }
 main().catch(console.error);

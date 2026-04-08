@@ -6,8 +6,8 @@
 
 import { existsSync, statSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
 import type { Observation } from '../types/worker-types.js';
+import { DATA_DIR } from '../shared/paths.js';
 
 // ─── Tipi pubblici ───
 
@@ -234,14 +234,11 @@ export function parseJsonlFile(content: string): Array<{ line: number; record?: 
   return results;
 }
 
-// ─── Config: gestione ~/.contextkit/config.json ───
+// ─── Config: gestione <data-dir>/config.json ───
 
 /** Percorso di default del file di configurazione */
 export function getConfigPath(): string {
-  const dataDir = process.env.TOTALRECALL_DATA_DIR
-    || process.env.CONTEXTKIT_DATA_DIR
-    || join(homedir(), '.contextkit');
-  return join(dataDir, 'config.json');
+  return join(DATA_DIR, 'config.json');
 }
 
 /** Valori di configurazione predefiniti */

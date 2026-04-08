@@ -1,5 +1,5 @@
 /**
- * Total Recall - Persistent cross-session memory for Kiro CLI
+ * Total Recall - Persistent cross-session memory for AI coding assistants
  *
  * @packageDocumentation
  */
@@ -43,5 +43,7 @@ export { readStdin, detectProject, formatContext, runHook } from './hooks/utils.
 export { logger, LogLevel } from './utils/logger.js';
 export type { Component } from './utils/logger.js';
 
+import { TOTALRECALL_VERSION } from './shared/version.js';
+
 // Version
-export const VERSION = '3.1.1';
+export const VERSION = TOTALRECALL_VERSION;

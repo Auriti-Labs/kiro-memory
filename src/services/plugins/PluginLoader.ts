@@ -3,7 +3,7 @@
  *
  * Responsabilità:
  *   1. Discovery automatico: scansiona node_modules/totalrecall-plugin-*
- *   2. Discovery locale: carica plugin da ~/.contextkit/plugins/<nome>/index.js
+ *   2. Discovery locale: carica plugin da <data-dir>/plugins/<nome>/index.js
  *   3. Discovery da configurazione: legge la chiave "plugins" in config.json
  *   4. Validazione: verifica che ogni modulo implementi IPlugin
  *   5. Hot reload: supporto per ricaricare un singolo plugin a runtime
@@ -24,8 +24,9 @@ import { DATA_DIR } from '../../shared/paths.js';
 import { readConfig } from '../../cli/cli-utils.js';
 import type { IPlugin } from './types.js';
 
+import { TOTALRECALL_VERSION } from '../../shared/version.js';
+
 // ── Versione del runtime usata per la verifica minKiroVersion ──
-const TOTALRECALL_VERSION = '3.1.1';
 
 /**
  * Interfaccia minima del registry necessaria al Loader.
@@ -78,7 +79,7 @@ export interface LoadAllResult {
 export class PluginLoader {
   /**
    * Directory locale dove risiedono i plugin installati dall'utente.
-   * Struttura: ~/.contextkit/plugins/<nome>/index.js
+   * Struttura: <data-dir>/plugins/<nome>/index.js
    */
   protected readonly localPluginsDir: string;
 
@@ -570,7 +571,7 @@ export class PluginLoader {
   }
 
   /**
-   * Scansiona la directory locale dei plugin (~/.contextkit/plugins/).
+   * Scansiona la directory locale dei plugin (<data-dir>/plugins/).
    * Ogni sub-directory con un file index.js è considerata un plugin.
    */
   private discoverLocalPlugins(): Array<{ name: string; path: string }> {

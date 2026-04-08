@@ -53,7 +53,6 @@ totalrecall/
 ├── plugin/                     # Build output (git-tracked for npm publish)
 │   └── dist/
 ├── docs/                       # This documentation site
-└── CLAUDE.md                   # AI coding assistant guidance
 ```
 
 ## Build
@@ -201,7 +200,7 @@ npm run worker:status
 
 1. Fork the repository on GitHub
 2. Create a branch: `git checkout -b feat/my-feature`
-3. Make your changes following the conventions in `CLAUDE.md`
+3. Make your changes following the repository conventions documented in this guide
 4. Write tests (see [Testing guide](/totalrecall/contributing/testing))
 5. Build and verify: `npm run build && bun test`
 6. Submit a pull request

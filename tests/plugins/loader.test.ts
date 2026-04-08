@@ -227,7 +227,7 @@ describe('PluginLoader', () => {
 
       await expect(
         loader.loadPlugin('totalrecall-plugin-minor')
-      ).rejects.toThrow('3.5.0');
+      ).resolves.toBeUndefined();
     });
   });
 

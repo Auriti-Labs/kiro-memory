@@ -1,0 +1,31 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "lib": ["ES2022"],
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true
+  },
+  "include": [
+    "src/cli/**/*",
+    "src/db/**/*",
+    "src/hooks/**/*",
+    "src/shared/**/*",
+    "src/types/**/*",
+    "src/utils/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "plugin",
+    "tests",
+    "src/services/**/*",
+    "src/sdk/**/*",
+    "src/servers/**/*",
+    "src/plugins/**/*",
+    "src/ui/**/*",
+    "src/index.ts"
+  ]
+}

@@ -3,7 +3,6 @@ import { homedir } from 'os';
 import { existsSync, mkdirSync } from 'fs';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { logger } from '../utils/logger.js';
 
 // Get __dirname that works in both ESM and CJS contexts
 function getDirname(): string {
@@ -19,24 +18,23 @@ const _dirname = getDirname();
  * Simple path configuration for Total Recall
  */
 
-// Base directory - Total Recall data in home directory
-// Backward compat chain: ~/.totalrecall (new) → ~/.totalrecall (v3) → ~/.contextkit (v1-v2)
+// Base directory - canonical Total Recall data location in home directory
+// Backward compatibility chain: ~/.totalrecall (canonical) → ~/.contextkit (legacy installs)
 const _legacyV1Dir = join(homedir(), '.contextkit');
-const _legacyV3Dir = join(homedir(), '.totalrecall');
-const _newDir = join(homedir(), '.totalrecall');
+const _canonicalDir = join(homedir(), '.totalrecall');
 
 function resolveDataDir(): string {
-  // Prefer new name if it exists
-  if (existsSync(_newDir)) return _newDir;
-  // Fall back to v3 name
-  if (existsSync(_legacyV3Dir)) return _legacyV3Dir;
-  // Fall back to v1 name
+  // Prefer canonical name when present
+  if (existsSync(_canonicalDir)) return _canonicalDir;
+  // Fall back to legacy installs
   if (existsSync(_legacyV1Dir)) return _legacyV1Dir;
-  // Default to new name for fresh installs
-  return _newDir;
+  // Default to canonical name for fresh installs
+  return _canonicalDir;
 }
 
-export const DATA_DIR = process.env.TOTALRECALL_DATA_DIR || process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || resolveDataDir();
+export const DATA_DIR = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || resolveDataDir();
+export const LEGACY_DATA_DIR = _legacyV1Dir;
+export const CANONICAL_DATA_DIR = _canonicalDir;
 
 // Kiro config directory (still needed for Claude Code / Kiro CLI integration)
 export const KIRO_CONFIG_DIR = process.env.KIRO_CONFIG_DIR || join(homedir(), '.kiro');
@@ -122,10 +120,7 @@ export function getCurrentProjectName(): string {
       windowsHide: true
     }).trim();
     return basename(gitRoot);
-  } catch (error) {
-    logger.debug('SYSTEM', 'Git root detection failed, using cwd basename', {
-      cwd: process.cwd()
-    }, error as Error);
+  } catch {
     return basename(process.cwd());
   }
 }

@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true
+  },
+  "include": [
+    "src/ui/**/*",
+    "src/shared/version.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "plugin",
+    "tests"
+  ]
+}

@@ -207,14 +207,10 @@ describe('Backup Module', () => {
 
       const { dbPath, db } = createTestDb(srcDir);
       try {
-        // Crea 3 backup in sequenza
-        const b1 = createBackup(dbPath, backupDir, db.db);
-        // Piccola pausa per garantire timestamp diversi (1ms)
-        const now = Date.now();
-        while (Date.now() === now) { /* busy wait < 1ms */ }
-        const b2 = createBackup(dbPath, backupDir, db.db);
-        while (Date.now() === now) { /* busy wait < 1ms */ }
-        const b3 = createBackup(dbPath, backupDir, db.db);
+        // Crea 3 backup in sequenza senza dipendere dal clock reale
+        createBackup(dbPath, backupDir, db.db);
+        createBackup(dbPath, backupDir, db.db);
+        createBackup(dbPath, backupDir, db.db);
 
         const entries = listBackups(backupDir);
 
@@ -293,14 +289,11 @@ describe('Backup Module', () => {
 
       const { dbPath, db } = createTestDb(srcDir);
       try {
-        // Crea 5 backup (timestamp distinti tramite loop)
+        // Crea 5 backup consecutivi: createBackup garantisce nomi univoci
         const created: string[] = [];
         for (let i = 0; i < 5; i++) {
           const entry = createBackup(dbPath, backupDir, db.db);
           created.push(entry.metadata.filename);
-          // Attende 1ms per garantire timestamp diversi
-          const t = Date.now();
-          while (Date.now() === t) { /* busy wait */ }
         }
 
         // Mantiene solo gli ultimi 3
@@ -329,8 +322,6 @@ describe('Backup Module', () => {
       const { dbPath, db } = createTestDb(srcDir);
       try {
         const entry1 = createBackup(dbPath, backupDir, db.db);
-        const t = Date.now();
-        while (Date.now() === t) { /* busy wait */ }
         createBackup(dbPath, backupDir, db.db);
 
         // Mantiene solo 1

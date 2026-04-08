@@ -139,8 +139,8 @@ describe('projectMatchScore', () => {
   });
 
   it('returns 1 when projects match case-insensitively', () => {
-    expect(projectMatchScore('Kiro-Memory', 'totalrecall')).toBe(1);
-    expect(projectMatchScore('totalrecall', 'KIRO-MEMORY')).toBe(1);
+    expect(projectMatchScore('TotalRecall', 'totalrecall')).toBe(1);
+    expect(projectMatchScore('totalrecall', 'TOTALRECALL')).toBe(1);
   });
 
   it('returns 0 when projects differ', () => {
