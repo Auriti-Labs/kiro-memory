@@ -1,9 +1,52 @@
 import { createRequire } from 'module';const require = createRequire(import.meta.url);
 
 // src/utils/logger.ts
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "fs";
-import { join } from "path";
+import { appendFileSync, existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync } from "fs";
+import { join as join2 } from "path";
+
+// src/shared/paths.ts
+import { join, dirname, basename } from "path";
 import { homedir } from "os";
+import { existsSync, mkdirSync } from "fs";
+import { fileURLToPath } from "url";
+function getDirname() {
+  if (typeof __dirname !== "undefined") {
+    return __dirname;
+  }
+  return dirname(fileURLToPath(import.meta.url));
+}
+var _dirname = getDirname();
+var _legacyV1Dir = join(homedir(), ".contextkit");
+var _canonicalDir = join(homedir(), ".totalrecall");
+function resolveDataDir() {
+  if (existsSync(_canonicalDir)) return _canonicalDir;
+  if (existsSync(_legacyV1Dir)) return _legacyV1Dir;
+  return _canonicalDir;
+}
+var DATA_DIR = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || resolveDataDir();
+var KIRO_CONFIG_DIR = process.env.KIRO_CONFIG_DIR || join(homedir(), ".kiro");
+var PLUGIN_ROOT = join(KIRO_CONFIG_DIR, "plugins", "totalrecall");
+var ARCHIVES_DIR = join(DATA_DIR, "archives");
+var LOGS_DIR = join(DATA_DIR, "logs");
+var TRASH_DIR = join(DATA_DIR, "trash");
+var BACKUPS_DIR = join(DATA_DIR, "backups");
+var MODES_DIR = join(DATA_DIR, "modes");
+var USER_SETTINGS_PATH = join(DATA_DIR, "settings.json");
+var _legacyDbV1 = join(DATA_DIR, "contextkit.db");
+var _legacyDbV3 = join(DATA_DIR, "totalrecall.db");
+function resolveDbPath() {
+  if (existsSync(join(DATA_DIR, "totalrecall.db"))) return join(DATA_DIR, "totalrecall.db");
+  if (existsSync(_legacyDbV3)) return _legacyDbV3;
+  if (existsSync(_legacyDbV1)) return _legacyDbV1;
+  return join(DATA_DIR, "totalrecall.db");
+}
+var DB_PATH = resolveDbPath();
+var VECTOR_DB_DIR = join(DATA_DIR, "vector-db");
+var OBSERVER_SESSIONS_DIR = join(DATA_DIR, "observer-sessions");
+var KIRO_SETTINGS_PATH = join(KIRO_CONFIG_DIR, "settings.json");
+var KIRO_CONTEXT_PATH = join(KIRO_CONFIG_DIR, "context.md");
+
+// src/utils/logger.ts
 var LogLevel = /* @__PURE__ */ ((LogLevel2) => {
   LogLevel2[LogLevel2["DEBUG"] = 0] = "DEBUG";
   LogLevel2[LogLevel2["INFO"] = 1] = "INFO";
@@ -12,7 +55,6 @@ var LogLevel = /* @__PURE__ */ ((LogLevel2) => {
   LogLevel2[LogLevel2["SILENT"] = 4] = "SILENT";
   return LogLevel2;
 })(LogLevel || {});
-var DEFAULT_DATA_DIR = join(homedir(), ".contextkit");
 var Logger = class {
   level = null;
   useColor;
@@ -28,12 +70,11 @@ var Logger = class {
     if (this.logFileInitialized) return;
     this.logFileInitialized = true;
     try {
-      const logsDir = join(DEFAULT_DATA_DIR, "logs");
-      if (!existsSync(logsDir)) {
-        mkdirSync(logsDir, { recursive: true });
+      if (!existsSync2(LOGS_DIR)) {
+        mkdirSync2(LOGS_DIR, { recursive: true });
       }
       const date = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-      this.logFilePath = join(logsDir, `kiro-memory-${date}.log`);
+      this.logFilePath = join2(LOGS_DIR, `totalrecall-${date}.log`);
     } catch (error) {
       console.error("[LOGGER] Failed to initialize log file:", error);
       this.logFilePath = null;
@@ -45,11 +86,10 @@ var Logger = class {
   getLevel() {
     if (this.level === null) {
       try {
-        const settingsPath = join(DEFAULT_DATA_DIR, "settings.json");
-        if (existsSync(settingsPath)) {
-          const settingsData = readFileSync(settingsPath, "utf-8");
+        if (existsSync2(USER_SETTINGS_PATH)) {
+          const settingsData = readFileSync(USER_SETTINGS_PATH, "utf-8");
           const settings = JSON.parse(settingsData);
-          const envLevel = (settings.KIRO_MEMORY_LOG_LEVEL || settings.CONTEXTKIT_LOG_LEVEL || "INFO").toUpperCase();
+          const envLevel = (settings.TOTALRECALL_LOG_LEVEL || settings.CONTEXTKIT_LOG_LEVEL || "INFO").toUpperCase();
           this.level = LogLevel[envLevel] ?? 1 /* INFO */;
         } else {
           this.level = 1 /* INFO */;
@@ -243,12 +283,12 @@ var EmbeddingService = class {
   config;
   configName;
   constructor() {
-    const envModel = process.env.KIRO_MEMORY_EMBEDDING_MODEL || "all-MiniLM-L6-v2";
+    const envModel = process.env.TOTALRECALL_EMBEDDING_MODEL || "all-MiniLM-L6-v2";
     this.configName = envModel;
     if (MODEL_CONFIGS[envModel]) {
       this.config = MODEL_CONFIGS[envModel];
     } else if (envModel.includes("/")) {
-      const dimensions = parseInt(process.env.KIRO_MEMORY_EMBEDDING_DIMENSIONS || "384", 10);
+      const dimensions = parseInt(process.env.TOTALRECALL_EMBEDDING_DIMENSIONS || "384", 10);
       this.config = {
         modelId: envModel,
         dimensions: isNaN(dimensions) ? 384 : dimensions

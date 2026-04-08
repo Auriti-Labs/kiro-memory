@@ -76,7 +76,7 @@ var GitHubClient = class {
       "Authorization": `token ${this.token}`,
       "Accept": "application/vnd.github.v3+json",
       "Content-Type": "application/json",
-      "User-Agent": "kiro-memory-plugin-github/1.0.0"
+      "User-Agent": "totalrecall-plugin-github/1.0.0"
     };
     let lastError = null;
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {

@@ -36,7 +36,7 @@ export interface BannerOptions {
   editor: string;         // "Kiro CLI", "Claude Code", "Cursor", ecc.
   version: string;        // "1.8.1"
   dashboardUrl: string;   // "http://localhost:3001"
-  dataDir: string;        // "~/.contextkit"
+  dataDir: string;        // "~/.totalrecall"
   configPaths: string[];  // percorsi config installati
 }
 

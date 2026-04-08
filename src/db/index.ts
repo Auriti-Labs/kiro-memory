@@ -12,7 +12,7 @@
 export type { Database as DatabaseInterface, Statement, RunResult } from './types.js';
 
 // Detect Bun runtime at module level
-const isBun = typeof globalThis.Bun !== 'undefined';
+const isBun = 'Bun' in globalThis;
 
 // Dynamic re-export based on runtime
 let DatabaseClass: any;

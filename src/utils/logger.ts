@@ -5,7 +5,7 @@
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
+import { LOGS_DIR, USER_SETTINGS_PATH } from '../shared/paths.js';
 
 export enum LogLevel {
   DEBUG = 0,
@@ -24,8 +24,6 @@ interface LogContext {
   [key: string]: any;
 }
 
-// Default data directory for Total Recall
-const DEFAULT_DATA_DIR = join(homedir(), '.contextkit');
 
 class Logger {
   private level: LogLevel | null = null;
@@ -46,16 +44,14 @@ class Logger {
     this.logFileInitialized = true;
 
     try {
-      const logsDir = join(DEFAULT_DATA_DIR, 'logs');
-
       // Ensure logs directory exists
-      if (!existsSync(logsDir)) {
-        mkdirSync(logsDir, { recursive: true });
+      if (!existsSync(LOGS_DIR)) {
+        mkdirSync(LOGS_DIR, { recursive: true });
       }
 
       // Create log file path with date
       const date = new Date().toISOString().split('T')[0];
-      this.logFilePath = join(logsDir, `totalrecall-${date}.log`);
+      this.logFilePath = join(LOGS_DIR, `totalrecall-${date}.log`);
     } catch (error) {
       console.error('[LOGGER] Failed to initialize log file:', error);
       this.logFilePath = null;
@@ -68,9 +64,8 @@ class Logger {
   private getLevel(): LogLevel {
     if (this.level === null) {
       try {
-        const settingsPath = join(DEFAULT_DATA_DIR, 'settings.json');
-        if (existsSync(settingsPath)) {
-          const settingsData = readFileSync(settingsPath, 'utf-8');
+        if (existsSync(USER_SETTINGS_PATH)) {
+          const settingsData = readFileSync(USER_SETTINGS_PATH, 'utf-8');
           const settings = JSON.parse(settingsData);
           const envLevel = (settings.TOTALRECALL_LOG_LEVEL || settings.CONTEXTKIT_LOG_LEVEL || 'INFO').toUpperCase();
           this.level = LogLevel[envLevel as keyof typeof LogLevel] ?? LogLevel.INFO;

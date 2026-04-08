@@ -48,9 +48,14 @@ local_cache/
 # npm tarballs
 *.tgz
 
-# Local dev instructions (not for open-source repo)
+# Local AI assistant instructions and config
 CLAUDE.md
+AGENTS.md
+GEMINI.md
+COPILOT.md
+.claude/
 .kiro/context.md
 COMPETITOR_ANALYSIS.md
 FEATURE_ROADMAP.md
+docs/competitive-analysis-*.md
 local_cache/

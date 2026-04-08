@@ -58,7 +58,7 @@ function buildContextBlock() {
     elements: [
       {
         type: "mrkdwn",
-        text: `Kiro Memory | ${timestamp}`
+        text: `Total Recall | ${timestamp}`
       }
     ]
   };
@@ -184,9 +184,9 @@ function createSlackPlugin() {
     }
   }
   const plugin = {
-    name: "kiro-memory-plugin-slack",
+    name: "totalrecall-plugin-slack",
     version: "1.0.0",
-    description: "Notifiche Slack per sessioni Kiro Memory",
+    description: "Notifiche Slack per sessioni Total Recall",
     minKiroVersion: "2.0.0",
     async init(context) {
       pluginLogger = context.logger;

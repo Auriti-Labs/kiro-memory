@@ -5,9 +5,9 @@
  * del database SQLite. Utilizza copia diretta del file per compatibilità
  * con WAL mode senza dipendere da API bun:sqlite native.
  *
- * Directory backup: ~/.contextkit/backups/
- * Nome file DB:     backup-YYYY-MM-DD-HHmmss.db
- * Nome metadata:    backup-YYYY-MM-DD-HHmmss.meta.json
+ * Directory backup: ~/.totalrecall/backups/ (legacy installs may still resolve from ~/.contextkit/backups/)
+ * Nome file DB:     backup-YYYY-MM-DD-HHmmss-mmm.db
+ * Nome metadata:    backup-YYYY-MM-DD-HHmmss-mmm.meta.json
  */
 
 import {
@@ -28,41 +28,27 @@ import { logger } from '../../utils/logger.js';
 
 /** Statistiche del database incluse nel metadata del backup */
 export interface BackupStats {
-  /** Numero di observations nel DB al momento del backup */
   observations: number;
-  /** Numero di sessioni nel DB al momento del backup */
   sessions: number;
-  /** Numero di summary nel DB al momento del backup */
   summaries: number;
-  /** Numero di prompts nel DB al momento del backup */
   prompts: number;
-  /** Dimensione del file DB in byte */
   dbSizeBytes: number;
 }
 
 /** Metadata associato a ogni backup */
 export interface BackupMetadata {
-  /** Timestamp ISO del backup */
   timestamp: string;
-  /** Timestamp epoch Unix (ms) */
   timestampEpoch: number;
-  /** Versione schema DB (dalla tabella schema_versions) */
   schemaVersion: number;
-  /** Statistiche del DB al momento del backup */
   stats: BackupStats;
-  /** Percorso assoluto del file DB originale */
   sourcePath: string;
-  /** Nome base del file backup (senza directory) */
   filename: string;
 }
 
 /** Voce nell'elenco backup (metadata + percorso assoluto) */
 export interface BackupEntry {
-  /** Percorso assoluto del file .db */
   filePath: string;
-  /** Percorso assoluto del file .meta.json */
   metaPath: string;
-  /** Metadata del backup */
   metadata: BackupMetadata;
 }
 
@@ -70,7 +56,7 @@ export interface BackupEntry {
 
 /**
  * Genera il timestamp formattato per il nome del file.
- * Formato: YYYY-MM-DD-HHmmss-mmm (inclusi millisecondi per unicità)
+ * Formato: YYYY-MM-DD-HHmmss-mmm.
  */
 function formatTimestamp(date: Date): string {
   const pad = (n: number, len = 2): string => String(n).padStart(len, '0');
@@ -85,9 +71,33 @@ function formatTimestamp(date: Date): string {
 }
 
 /**
- * Raccoglie le statistiche dal database tramite COUNT(*) sulle tabelle principali.
- * Se una tabella non esiste, il conteggio è 0.
+ * Risolve un nome backup univoco.
+ *
+ * Se più backup vengono creati nello stesso millisecondo, avanza di 1ms
+ * finché trova una coppia .db/.meta.json non ancora esistente. Questo rende
+ * il naming collision-safe e mantiene un ordinamento cronologico stabile.
  */
+function resolveUniqueBackupTarget(backupDir: string, baseDate: Date): {
+  date: Date;
+  filename: string;
+  filePath: string;
+  metaPath: string;
+} {
+  for (let attempt = 0; attempt < 10_000; attempt++) {
+    const date = new Date(baseDate.getTime() + attempt);
+    const ts = formatTimestamp(date);
+    const filename = `backup-${ts}.db`;
+    const filePath = join(backupDir, filename);
+    const metaPath = join(backupDir, `backup-${ts}.meta.json`);
+
+    if (!existsSync(filePath) && !existsSync(metaPath)) {
+      return { date, filename, filePath, metaPath };
+    }
+  }
+
+  throw new Error(`Impossibile risolvere un nome backup univoco in ${backupDir}`);
+}
+
 function collectStats(db: Database, dbPath: string): BackupStats {
   const countTable = (table: string): number => {
     try {
@@ -109,10 +119,6 @@ function collectStats(db: Database, dbPath: string): BackupStats {
   };
 }
 
-/**
- * Legge la versione dello schema dal database.
- * Ritorna 0 se la tabella non esiste.
- */
 function getSchemaVersion(db: Database): number {
   try {
     const row = db.query('SELECT MAX(version) as v FROM schema_versions').get() as { v: number } | null;
@@ -124,40 +130,21 @@ function getSchemaVersion(db: Database): number {
 
 // ─── API pubblica ───
 
-/**
- * Crea un backup del database SQLite.
- *
- * Copia il file .db e, se presenti in modalità WAL, anche -wal e -shm.
- * Genera il file metadata JSON con versione schema e statistiche.
- *
- * @param dbPath     - Percorso assoluto del file DB sorgente
- * @param backupDir  - Directory dove salvare i backup
- * @param db         - Istanza Database per raccogliere le statistiche
- * @returns BackupEntry con metadata e percorsi dei file creati
- */
 export function createBackup(
   dbPath: string,
   backupDir: string,
   db: Database
 ): BackupEntry {
-  // Assicura che la directory esista
   mkdirSync(backupDir, { recursive: true });
 
-  const now = new Date();
-  const ts = formatTimestamp(now);
-  const filename = `backup-${ts}.db`;
-  const destPath = join(backupDir, filename);
-  const metaFilename = `backup-${ts}.meta.json`;
-  const metaPath = join(backupDir, metaFilename);
+  const { date: now, filename, filePath: destPath, metaPath } = resolveUniqueBackupTarget(backupDir, new Date());
 
-  // Copia il file principale
   if (!existsSync(dbPath)) {
     throw new Error(`Database non trovato: ${dbPath}`);
   }
   copyFileSync(dbPath, destPath);
   logger.info('BACKUP', `File DB copiato: ${dbPath} → ${destPath}`);
 
-  // Copia WAL e SHM se esistono (modalità WAL di SQLite)
   const walPath = `${dbPath}-wal`;
   const shmPath = `${dbPath}-shm`;
   if (existsSync(walPath)) {
@@ -169,7 +156,6 @@ export function createBackup(
     logger.debug('BACKUP', 'File SHM copiato');
   }
 
-  // Raccoglie statistiche e versione schema
   const stats = collectStats(db, dbPath);
   const schemaVersion = getSchemaVersion(db);
 
@@ -182,7 +168,6 @@ export function createBackup(
     filename,
   };
 
-  // Scrive il file metadata
   writeFileSync(metaPath, JSON.stringify(metadata, null, 2), 'utf8');
   logger.info('BACKUP', `Metadata scritto: ${metaPath}`);
 
@@ -193,15 +178,6 @@ export function createBackup(
   };
 }
 
-/**
- * Elenca i backup presenti nella directory, ordinati dal più recente al più vecchio.
- *
- * Legge i file .meta.json per ottenere i dati strutturati.
- * I backup senza metadata vengono ignorati con un warning.
- *
- * @param backupDir - Directory dove cercare i backup
- * @returns Array di BackupEntry ordinate per timestamp DESC
- */
 export function listBackups(backupDir: string): BackupEntry[] {
   if (!existsSync(backupDir)) {
     return [];
@@ -217,17 +193,13 @@ export function listBackups(backupDir: string): BackupEntry[] {
     return [];
   }
 
-  // Trova tutti i file .meta.json dei backup
   const metaFiles = files.filter(f => f.startsWith('backup-') && f.endsWith('.meta.json'));
 
   for (const metaFile of metaFiles) {
     const metaPath = join(backupDir, metaFile);
-    // Deriva il nome del file DB sostituendo .meta.json con .db
-    // Esempio: backup-2026-02-27-150000.meta.json → backup-2026-02-27-150000.db
     const dbFilename = metaFile.replace(/\.meta\.json$/, '.db');
     const filePath = join(backupDir, dbFilename);
 
-    // Legge il metadata
     let metadata: BackupMetadata;
     try {
       const raw = readFileSync(metaPath, 'utf8');
@@ -237,7 +209,6 @@ export function listBackups(backupDir: string): BackupEntry[] {
       continue;
     }
 
-    // Verifica che il file DB esista
     if (!existsSync(filePath)) {
       logger.warn('BACKUP', `File backup mancante per metadata: ${filePath}`);
       continue;
@@ -246,34 +217,18 @@ export function listBackups(backupDir: string): BackupEntry[] {
     entries.push({ filePath, metaPath, metadata });
   }
 
-  // Ordina dal più recente al più vecchio
   entries.sort((a, b) => b.metadata.timestampEpoch - a.metadata.timestampEpoch);
-
   return entries;
 }
 
-/**
- * Ripristina il database da un file di backup.
- *
- * Sovrascrive il file DB corrente con il backup selezionato.
- * Ripristina anche -wal e -shm se presenti nel backup.
- *
- * ATTENZIONE: Il database deve essere chiuso prima di chiamare questa funzione,
- * altrimenti la copia potrebbe corrompere il DB.
- *
- * @param backupFile - Percorso assoluto del file .db da ripristinare
- * @param dbPath     - Percorso assoluto del file DB destinazione
- */
 export function restoreBackup(backupFile: string, dbPath: string): void {
   if (!existsSync(backupFile)) {
     throw new Error(`File backup non trovato: ${backupFile}`);
   }
 
-  // Copia il file principale
   copyFileSync(backupFile, dbPath);
   logger.info('BACKUP', `Database ripristinato: ${backupFile} → ${dbPath}`);
 
-  // Ripristina WAL e SHM se presenti nel backup
   const walBackup = `${backupFile}-wal`;
   const shmBackup = `${backupFile}-shm`;
   const walDest = `${dbPath}-wal`;
@@ -283,7 +238,6 @@ export function restoreBackup(backupFile: string, dbPath: string): void {
     copyFileSync(walBackup, walDest);
     logger.debug('BACKUP', 'File WAL ripristinato');
   } else if (existsSync(walDest)) {
-    // Rimuove il WAL corrente se il backup non ne aveva uno
     unlinkSync(walDest);
     logger.debug('BACKUP', 'File WAL corrente rimosso (non presente nel backup)');
   }
@@ -297,16 +251,6 @@ export function restoreBackup(backupFile: string, dbPath: string): void {
   }
 }
 
-/**
- * Ruota i backup eliminando quelli più vecchi.
- *
- * Mantiene gli ultimi N backup (per timestamp) e rimuove i rimanenti,
- * inclusi i relativi file .meta.json, -wal e -shm.
- *
- * @param backupDir - Directory dove cercare i backup
- * @param maxKeep   - Numero massimo di backup da mantenere
- * @returns Numero di backup eliminati
- */
 export function rotateBackups(backupDir: string, maxKeep: number): number {
   if (maxKeep <= 0) {
     throw new Error(`maxKeep deve essere > 0, ricevuto: ${maxKeep}`);
@@ -314,18 +258,15 @@ export function rotateBackups(backupDir: string, maxKeep: number): number {
 
   const entries = listBackups(backupDir);
 
-  // Se non supera il limite, nessuna rotazione necessaria
   if (entries.length <= maxKeep) {
     logger.debug('BACKUP', `Rotazione non necessaria: ${entries.length}/${maxKeep} backup presenti`);
     return 0;
   }
 
-  // I backup da eliminare sono quelli oltre il limite (listBackups è già ordinata DESC)
   const toDelete = entries.slice(maxKeep);
   let deleted = 0;
 
   for (const entry of toDelete) {
-    // Elimina file DB
     try {
       if (existsSync(entry.filePath)) {
         unlinkSync(entry.filePath);
@@ -334,14 +275,14 @@ export function rotateBackups(backupDir: string, maxKeep: number): number {
       logger.warn('BACKUP', `Impossibile eliminare: ${entry.filePath}`, {}, err as Error);
     }
 
-    // Elimina file WAL e SHM se presenti
     for (const extra of [`${entry.filePath}-wal`, `${entry.filePath}-shm`]) {
       try {
         if (existsSync(extra)) unlinkSync(extra);
-      } catch { /* ignora */ }
+      } catch {
+        /* ignora */
+      }
     }
 
-    // Elimina metadata
     try {
       if (existsSync(entry.metaPath)) {
         unlinkSync(entry.metaPath);

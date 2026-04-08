@@ -1,5 +1,5 @@
 /**
- * Sync ContextKit to Kiro plugins directory
+ * Sync Total Recall to the Kiro plugins directory.
  */
 
 import { join } from 'path';
@@ -8,8 +8,9 @@ import { existsSync, mkdirSync, cpSync, rmSync } from 'fs';
 
 const KIRO_DIR = join(homedir(), '.kiro');
 const PLUGINS_DIR = join(KIRO_DIR, 'plugins');
-const CONTEXTKIT_DIR = join(PLUGINS_DIR, 'totalrecall');
+const TOTALRECALL_PLUGIN_DIR = join(PLUGINS_DIR, 'totalrecall');
 const PLUGIN_SOURCE = join(process.cwd(), 'plugin');
+const DATA_DIR = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(homedir(), '.totalrecall');
 
 function sync() {
   console.log('Syncing Total Recall to Kiro...\n');
@@ -26,25 +27,25 @@ function sync() {
   }
   
   // Remove existing installation if force flag
-  if (process.argv.includes('--force') && existsSync(CONTEXTKIT_DIR)) {
+  if (process.argv.includes('--force') && existsSync(TOTALRECALL_PLUGIN_DIR)) {
     console.log('Removing existing installation...');
-    rmSync(CONTEXTKIT_DIR, { recursive: true });
+    rmSync(TOTALRECALL_PLUGIN_DIR, { recursive: true });
   }
-  
+
   // Copy plugin files
   console.log('Copying plugin files...');
-  cpSync(PLUGIN_SOURCE, CONTEXTKIT_DIR, { recursive: true });
-  
+  cpSync(PLUGIN_SOURCE, TOTALRECALL_PLUGIN_DIR, { recursive: true });
+
   // Ensure data directory exists
-  const dataDir = join(homedir(), '.contextkit');
-  if (!existsSync(dataDir)) {
+  if (!existsSync(DATA_DIR)) {
     console.log('Creating Total Recall data directory...');
-    mkdirSync(dataDir, { recursive: true });
-    mkdirSync(join(dataDir, 'logs'), { recursive: true });
+    mkdirSync(DATA_DIR, { recursive: true });
+    mkdirSync(join(DATA_DIR, 'logs'), { recursive: true });
   }
-  
+
   console.log('\n✅ Total Recall synced successfully!');
-  console.log(`Location: ${CONTEXTKIT_DIR}`);
+  console.log(`Location: ${TOTALRECALL_PLUGIN_DIR}`);
+  console.log(`Data dir: ${DATA_DIR}`);
   console.log('\nNext steps:');
   console.log('1. Restart Kiro CLI');
   console.log('2. Total Recall hooks will be available automatically');

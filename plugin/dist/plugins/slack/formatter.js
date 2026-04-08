@@ -58,7 +58,7 @@ function buildContextBlock() {
     elements: [
       {
         type: "mrkdwn",
-        text: `Kiro Memory | ${timestamp}`
+        text: `Total Recall | ${timestamp}`
       }
     ]
   };

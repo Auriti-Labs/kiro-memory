@@ -7,13 +7,14 @@
 
 import * as esbuild from 'esbuild';
 import { join } from 'path';
-import { existsSync, mkdirSync, copyFileSync } from 'fs';
+import { existsSync, mkdirSync, copyFileSync, readFileSync } from 'fs';
 import { execFileSync } from 'child_process';
 
 const ROOT_DIR = process.cwd();
 const SRC_DIR = join(ROOT_DIR, 'src');
 const PLUGIN_DIR = join(ROOT_DIR, 'plugin');
 const DIST_DIR = join(PLUGIN_DIR, 'dist');
+const PACKAGE_VERSION = JSON.parse(readFileSync(join(ROOT_DIR, 'package.json'), 'utf8')).version;
 
 // Banner to enable require() in ESM context (needed for native CJS modules like better-sqlite3)
 const esmRequireBanner = {
@@ -21,14 +22,27 @@ const esmRequireBanner = {
 };
 
 // Common options for all Node.js builds
+const bunSqliteShimPlugin = {
+  name: 'bun-sqlite-shim',
+  setup(build) {
+    build.onResolve({ filter: /^bun:sqlite$/ }, () => ({
+      path: join(SRC_DIR, 'shims', 'bun-sqlite.ts')
+    }));
+  }
+};
+
 const nodeCommon = {
   bundle: true,
   platform: 'node',
   target: 'node18',
   format: 'esm',
   banner: esmRequireBanner,
-  // Native CJS modules, optional deps, and runtime-specific adapters
-  external: ['better-sqlite3', 'bun:sqlite', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
+  define: {
+    __TOTALRECALL_VERSION__: JSON.stringify(PACKAGE_VERSION)
+  },
+  plugins: [bunSqliteShimPlugin],
+  // Native CJS modules and optional deps loaded at runtime
+  external: ['better-sqlite3', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
 };
 
 function ensureDir(dir) {
@@ -65,7 +79,7 @@ async function build() {
     ...nodeCommon,
     entryPoints: [join(SRC_DIR, 'services', 'worker-service.ts')],
     outfile: join(DIST_DIR, 'worker-service.js'),
-    external: ['better-sqlite3', 'bun:sqlite', 'express', 'cors', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers'],
+    external: ['better-sqlite3', 'express', 'cors', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers'],
     minify: true,
     sourcemap: true
   });
@@ -95,7 +109,7 @@ async function build() {
     ...nodeCommon,
     entryPoints: [join(SRC_DIR, 'servers', 'mcp-server.ts')],
     outfile: join(DIST_DIR, 'servers', 'mcp-server.js'),
-    external: ['better-sqlite3', 'bun:sqlite', '@modelcontextprotocol/sdk']
+    external: ['better-sqlite3', '@modelcontextprotocol/sdk']
   });
 
   // Build SQLite services (singoli file)
@@ -128,7 +142,7 @@ async function build() {
       join(SRC_DIR, 'services', 'search', 'ScoringEngine.ts')
     ],
     outdir: join(DIST_DIR, 'services', 'search'),
-    external: ['better-sqlite3', 'bun:sqlite', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
+    external: ['better-sqlite3', 'fastembed', '@huggingface/transformers', 'onnxruntime-node', '@anush008/tokenizers']
   });
 
   // Build plugin Slack (notifiche Slack per sessioni)
@@ -213,6 +227,9 @@ async function build() {
     format: 'esm',
     outfile: join(DIST_DIR, 'viewer.js'),
     external: [],
+    define: {
+      __TOTALRECALL_VERSION__: JSON.stringify(PACKAGE_VERSION)
+    },
     loader: { '.tsx': 'tsx', '.ts': 'ts' },
     minify: true,
     sourcemap: true
