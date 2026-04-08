@@ -67,6 +67,17 @@ export interface UserPrompt {
   created_at_epoch: number;
 }
 
+export interface ConversationMessage {
+  id: number;
+  content_session_id: string;
+  project: string;
+  role: 'user' | 'assistant' | 'system';
+  message_index: number;
+  content: string;
+  created_at: string;
+  created_at_epoch: number;
+}
+
 export interface DBSession {
   id: number;
   content_session_id: string;

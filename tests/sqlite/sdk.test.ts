@@ -3,6 +3,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { mkdtempSync, writeFileSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import { TotalRecallSDK, createTotalRecall } from '../../src/sdk/index.js';
 
 describe('TotalRecall SDK', () => {
@@ -122,6 +125,79 @@ describe('TotalRecall SDK', () => {
 
       const promptId = await sdk.storePrompt('test-session-1', 1, 'Come faccio a...');
       expect(promptId).toBeGreaterThan(0);
+
+      const refreshed = await sdk.getOrCreateSession('test-session-1');
+      expect(refreshed.user_prompt).toBe('Come faccio a...');
+    });
+
+    it('dovrebbe salvare e recuperare messaggi conversazionali', async () => {
+      await sdk.storeConversationMessage({
+        contentSessionId: 'conversation-1',
+        role: 'user',
+        messageIndex: 0,
+        content: 'ciao',
+      });
+      await sdk.storeConversationMessage({
+        contentSessionId: 'conversation-1',
+        role: 'assistant',
+        messageIndex: 1,
+        content: 'eccomi',
+      });
+
+      const messages = await sdk.getConversationMessages('conversation-1');
+      expect(messages).toHaveLength(2);
+      expect(messages[0].content).toBe('ciao');
+      expect(messages[1].content).toBe('eccomi');
+    });
+
+    it('dovrebbe importare un transcript JSONL con messaggi user e assistant', async () => {
+      const tempDir = mkdtempSync(join(tmpdir(), 'totalrecall-transcript-'));
+      const transcriptPath = join(tempDir, 'session.jsonl');
+      writeFileSync(
+        transcriptPath,
+        [
+          JSON.stringify({
+            type: 'user',
+            timestamp: '2026-04-08T13:42:36.863Z',
+            message: { role: 'user', content: 'riavviato' }
+          }),
+          JSON.stringify({
+            type: 'assistant',
+            timestamp: '2026-04-08T13:42:37.000Z',
+            message: {
+              role: 'assistant',
+              content: [{ type: 'text', text: 'Perfetto, riprendiamo da qui.' }]
+            }
+          }),
+          JSON.stringify({
+            type: 'system',
+            timestamp: '2026-04-08T13:42:38.000Z',
+            message: {
+              role: 'system',
+              content: 'meta event'
+            }
+          })
+        ].join('\n'),
+        'utf8'
+      );
+
+      try {
+        const imported = await sdk.importConversationTranscript('transcript-1', transcriptPath);
+        expect(imported).toBe(3);
+
+        const messages = await sdk.getConversationMessages('transcript-1');
+        expect(messages).toHaveLength(3);
+        expect(messages[0].role).toBe('user');
+        expect(messages[0].content).toBe('riavviato');
+        expect(messages[1].role).toBe('assistant');
+        expect(messages[1].content).toContain('Perfetto');
+        expect(messages[2].role).toBe('system');
+
+        const session = await sdk.getOrCreateSession('transcript-1');
+        expect(session.user_prompt).toBe('riavviato');
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
     });
   });
 

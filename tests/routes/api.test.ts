@@ -36,7 +36,12 @@ import {
 import {
   createSession,
   completeSession,
+  getSessionById,
 } from '../../src/services/sqlite/Sessions.js';
+import {
+  createConversationMessage,
+  getConversationMessagesBySession,
+} from '../../src/services/sqlite/ConversationMessages.js';
 import {
   isValidProject,
   isValidString,
@@ -502,6 +507,27 @@ describe('API route database functions', () => {
   // -------------------------------------------------------------------------
   // getProjectStats (used by /api/stats/:project)
   // -------------------------------------------------------------------------
+
+  describe('session messages query helpers', () => {
+    it('retrieves ordered conversation messages for a session content ID', () => {
+      createSession(db, 'content-msg-1', 'proj-msg', 'hello');
+      createConversationMessage(db, 'content-msg-1', 'proj-msg', 'user', 0, 'hello');
+      createConversationMessage(db, 'content-msg-1', 'proj-msg', 'assistant', 1, 'hi there');
+
+      const messages = getConversationMessagesBySession(db, 'content-msg-1');
+      expect(messages).toHaveLength(2);
+      expect(messages[0].role).toBe('user');
+      expect(messages[1].role).toBe('assistant');
+      expect(messages[1].content).toBe('hi there');
+    });
+
+    it('can resolve session metadata separately for /api/sessions/:id/messages', () => {
+      const id = createSession(db, 'content-msg-2', 'proj-msg', 'prompt');
+      const session = getSessionById(db, id);
+      expect(session).not.toBeNull();
+      expect(session!.content_session_id).toBe('content-msg-2');
+    });
+  });
 
   describe('getProjectStats', () => {
     it('aggregates counts across observations, summaries, sessions, and prompts', () => {

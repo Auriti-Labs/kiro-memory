@@ -1,6 +1,81 @@
 import React, { useState, useEffect } from 'react';
-import type { Session } from '../types';
+import type { Session, SessionMessage } from '../types';
 import { timeAgo, formatDuration } from '../utils/format';
+
+const MESSAGE_STYLES: Record<SessionMessage['role'], { badge: string; box: string; label: string }> = {
+  user: {
+    badge: 'bg-rose-500/10 text-rose-400',
+    box: 'bg-surface-0 border-border',
+    label: 'User',
+  },
+  assistant: {
+    badge: 'bg-blue-500/10 text-blue-400',
+    box: 'bg-blue-500/5 border-blue-500/20',
+    label: 'Assistant',
+  },
+  system: {
+    badge: 'bg-zinc-500/10 text-zinc-400',
+    box: 'bg-zinc-500/5 border-zinc-500/20',
+    label: 'System',
+  },
+};
+
+function SessionConversation({ messages }: { messages: SessionMessage[] }) {
+  if (messages.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-border px-3 py-3 text-xs text-zinc-500">
+        Nessun messaggio conversazionale disponibile per questa sessione.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {messages.map(message => {
+        const style = MESSAGE_STYLES[message.role] || MESSAGE_STYLES.system;
+        return (
+          <div key={message.id || `${message.content_session_id}-${message.message_index}`} className={`rounded-md border px-3 py-3 ${style.box}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded ${style.badge}`}>
+                {style.label}
+              </span>
+              <span className="text-[10px] text-zinc-600 font-mono ml-auto">#{message.message_index}</span>
+            </div>
+            <pre className="text-xs text-zinc-300 whitespace-pre-wrap break-words font-sans leading-relaxed">{message.content}</pre>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+interface SessionMessagesState {
+  [sessionId: number]: {
+    isLoading: boolean;
+    messages: SessionMessage[];
+    error: boolean;
+  };
+}
+
+function buildEmptyMessagesState(): SessionMessagesState {
+  return {};
+}
+
+function shouldFetchMessages(sessionId: number, store: SessionMessagesState): boolean {
+  return !store[sessionId] || (!store[sessionId].isLoading && store[sessionId].messages.length === 0 && !store[sessionId].error);
+}
+
+function renderSessionConversation(sessionId: number, state: SessionMessagesState) {
+  const current = state[sessionId];
+  if (!current) return null;
+  if (current.isLoading) {
+    return <p className="text-xs text-zinc-500">Caricamento conversazione…</p>;
+  }
+  if (current.error) {
+    return <p className="text-xs text-rose-400">Impossibile caricare i messaggi della sessione.</p>;
+  }
+  return <SessionConversation messages={current.messages} />;
+}
 
 const STATUS_STYLES: Record<string, { dot: string; text: string; label: string }> = {
   active: { dot: 'bg-accent-green animate-pulse-dot', text: 'text-accent-green', label: 'Active' },
@@ -17,8 +92,11 @@ export function Sessions({ currentFilter, getDisplayName }: SessionsProps) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [messagesBySession, setMessagesBySession] = useState<SessionMessagesState>(buildEmptyMessagesState);
 
   useEffect(() => {
+    setMessagesBySession(buildEmptyMessagesState());
+    setExpandedId(null);
     setIsLoading(true);
     const params = currentFilter ? `?project=${encodeURIComponent(currentFilter)}` : '';
     fetch(`/api/sessions${params}`)
@@ -64,6 +142,36 @@ export function Sessions({ currentFilter, getDisplayName }: SessionsProps) {
     return totalMs / completedSessions.length / 60_000; // minuti
   })();
 
+  const loadSessionMessages = async (sessionId: number) => {
+    setMessagesBySession(prev => ({
+      ...prev,
+      [sessionId]: { isLoading: true, messages: prev[sessionId]?.messages || [], error: false },
+    }));
+
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/messages`);
+      const data = res.ok ? await res.json() : null;
+      const messages = Array.isArray(data?.messages) ? data.messages : [];
+      setMessagesBySession(prev => ({
+        ...prev,
+        [sessionId]: { isLoading: false, messages, error: false },
+      }));
+    } catch {
+      setMessagesBySession(prev => ({
+        ...prev,
+        [sessionId]: { isLoading: false, messages: prev[sessionId]?.messages || [], error: true },
+      }));
+    }
+  };
+
+  const handleToggleExpand = (sessionId: number) => {
+    const nextExpanded = expandedId === sessionId ? null : sessionId;
+    setExpandedId(nextExpanded);
+    if (nextExpanded !== null && shouldFetchMessages(sessionId, messagesBySession)) {
+      void loadSessionMessages(sessionId);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Stats cards */}
@@ -94,6 +202,9 @@ export function Sessions({ currentFilter, getDisplayName }: SessionsProps) {
           const duration = session.completed_at_epoch
             ? (session.completed_at_epoch - session.started_at_epoch) / 60_000
             : (Date.now() - session.started_at_epoch) / 60_000;
+          const conversationState = messagesBySession[session.id];
+          const firstUserMessage = conversationState?.messages.find(message => message.role === 'user');
+          const displayPrompt = session.user_prompt || firstUserMessage?.content || 'Session';
 
           return (
             <div
@@ -102,7 +213,7 @@ export function Sessions({ currentFilter, getDisplayName }: SessionsProps) {
             >
               {/* Riga principale */}
               <button
-                onClick={() => setExpandedId(isExpanded ? null : session.id)}
+                onClick={() => handleToggleExpand(session.id)}
                 className="w-full flex items-center gap-3 px-4 py-3 text-left"
                 aria-expanded={isExpanded}
               >
@@ -113,7 +224,7 @@ export function Sessions({ currentFilter, getDisplayName }: SessionsProps) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-zinc-200 truncate">
-                      {session.user_prompt || 'Session'}
+                      {displayPrompt}
                     </span>
                     <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${style.text} bg-surface-3`}>
                       {style.label}
@@ -158,17 +269,24 @@ export function Sessions({ currentFilter, getDisplayName }: SessionsProps) {
                       </div>
                     </div>
                   </div>
-                  {session.user_prompt && (
+                  {displayPrompt && displayPrompt !== 'Session' && (
                     <div>
                       <span className="text-[11px] text-zinc-600">Prompt</span>
-                      <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed break-words">{session.user_prompt}</p>
+                      <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed break-words">{displayPrompt}</p>
                     </div>
                   )}
+                  <div>
+                    <span className="text-[11px] text-zinc-600">Conversation</span>
+                    <div className="mt-2">
+                      {renderSessionConversation(session.id, messagesBySession)}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
           );
         })}
+
       </div>
     </div>
   );

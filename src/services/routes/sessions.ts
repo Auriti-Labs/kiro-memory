@@ -7,8 +7,9 @@
 import { Router } from 'express';
 import type { WorkerContext } from '../worker-context.js';
 import { isValidProject, parseIntSafe } from '../worker-context.js';
-import { getSessionsByProject, getAllSessions } from '../sqlite/Sessions.js';
+import { getSessionsByProject, getAllSessions, getSessionById } from '../sqlite/Sessions.js';
 import { getLatestCheckpoint, getLatestCheckpointByProject } from '../sqlite/Checkpoints.js';
+import { getConversationMessagesBySession } from '../sqlite/ConversationMessages.js';
 import { decodeCursor, buildNextCursor } from '../sqlite/cursor.js';
 import { logger } from '../../utils/logger.js';
 
@@ -54,6 +55,48 @@ export function createSessionsRouter(ctx: WorkerContext): Router {
     } catch (error) {
       logger.error('WORKER', 'Checkpoint fetch failed', { sessionId }, error as Error);
       res.status(500).json({ error: 'Checkpoint fetch failed' });
+    }
+  });
+
+  // Thread conversazionale completo di una sessione
+  router.get('/api/sessions/:id/messages', (req, res) => {
+    const sessionId = parseInt(req.params.id, 10);
+
+    if (isNaN(sessionId) || sessionId <= 0) {
+      res.status(400).json({ error: 'Invalid session ID' });
+      return;
+    }
+
+    try {
+      const session = getSessionById(ctx.db.db, sessionId);
+      if (!session) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      const messages = getConversationMessagesBySession(ctx.db.db, session.content_session_id);
+      res.json({ session, messages });
+    } catch (error) {
+      logger.error('WORKER', 'Session messages fetch failed', { sessionId }, error as Error);
+      res.status(500).json({ error: 'Session messages fetch failed' });
+    }
+  });
+
+  // Thread conversazionale completo per content_session_id
+  router.get('/api/session-messages/:contentSessionId', (req, res) => {
+    const { contentSessionId } = req.params;
+
+    if (!contentSessionId || typeof contentSessionId !== 'string') {
+      res.status(400).json({ error: 'Invalid content session ID' });
+      return;
+    }
+
+    try {
+      const messages = getConversationMessagesBySession(ctx.db.db, contentSessionId);
+      res.json({ messages });
+    } catch (error) {
+      logger.error('WORKER', 'Content session messages fetch failed', { contentSessionId }, error as Error);
+      res.status(500).json({ error: 'Content session messages fetch failed' });
     }
   });
 

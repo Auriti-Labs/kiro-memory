@@ -33,6 +33,7 @@ runHook('userPromptSubmit', async (input) => {
 
     // Notify the dashboard in real-time
     await notifyWorker('prompt-created', { project });
+    await notifyWorker('session-created', { project });
 
     // Cursor beforeSubmitPrompt requires JSON output to proceed
     if (input.hook_event_name === 'beforeSubmitPrompt') {

@@ -24,6 +24,12 @@ function updateSessionMemoryId(db, id, memorySessionId) {
     [memorySessionId, id]
   );
 }
+function updateSessionUserPrompt(db, contentSessionId, userPrompt) {
+  db.run(
+    "UPDATE sessions SET user_prompt = ? WHERE content_session_id = ?",
+    [userPrompt, contentSessionId]
+  );
+}
 function completeSession(db, id) {
   const now = /* @__PURE__ */ new Date();
   db.run(
@@ -63,5 +69,6 @@ export {
   getSessionByContentId,
   getSessionById,
   getSessionsByProject,
-  updateSessionMemoryId
+  updateSessionMemoryId,
+  updateSessionUserPrompt
 };

@@ -18,6 +18,10 @@ runHook('stop', async (input) => {
     const contentSessionId = input.session_id || `stop-${Date.now()}`;
     const session = await sdk.getOrCreateSession(contentSessionId);
 
+    if (input.transcript_path) {
+      await sdk.importConversationTranscript(contentSessionId, input.transcript_path);
+    }
+
     // Filter observations: use session's started_at_epoch if available,
     // otherwise fallback to 4h window. Fix: content_session_id ≠ memory_session_id
     const recentObs = await sdk.getRecentObservations(50);

@@ -1663,6 +1663,26 @@ var MigrationRunner = class {
           db.run("CREATE INDEX IF NOT EXISTS idx_prompts_keyset ON prompts(created_at_epoch DESC, id DESC)");
           db.run("CREATE INDEX IF NOT EXISTS idx_prompts_project_keyset ON prompts(project, created_at_epoch DESC, id DESC)");
         }
+      },
+      {
+        version: 14,
+        up: (db) => {
+          db.run(`
+            CREATE TABLE IF NOT EXISTS conversation_messages (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              content_session_id TEXT NOT NULL,
+              project TEXT NOT NULL,
+              role TEXT NOT NULL,
+              message_index INTEGER NOT NULL,
+              content TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              created_at_epoch INTEGER NOT NULL,
+              UNIQUE(content_session_id, message_index)
+            )
+          `);
+          db.run("CREATE INDEX IF NOT EXISTS idx_conversation_messages_session ON conversation_messages(content_session_id, message_index ASC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_conversation_messages_project_epoch ON conversation_messages(project, created_at_epoch DESC)");
+        }
       }
     ];
   }
@@ -1703,6 +1723,12 @@ function createSession(db, contentSessionId, project, userPrompt) {
 function getSessionByContentId(db, contentSessionId) {
   const query = db.query("SELECT * FROM sessions WHERE content_session_id = ?");
   return query.get(contentSessionId);
+}
+function updateSessionUserPrompt(db, contentSessionId, userPrompt) {
+  db.run(
+    "UPDATE sessions SET user_prompt = ? WHERE content_session_id = ?",
+    [userPrompt, contentSessionId]
+  );
 }
 function completeSession(db, id) {
   const now = /* @__PURE__ */ new Date();
@@ -1767,6 +1793,34 @@ function getPromptsByProject(db, project, limit = 100) {
     "SELECT * FROM prompts WHERE project = ? ORDER BY created_at_epoch DESC, id DESC LIMIT ?"
   );
   return query.all(project, limit);
+}
+
+// src/services/sqlite/ConversationMessages.ts
+function createConversationMessage(db, contentSessionId, project, role, messageIndex, content, createdAt, createdAtEpoch) {
+  const timestamp = createdAt || (/* @__PURE__ */ new Date()).toISOString();
+  const epoch = createdAtEpoch ?? Date.now();
+  const result = db.run(
+    `INSERT OR IGNORE INTO conversation_messages
+     (content_session_id, project, role, message_index, content, created_at, created_at_epoch)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [contentSessionId, project, role, messageIndex, content, timestamp, epoch]
+  );
+  return Number(result.lastInsertRowid || 0);
+}
+function getConversationMessagesBySession(db, contentSessionId) {
+  const query = db.query(
+    `SELECT * FROM conversation_messages
+     WHERE content_session_id = ?
+     ORDER BY message_index ASC, id ASC`
+  );
+  return query.all(contentSessionId);
+}
+function getConversationMessageCountBySession(db, contentSessionId) {
+  const query = db.query(
+    "SELECT COUNT(*) as total FROM conversation_messages WHERE content_session_id = ?"
+  );
+  const result = query.get(contentSessionId);
+  return result?.total || 0;
 }
 
 // src/services/sqlite/Checkpoints.ts
@@ -2846,7 +2900,79 @@ var TotalRecallSDK = class {
    * Store a user prompt
    */
   async storePrompt(contentSessionId, promptNumber, text) {
+    await this.getOrCreateSession(contentSessionId);
+    updateSessionUserPrompt(this.db.db, contentSessionId, text);
     return createPrompt(this.db.db, contentSessionId, this.project, promptNumber, text);
+  }
+  /**
+   * Salva un messaggio conversazionale della sessione.
+   */
+  async storeConversationMessage(data) {
+    await this.getOrCreateSession(data.contentSessionId);
+    return createConversationMessage(
+      this.db.db,
+      data.contentSessionId,
+      this.project,
+      data.role,
+      data.messageIndex,
+      data.content,
+      data.createdAt,
+      data.createdAtEpoch
+    );
+  }
+  /**
+   * Restituisce il thread completo di una sessione.
+   */
+  async getConversationMessages(contentSessionId) {
+    return getConversationMessagesBySession(this.db.db, contentSessionId);
+  }
+  /**
+   * Importa un transcript salvando solo i turni user/assistant/system testuali.
+   */
+  async importConversationTranscript(contentSessionId, transcriptPath) {
+    const { readFileSync: readFileSync2 } = await import("fs");
+    const raw = readFileSync2(transcriptPath, "utf8");
+    const lines = raw.split("\n").filter(Boolean);
+    let messageIndex = getConversationMessageCountBySession(this.db.db, contentSessionId);
+    let inserted = 0;
+    for (const line of lines) {
+      let row;
+      try {
+        row = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      const role = row?.message?.role;
+      if (role !== "user" && role !== "assistant" && role !== "system") continue;
+      const content = this.extractTranscriptContent(row?.message?.content);
+      if (!content) continue;
+      const id = await this.storeConversationMessage({
+        contentSessionId,
+        role,
+        messageIndex,
+        content,
+        createdAt: row.timestamp,
+        createdAtEpoch: row.timestamp ? new Date(row.timestamp).getTime() : void 0
+      });
+      if (id > 0) {
+        inserted += 1;
+        if (role === "user" && messageIndex === 0) {
+          updateSessionUserPrompt(this.db.db, contentSessionId, content);
+        }
+      }
+      messageIndex += 1;
+    }
+    return inserted;
+  }
+  extractTranscriptContent(content) {
+    if (typeof content === "string") return content.trim();
+    if (!Array.isArray(content)) return "";
+    const parts = content.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      if (item.type === "text" && typeof item.text === "string") return [item.text.trim()];
+      return [];
+    }).filter(Boolean);
+    return parts.join("\n\n").trim();
   }
   /**
    * Complete a session

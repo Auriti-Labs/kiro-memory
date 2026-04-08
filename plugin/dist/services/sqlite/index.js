@@ -953,6 +953,26 @@ var MigrationRunner = class {
           db.run("CREATE INDEX IF NOT EXISTS idx_prompts_keyset ON prompts(created_at_epoch DESC, id DESC)");
           db.run("CREATE INDEX IF NOT EXISTS idx_prompts_project_keyset ON prompts(project, created_at_epoch DESC, id DESC)");
         }
+      },
+      {
+        version: 14,
+        up: (db) => {
+          db.run(`
+            CREATE TABLE IF NOT EXISTS conversation_messages (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              content_session_id TEXT NOT NULL,
+              project TEXT NOT NULL,
+              role TEXT NOT NULL,
+              message_index INTEGER NOT NULL,
+              content TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              created_at_epoch INTEGER NOT NULL,
+              UNIQUE(content_session_id, message_index)
+            )
+          `);
+          db.run("CREATE INDEX IF NOT EXISTS idx_conversation_messages_session ON conversation_messages(content_session_id, message_index ASC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_conversation_messages_project_epoch ON conversation_messages(project, created_at_epoch DESC)");
+        }
       }
     ];
   }
@@ -1008,6 +1028,12 @@ function updateSessionMemoryId(db, id, memorySessionId) {
   db.run(
     "UPDATE sessions SET memory_session_id = ? WHERE id = ?",
     [memorySessionId, id]
+  );
+}
+function updateSessionUserPrompt(db, contentSessionId, userPrompt) {
+  db.run(
+    "UPDATE sessions SET user_prompt = ? WHERE content_session_id = ?",
+    [userPrompt, contentSessionId]
   );
 }
 function completeSession(db, id) {
@@ -1521,6 +1547,34 @@ function getLatestPrompt(db, contentSessionId) {
 }
 function deletePrompt(db, id) {
   db.run("DELETE FROM prompts WHERE id = ?", [id]);
+}
+
+// src/services/sqlite/ConversationMessages.ts
+function createConversationMessage(db, contentSessionId, project, role, messageIndex, content, createdAt, createdAtEpoch) {
+  const timestamp = createdAt || (/* @__PURE__ */ new Date()).toISOString();
+  const epoch = createdAtEpoch ?? Date.now();
+  const result = db.run(
+    `INSERT OR IGNORE INTO conversation_messages
+     (content_session_id, project, role, message_index, content, created_at, created_at_epoch)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [contentSessionId, project, role, messageIndex, content, timestamp, epoch]
+  );
+  return Number(result.lastInsertRowid || 0);
+}
+function getConversationMessagesBySession(db, contentSessionId) {
+  const query = db.query(
+    `SELECT * FROM conversation_messages
+     WHERE content_session_id = ?
+     ORDER BY message_index ASC, id ASC`
+  );
+  return query.all(contentSessionId);
+}
+function getConversationMessageCountBySession(db, contentSessionId) {
+  const query = db.query(
+    "SELECT COUNT(*) as total FROM conversation_messages WHERE content_session_id = ?"
+  );
+  const result = query.get(contentSessionId);
+  return result?.total || 0;
 }
 
 // src/services/sqlite/Checkpoints.ts
@@ -2836,6 +2890,7 @@ export {
   countExportRecords,
   createBackup,
   createCheckpoint,
+  createConversationMessage,
   createGithubLink,
   createObservation,
   createPrompt,
@@ -2854,6 +2909,8 @@ export {
   getActiveSessions,
   getAllSessions,
   getCheckpointsBySession,
+  getConversationMessageCountBySession,
+  getConversationMessagesBySession,
   getGithubLinksByIssue,
   getGithubLinksByObservation,
   getGithubLinksByPR,
@@ -2893,5 +2950,6 @@ export {
   searchSummariesFiltered,
   updateLastAccessed,
   updateSessionMemoryId,
+  updateSessionUserPrompt,
   validateJsonlRow
 };

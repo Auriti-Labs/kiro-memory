@@ -31,6 +31,7 @@ describe('TotalRecall Database', () => {
     expect(tableNames).toContain('observations');
     expect(tableNames).toContain('summaries');
     expect(tableNames).toContain('prompts');
+    expect(tableNames).toContain('conversation_messages');
     expect(tableNames).toContain('pending_messages');
     expect(tableNames).toContain('schema_versions');
   });

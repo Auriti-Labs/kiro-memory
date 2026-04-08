@@ -200,3 +200,14 @@ export interface Session {
   completed_at: string | null;
   completed_at_epoch: number | null;
 }
+
+export interface SessionMessage {
+  id: number;
+  content_session_id: string;
+  project: string;
+  role: 'user' | 'assistant' | 'system';
+  message_index: number;
+  content: string;
+  created_at: string;
+  created_at_epoch: number;
+}

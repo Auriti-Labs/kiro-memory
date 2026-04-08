@@ -9,11 +9,17 @@ import {
   getSessionByContentId,
   getSessionById,
   updateSessionMemoryId,
+  updateSessionUserPrompt,
   completeSession,
   failSession,
   getActiveSessions,
   getSessionsByProject
 } from '../../src/services/sqlite/Sessions.js';
+import {
+  createConversationMessage,
+  getConversationMessagesBySession,
+  getConversationMessageCountBySession
+} from '../../src/services/sqlite/ConversationMessages.js';
 import type { Database } from 'bun:sqlite';
 
 describe('Sessions Module', () => {
@@ -68,14 +74,61 @@ describe('Sessions Module', () => {
     });
   });
 
+  describe('updateSessionUserPrompt', () => {
+    it('should update the initial user prompt for a session', () => {
+      createSession(db, 'session-prompt', 'project', '');
+      updateSessionUserPrompt(db, 'session-prompt', 'Prompt iniziale');
+
+      const session = getSessionByContentId(db, 'session-prompt');
+      expect(session!.user_prompt).toBe('Prompt iniziale');
+    });
+  });
+
+  describe('conversation messages', () => {
+    it('should store and retrieve ordered session messages', () => {
+      createSession(db, 'session-msg', 'project', 'prompt');
+      createConversationMessage(db, 'session-msg', 'project', 'user', 0, 'ciao');
+      createConversationMessage(db, 'session-msg', 'project', 'assistant', 1, 'risposta');
+
+      const messages = getConversationMessagesBySession(db, 'session-msg');
+      expect(messages).toHaveLength(2);
+      expect(messages[0].role).toBe('user');
+      expect(messages[0].content).toBe('ciao');
+      expect(messages[1].role).toBe('assistant');
+      expect(messages[1].content).toBe('risposta');
+      expect(getConversationMessageCountBySession(db, 'session-msg')).toBe(2);
+    });
+
+    it('should ignore duplicate message_index for the same session', () => {
+      createConversationMessage(db, 'session-dedupe', 'project', 'user', 0, 'uno');
+      createConversationMessage(db, 'session-dedupe', 'project', 'assistant', 0, 'due');
+
+      const messages = getConversationMessagesBySession(db, 'session-dedupe');
+      expect(messages).toHaveLength(1);
+      expect(messages[0].content).toBe('uno');
+    });
+  });
+
   describe('completeSession', () => {
     it('should mark session as completed', () => {
       const id = createSession(db, 'session-001', 'project', 'prompt');
       completeSession(db, id);
-      
+
       const session = getSessionById(db, id);
       expect(session!.status).toBe('completed');
       expect(session!.completed_at).not.toBeNull();
+    });
+  });
+
+  describe('getSessionsByProject', () => {
+    it('should return sessions scoped to the requested project', () => {
+      createSession(db, 'proj-a-1', 'project-a', 'a1');
+      createSession(db, 'proj-b-1', 'project-b', 'b1');
+      createSession(db, 'proj-a-2', 'project-a', 'a2');
+
+      const rows = getSessionsByProject(db, 'project-a');
+      expect(rows).toHaveLength(2);
+      expect(rows.every(row => row.project === 'project-a')).toBe(true);
     });
   });
 

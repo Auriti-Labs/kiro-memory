@@ -11,7 +11,8 @@ import { getObservationsByProject, createObservation, searchObservations, update
 import { createHash } from 'crypto';
 import { getSummariesByProject, createSummary, searchSummaries } from '../services/sqlite/Summaries.js';
 import { getPromptsByProject, createPrompt } from '../services/sqlite/Prompts.js';
-import { getSessionByContentId, createSession, completeSession as dbCompleteSession } from '../services/sqlite/Sessions.js';
+import { getSessionByContentId, createSession, completeSession as dbCompleteSession, updateSessionUserPrompt } from '../services/sqlite/Sessions.js';
+import { createConversationMessage, getConversationMessagesBySession, getConversationMessageCountBySession } from '../services/sqlite/ConversationMessages.js';
 import { searchObservationsFTS, searchSummariesFiltered, getObservationsByIds as dbGetObservationsByIds, getTimeline as dbGetTimeline, getStaleObservations as dbGetStaleObservations, markObservationsStale as dbMarkObservationsStale } from '../services/sqlite/Search.js';
 import { createCheckpoint as dbCreateCheckpoint, getLatestCheckpoint as dbGetLatestCheckpoint, getLatestCheckpointByProject as dbGetLatestCheckpointByProject } from '../services/sqlite/Checkpoints.js';
 import { getReportData as dbGetReportData } from '../services/sqlite/Reports.js';
@@ -30,6 +31,7 @@ import type {
   Observation,
   Summary,
   UserPrompt,
+  ConversationMessage,
   DBSession,
   DBCheckpoint,
   ContextContext,
@@ -405,7 +407,98 @@ export class TotalRecallSDK {
    * Store a user prompt
    */
   async storePrompt(contentSessionId: string, promptNumber: number, text: string): Promise<number> {
+    await this.getOrCreateSession(contentSessionId);
+    updateSessionUserPrompt(this.db.db, contentSessionId, text);
     return createPrompt(this.db.db, contentSessionId, this.project, promptNumber, text);
+  }
+
+  /**
+   * Salva un messaggio conversazionale della sessione.
+   */
+  async storeConversationMessage(data: {
+    contentSessionId: string;
+    role: ConversationMessage['role'];
+    messageIndex: number;
+    content: string;
+    createdAt?: string;
+    createdAtEpoch?: number;
+  }): Promise<number> {
+    await this.getOrCreateSession(data.contentSessionId);
+    return createConversationMessage(
+      this.db.db,
+      data.contentSessionId,
+      this.project,
+      data.role,
+      data.messageIndex,
+      data.content,
+      data.createdAt,
+      data.createdAtEpoch
+    );
+  }
+
+  /**
+   * Restituisce il thread completo di una sessione.
+   */
+  async getConversationMessages(contentSessionId: string): Promise<ConversationMessage[]> {
+    return getConversationMessagesBySession(this.db.db, contentSessionId);
+  }
+
+  /**
+   * Importa un transcript salvando solo i turni user/assistant/system testuali.
+   */
+  async importConversationTranscript(contentSessionId: string, transcriptPath: string): Promise<number> {
+    const { readFileSync } = await import('fs');
+    const raw = readFileSync(transcriptPath, 'utf8');
+    const lines = raw.split('\n').filter(Boolean);
+    let messageIndex = getConversationMessageCountBySession(this.db.db, contentSessionId);
+    let inserted = 0;
+
+    for (const line of lines) {
+      let row: any;
+      try {
+        row = JSON.parse(line);
+      } catch {
+        continue;
+      }
+
+      const role = row?.message?.role;
+      if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
+
+      const content = this.extractTranscriptContent(row?.message?.content);
+      if (!content) continue;
+
+      const id = await this.storeConversationMessage({
+        contentSessionId,
+        role,
+        messageIndex,
+        content,
+        createdAt: row.timestamp,
+        createdAtEpoch: row.timestamp ? new Date(row.timestamp).getTime() : undefined,
+      });
+
+      if (id > 0) {
+        inserted += 1;
+        if (role === 'user' && messageIndex === 0) {
+          updateSessionUserPrompt(this.db.db, contentSessionId, content);
+        }
+      }
+      messageIndex += 1;
+    }
+
+    return inserted;
+  }
+
+  private extractTranscriptContent(content: unknown): string {
+    if (typeof content === 'string') return content.trim();
+    if (!Array.isArray(content)) return '';
+
+    const parts = content.flatMap((item: any) => {
+      if (!item || typeof item !== 'object') return [];
+      if (item.type === 'text' && typeof item.text === 'string') return [item.text.trim()];
+      return [];
+    }).filter(Boolean);
+
+    return parts.join('\n\n').trim();
   }
 
   /**
@@ -850,6 +943,7 @@ export type {
   Observation,
   Summary,
   UserPrompt,
+  ConversationMessage,
   DBSession,
   DBCheckpoint,
   ContextContext,

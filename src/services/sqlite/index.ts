@@ -10,6 +10,7 @@ export * from './Sessions.js';
 export * from './Observations.js';
 export * from './Summaries.js';
 export * from './Prompts.js';
+export * from './ConversationMessages.js';
 
 // Export checkpoints
 export * from './Checkpoints.js';

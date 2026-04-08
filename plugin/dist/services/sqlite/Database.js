@@ -953,6 +953,26 @@ var MigrationRunner = class {
           db.run("CREATE INDEX IF NOT EXISTS idx_prompts_keyset ON prompts(created_at_epoch DESC, id DESC)");
           db.run("CREATE INDEX IF NOT EXISTS idx_prompts_project_keyset ON prompts(project, created_at_epoch DESC, id DESC)");
         }
+      },
+      {
+        version: 14,
+        up: (db) => {
+          db.run(`
+            CREATE TABLE IF NOT EXISTS conversation_messages (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              content_session_id TEXT NOT NULL,
+              project TEXT NOT NULL,
+              role TEXT NOT NULL,
+              message_index INTEGER NOT NULL,
+              content TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              created_at_epoch INTEGER NOT NULL,
+              UNIQUE(content_session_id, message_index)
+            )
+          `);
+          db.run("CREATE INDEX IF NOT EXISTS idx_conversation_messages_session ON conversation_messages(content_session_id, message_index ASC)");
+          db.run("CREATE INDEX IF NOT EXISTS idx_conversation_messages_project_epoch ON conversation_messages(project, created_at_epoch DESC)");
+        }
       }
     ];
   }

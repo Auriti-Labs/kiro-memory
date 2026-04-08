@@ -41,6 +41,17 @@ export function updateSessionMemoryId(
   );
 }
 
+export function updateSessionUserPrompt(
+  db: Database,
+  contentSessionId: string,
+  userPrompt: string
+): void {
+  db.run(
+    'UPDATE sessions SET user_prompt = ? WHERE content_session_id = ?',
+    [userPrompt, contentSessionId]
+  );
+}
+
 export function completeSession(db: Database, id: number): void {
   const now = new Date();
   db.run(
