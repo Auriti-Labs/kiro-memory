@@ -1005,8 +1005,8 @@ var init_Search = __esm({
 });
 
 // src/hooks/utils.ts
-import { writeFileSync, mkdirSync, existsSync, readFileSync } from "fs";
-import { join } from "path";
+import { writeFileSync, mkdirSync as mkdirSync2, existsSync as existsSync2, readFileSync } from "fs";
+import { join as join2 } from "path";
 
 // src/services/search/ScoringEngine.ts
 var SEARCH_WEIGHTS = {
@@ -1058,19 +1058,78 @@ function estimateTokens(text) {
   return Math.ceil(text.length / 4);
 }
 
+// src/shared/paths.ts
+import { join, dirname, basename } from "path";
+import { homedir } from "os";
+import { existsSync, mkdirSync, statSync } from "fs";
+import { fileURLToPath } from "url";
+function getDirname() {
+  if (typeof __dirname !== "undefined") {
+    return __dirname;
+  }
+  return dirname(fileURLToPath(import.meta.url));
+}
+var _dirname = getDirname();
+var _legacyV1Dir = join(homedir(), ".contextkit");
+var _canonicalDir = join(homedir(), ".totalrecall");
+function getFileSize(path) {
+  try {
+    return existsSync(path) ? statSync(path).size : -1;
+  } catch {
+    return -1;
+  }
+}
+function resolveDataDir() {
+  const canonicalDb = join(_canonicalDir, "totalrecall.db");
+  const legacyCanonicalNamedDb = join(_legacyV1Dir, "totalrecall.db");
+  const legacyDb = join(_legacyV1Dir, "contextkit.db");
+  const canonicalSize = getFileSize(canonicalDb);
+  const legacySize = Math.max(getFileSize(legacyCanonicalNamedDb), getFileSize(legacyDb));
+  if (canonicalSize > 0 && legacySize > 0) {
+    return legacySize > canonicalSize ? _legacyV1Dir : _canonicalDir;
+  }
+  if (legacySize > 0) return _legacyV1Dir;
+  if (canonicalSize > 0) return _canonicalDir;
+  if (existsSync(_canonicalDir)) return _canonicalDir;
+  if (existsSync(_legacyV1Dir)) return _legacyV1Dir;
+  return _canonicalDir;
+}
+var DATA_DIR = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || resolveDataDir();
+var KIRO_CONFIG_DIR = process.env.KIRO_CONFIG_DIR || join(homedir(), ".kiro");
+var PLUGIN_ROOT = join(KIRO_CONFIG_DIR, "plugins", "totalrecall");
+var ARCHIVES_DIR = join(DATA_DIR, "archives");
+var LOGS_DIR = join(DATA_DIR, "logs");
+var TRASH_DIR = join(DATA_DIR, "trash");
+var BACKUPS_DIR = join(DATA_DIR, "backups");
+var MODES_DIR = join(DATA_DIR, "modes");
+var USER_SETTINGS_PATH = join(DATA_DIR, "settings.json");
+var _legacyDbV1 = join(DATA_DIR, "contextkit.db");
+var _legacyDbV3 = join(DATA_DIR, "totalrecall.db");
+function resolveDbPath() {
+  if (existsSync(join(DATA_DIR, "totalrecall.db"))) return join(DATA_DIR, "totalrecall.db");
+  if (existsSync(_legacyDbV3)) return _legacyDbV3;
+  if (existsSync(_legacyDbV1)) return _legacyDbV1;
+  return join(DATA_DIR, "totalrecall.db");
+}
+var DB_PATH = resolveDbPath();
+var VECTOR_DB_DIR = join(DATA_DIR, "vector-db");
+var OBSERVER_SESSIONS_DIR = join(DATA_DIR, "observer-sessions");
+var KIRO_SETTINGS_PATH = join(KIRO_CONFIG_DIR, "settings.json");
+var KIRO_CONTEXT_PATH = join(KIRO_CONFIG_DIR, "context.md");
+function ensureDir(dirPath) {
+  mkdirSync(dirPath, { recursive: true });
+}
+
 // src/hooks/utils.ts
-var DATA_DIR = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join(process.env.HOME || "/tmp", ".totalrecall");
-var TOKEN_FILE = join(DATA_DIR, "worker.token");
+var TOKEN_FILE = join2(DATA_DIR, "worker.token");
 function debugLog(hookName, label, data) {
   if ((process.env.TOTALRECALL_LOG_LEVEL || "").toUpperCase() !== "DEBUG") return;
   try {
-    const dataDir = process.env.TOTALRECALL_DATA_DIR || join(process.env.HOME || "/tmp", ".totalrecall");
-    const logDir = join(dataDir, "logs");
-    if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true });
+    if (!existsSync2(LOGS_DIR)) mkdirSync2(LOGS_DIR, { recursive: true });
     const ts = (/* @__PURE__ */ new Date()).toISOString();
     const line = `[${ts}] [${hookName}] ${label}: ${JSON.stringify(data)}
 `;
-    const logFile = join(logDir, `hooks-${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.log`);
+    const logFile = join2(LOGS_DIR, `hooks-${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.log`);
     writeFileSync(logFile, line, { flag: "a" });
   } catch {
   }
@@ -1202,68 +1261,6 @@ if (isBun) {
   DatabaseClass = mod.Database;
 }
 var Database4 = DatabaseClass;
-
-// src/shared/paths.ts
-import { join as join2, dirname, basename } from "path";
-import { homedir } from "os";
-import { existsSync as existsSync2, mkdirSync as mkdirSync2, statSync } from "fs";
-import { fileURLToPath } from "url";
-function getDirname() {
-  if (typeof __dirname !== "undefined") {
-    return __dirname;
-  }
-  return dirname(fileURLToPath(import.meta.url));
-}
-var _dirname = getDirname();
-var _legacyV1Dir = join2(homedir(), ".contextkit");
-var _canonicalDir = join2(homedir(), ".totalrecall");
-function getFileSize(path) {
-  try {
-    return existsSync2(path) ? statSync(path).size : -1;
-  } catch {
-    return -1;
-  }
-}
-function resolveDataDir() {
-  const canonicalDb = join2(_canonicalDir, "totalrecall.db");
-  const legacyCanonicalNamedDb = join2(_legacyV1Dir, "totalrecall.db");
-  const legacyDb = join2(_legacyV1Dir, "contextkit.db");
-  const canonicalSize = getFileSize(canonicalDb);
-  const legacySize = Math.max(getFileSize(legacyCanonicalNamedDb), getFileSize(legacyDb));
-  if (canonicalSize > 0 && legacySize > 0) {
-    return legacySize > canonicalSize ? _legacyV1Dir : _canonicalDir;
-  }
-  if (legacySize > 0) return _legacyV1Dir;
-  if (canonicalSize > 0) return _canonicalDir;
-  if (existsSync2(_canonicalDir)) return _canonicalDir;
-  if (existsSync2(_legacyV1Dir)) return _legacyV1Dir;
-  return _canonicalDir;
-}
-var DATA_DIR2 = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || resolveDataDir();
-var KIRO_CONFIG_DIR = process.env.KIRO_CONFIG_DIR || join2(homedir(), ".kiro");
-var PLUGIN_ROOT = join2(KIRO_CONFIG_DIR, "plugins", "totalrecall");
-var ARCHIVES_DIR = join2(DATA_DIR2, "archives");
-var LOGS_DIR = join2(DATA_DIR2, "logs");
-var TRASH_DIR = join2(DATA_DIR2, "trash");
-var BACKUPS_DIR = join2(DATA_DIR2, "backups");
-var MODES_DIR = join2(DATA_DIR2, "modes");
-var USER_SETTINGS_PATH = join2(DATA_DIR2, "settings.json");
-var _legacyDbV1 = join2(DATA_DIR2, "contextkit.db");
-var _legacyDbV3 = join2(DATA_DIR2, "totalrecall.db");
-function resolveDbPath() {
-  if (existsSync2(join2(DATA_DIR2, "totalrecall.db"))) return join2(DATA_DIR2, "totalrecall.db");
-  if (existsSync2(_legacyDbV3)) return _legacyDbV3;
-  if (existsSync2(_legacyDbV1)) return _legacyDbV1;
-  return join2(DATA_DIR2, "totalrecall.db");
-}
-var DB_PATH = resolveDbPath();
-var VECTOR_DB_DIR = join2(DATA_DIR2, "vector-db");
-var OBSERVER_SESSIONS_DIR = join2(DATA_DIR2, "observer-sessions");
-var KIRO_SETTINGS_PATH = join2(KIRO_CONFIG_DIR, "settings.json");
-var KIRO_CONTEXT_PATH = join2(KIRO_CONFIG_DIR, "context.md");
-function ensureDir(dirPath) {
-  mkdirSync2(dirPath, { recursive: true });
-}
 
 // src/utils/logger.ts
 import { appendFileSync, existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync2 } from "fs";
@@ -1498,7 +1495,7 @@ var TotalRecallDatabase = class {
    */
   constructor(dbPath = DB_PATH, skipMigrations = false) {
     if (dbPath !== ":memory:") {
-      ensureDir(DATA_DIR2);
+      ensureDir(DATA_DIR);
     }
     this._db = new Database4(dbPath, { create: true, readwrite: true });
     this._db.run("PRAGMA journal_mode = WAL");

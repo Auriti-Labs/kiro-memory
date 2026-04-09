@@ -392,7 +392,7 @@ export class PluginLoader {
    * - Se è un percorso assoluto: restituisce com'è
    * - Se è un percorso relativo: risolve rispetto a cwd
    * - Se è un nome npm: cerca in node_modules
-   * - Se è un nome locale: cerca in ~/.contextkit/plugins/<nome>
+   * - Se è un nome locale: cerca in <data-dir>/plugins/<nome>
    */
   private resolveModulePath(nameOrPath: string): string {
     // Percorso assoluto
@@ -411,7 +411,7 @@ export class PluginLoader {
       return nodeModulesPath;
     }
 
-    // Plugin locale: cerca in ~/.contextkit/plugins/<nome>
+    // Plugin locale: cerca in <data-dir>/plugins/<nome>
     const localPath = join(this.localPluginsDir, nameOrPath);
     if (existsSync(localPath)) {
       return localPath;
@@ -463,7 +463,7 @@ export class PluginLoader {
   /**
    * Carica tutti i plugin disponibili:
    *   1. Discovery automatico da node_modules (totalrecall-plugin-*)
-   *   2. Plugin locali in ~/.contextkit/plugins/
+   *   2. Plugin locali in <data-dir>/plugins/
    *   3. Plugin configurati in config.json
    *
    * I plugin già registrati non vengono caricati una seconda volta.
@@ -496,7 +496,7 @@ export class PluginLoader {
       }
     }
 
-    // ── 2. Discovery locale da ~/.contextkit/plugins/ ──
+    // ── 2. Discovery locale da <data-dir>/plugins/ ──
     const localPlugins = this.discoverLocalPlugins();
     for (const { name, path: localPath } of localPlugins) {
       if (this.registry.get(name)) {

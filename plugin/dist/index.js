@@ -3302,18 +3302,15 @@ init_Search();
 // src/hooks/utils.ts
 import { writeFileSync, mkdirSync as mkdirSync3, existsSync as existsSync4, readFileSync as readFileSync2 } from "fs";
 import { join as join3 } from "path";
-var DATA_DIR2 = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || join3(process.env.HOME || "/tmp", ".totalrecall");
-var TOKEN_FILE = join3(DATA_DIR2, "worker.token");
+var TOKEN_FILE = join3(DATA_DIR, "worker.token");
 function debugLog(hookName, label, data) {
   if ((process.env.TOTALRECALL_LOG_LEVEL || "").toUpperCase() !== "DEBUG") return;
   try {
-    const dataDir = process.env.TOTALRECALL_DATA_DIR || join3(process.env.HOME || "/tmp", ".totalrecall");
-    const logDir = join3(dataDir, "logs");
-    if (!existsSync4(logDir)) mkdirSync3(logDir, { recursive: true });
+    if (!existsSync4(LOGS_DIR)) mkdirSync3(LOGS_DIR, { recursive: true });
     const ts = (/* @__PURE__ */ new Date()).toISOString();
     const line = `[${ts}] [${hookName}] ${label}: ${JSON.stringify(data)}
 `;
-    const logFile = join3(logDir, `hooks-${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.log`);
+    const logFile = join3(LOGS_DIR, `hooks-${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.log`);
     writeFileSync(logFile, line, { flag: "a" });
   } catch {
   }

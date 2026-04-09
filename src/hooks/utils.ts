@@ -11,11 +11,9 @@ import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import type { KiroHookInput, ScoredItem, Summary } from '../types/worker-types.js';
 import { estimateTokens } from '../services/search/ScoringEngine.js';
+import { DATA_DIR, LOGS_DIR } from '../shared/paths.js';
 
 // Path to shared authentication token with the worker
-const DATA_DIR = process.env.TOTALRECALL_DATA_DIR
-  || process.env.CONTEXTKIT_DATA_DIR
-  || join(process.env.HOME || '/tmp', '.totalrecall');
 const TOKEN_FILE = join(DATA_DIR, 'worker.token');
 
 /**
@@ -24,14 +22,11 @@ const TOKEN_FILE = join(DATA_DIR, 'worker.token');
 export function debugLog(hookName: string, label: string, data: unknown): void {
   if ((process.env.TOTALRECALL_LOG_LEVEL || '').toUpperCase() !== 'DEBUG') return;
   try {
-    const dataDir = process.env.TOTALRECALL_DATA_DIR
-      || join(process.env.HOME || '/tmp', '.totalrecall');
-    const logDir = join(dataDir, 'logs');
-    if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true });
+    if (!existsSync(LOGS_DIR)) mkdirSync(LOGS_DIR, { recursive: true });
 
     const ts = new Date().toISOString();
     const line = `[${ts}] [${hookName}] ${label}: ${JSON.stringify(data)}\n`;
-    const logFile = join(logDir, `hooks-${new Date().toISOString().split('T')[0]}.log`);
+    const logFile = join(LOGS_DIR, `hooks-${new Date().toISOString().split('T')[0]}.log`);
     writeFileSync(logFile, line, { flag: 'a' });
   } catch {
     // Logging must never block the hook
