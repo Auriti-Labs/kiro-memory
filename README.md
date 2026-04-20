@@ -8,20 +8,19 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/totalrecall"><img src="https://img.shields.io/npm/v/totalrecall" alt="npm" /></a>
+  <a href="https://www.npmjs.com/package/totalrecallai"><img src="https://img.shields.io/npm/v/totalrecallai" alt="npm" /></a>
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License" />
   <img src="https://img.shields.io/badge/node-%3E%3D18-green" alt="Node" />
-  <a href="https://auritidesign.it/docs/totalrecall/"><img src="https://img.shields.io/badge/docs-auritidesign.it-00b4d8" alt="Docs" /></a>
+  <a href="https://github.com/Auriti-Labs/kiro-memory/wiki"><img src="https://img.shields.io/badge/docs-Wiki-00b4d8" alt="Docs" /></a>
 </p>
 
 ---
 
-Total Recall gives your AI coding assistant memory that persists across sessions. It automatically captures what happened -- files changed, tools used, decisions made -- and feeds relevant context back at the start of the next session. No manual bookkeeping. Your agent picks up exactly where it left off.
+Total Recall is an AI coding assistant memory system that gives your agent persistent, cross-session context. It automatically captures what happened during each session — files changed, tools used, decisions made — and feeds relevant context back when the next session starts. No manual bookkeeping. Your agent picks up exactly where it left off.
 
+**[Read the full documentation →](https://github.com/Auriti-Labs/kiro-memory/wiki)**
 
-**[Read the full documentation →](https://auritidesign.it/docs/totalrecall/)**
-
-Works with **Claude Code** (hooks), **Cursor** (rules + MCP), **Windsurf** (rules + MCP), **Cline** (custom instructions + MCP), and any editor that supports the **Model Context Protocol**.
+Total Recall works with **Claude Code** (hooks), **Cursor** (rules + MCP), **Windsurf** (rules + MCP), **Cline** (custom instructions + MCP), and any editor that supports the **Model Context Protocol**. With 933 tests, 10 MCP tools, and a TypeScript SDK, Total Recall is the most complete persistent memory solution for AI coding assistants.
 
 ## What Your Agent Sees
 
@@ -47,34 +46,51 @@ When a new session starts, Total Recall automatically injects previous session c
 
 ## Features
 
-- **Multi-Editor Support** -- Works with Claude Code, Cursor, Windsurf, Cline, and any MCP-compatible editor
-- **Automatic Context Injection** -- Previous session knowledge injected at agent start via hooks
-- **Vector Search** -- Local embeddings with semantic similarity search (no API keys required)
-- **Smart Ranking** -- 4-signal scoring (recency, frequency, semantic, decay) for relevance ordering
-- **Memory Decay** -- Automatic stale detection and consolidation of old observations
-- **Structured Knowledge** -- Store architectural decisions, constraints, heuristics, and rejected approaches
-- **Session Checkpoint & Resume** -- Checkpoint sessions and resume from where you left off
-- **Activity Reports** -- Weekly/monthly digests in text, Markdown, or JSON format
-- **Analytics Dashboard** -- Activity timeline, type distribution, session stats, and file hotspots
-- **Session Tracking** -- Sessions view with stats (total, active, completed, avg duration) and expandable session details
-- **Session Summaries** -- Structured summaries with investigated/completed/learned/next_steps sections
-- **Web Dashboard** -- Real-time viewer at `http://localhost:3001` with dark/light/system theme, hybrid search, project filters, mobile drawer, and live updates via SSE
-- **Plugin System** -- Extensible architecture with auto-discovery, lifecycle management, REST API. Built-in Slack and GitHub plugins
-- **Backup & Restore** -- Automatic SQLite backup with rotation, point-in-time restore, gzip compression
-- **Import/Export JSONL** -- Streaming import/export with SHA256 deduplication for portable backups
-- **Secret Filtering** -- Automatic redaction of API keys, passwords, and tokens in observations
-- **MCP Server** -- 11 tools exposed via Model Context Protocol
-- **Full-Text Search** -- SQLite FTS5 with weighted BM25 scoring for relevance-ranked results
-- **Data Export** -- Export observations and summaries in JSON or Markdown format
-- **Retention Policy** -- Automatic cleanup of old data with configurable age and dry-run mode
-- **TypeScript SDK** -- Programmatic access to the entire memory system
-- **CLI** -- Query and manage context directly from the terminal
+### Memory & Search
+
+- **Vector Search** — Local embeddings with semantic similarity search (no API keys required)
+- **Smart Ranking** — 4-signal scoring (recency, frequency, semantic, decay) for relevance ordering
+- **Full-Text Search** — SQLite FTS5 with weighted BM25 scoring
+- **Memory Decay** — Automatic stale detection and consolidation of old observations
+- **Structured Knowledge** — Store architectural decisions, constraints, heuristics, and rejected approaches
+
+### Session Management
+
+- **Automatic Context Injection** — Previous session knowledge injected at agent start via hooks
+- **Session Checkpoint & Resume** — Checkpoint sessions and resume from where you left off
+- **Session Summaries** — Structured summaries with investigated/completed/learned/next_steps sections
+- **Session Tracking** — Stats (total, active, completed, avg duration) with expandable details
+
+### Monitoring & Operations
+
+- **Web Dashboard** — Real-time viewer at `http://localhost:3001` with dark/light theme, hybrid search, project filters, and live updates via SSE
+- **Analytics Dashboard** — Activity timeline, type distribution, session stats, and file hotspots
+- **Activity Reports** — Weekly/monthly digests in text, Markdown, or JSON format
+- **Health Diagnostics** — Enhanced `/health` endpoint with system status and embedding health checks
+- **Service Auto-Start** — `totalrecall service install` registers the worker to start on boot (crontab/systemd)
+
+### Integrations & Extensibility
+
+- **Multi-Editor Support** — Claude Code, Cursor, Windsurf, Cline, and any MCP-compatible editor
+- **MCP Server** — 11 tools exposed via Model Context Protocol
+- **TypeScript SDK** — Full programmatic access to the memory system
+- **Plugin System** — Extensible architecture with auto-discovery and lifecycle management. Built-in Slack and GitHub plugins
+- **Import/Export JSONL** — Streaming import/export with SHA256 deduplication
+- **Backup & Restore** — Automatic SQLite backup with rotation, point-in-time restore, gzip compression
+- **Secret Filtering** — Automatic redaction of API keys, passwords, and tokens
+- **Retention Policy** — Automatic cleanup of old data with configurable age and dry-run mode
 
 ## Quick Start
 
+### Requirements
+
+- **Node.js** >= 18
+
+### Install
+
 ```bash
 # Install globally
-npm install -g totalrecall
+npm install -g totalrecallai
 
 # Install for your editor
 totalrecall install              # Auto-detects your editor
@@ -87,25 +103,25 @@ totalrecall install --cline        # Cline (instructions + MCP)
 Or from source:
 
 ```bash
-git clone https://github.com/Auriti-Labs/totalrecall.git
-cd totalrecall
+git clone https://github.com/Auriti-Labs/kiro-memory.git
+cd kiro-memory
 npm install && npm run build
 npm run install:kiro
 ```
 
 Once installed, the worker auto-starts and the web dashboard is available at `http://localhost:3001`.
 
-## Updating
+### Updating
 
 ```bash
 # Update to the latest version
-npm update -g totalrecall
+npm update -g totalrecallai
 
 # Verify the installed version
 totalrecall --version
 ```
 
-The worker will automatically use the new version at the next session start. To apply the update immediately:
+The worker automatically uses the new version at the next session start. To apply immediately:
 
 ```bash
 npm run worker:restart
@@ -134,7 +150,7 @@ For editors without hook support, Total Recall uses **rules files** + **MCP serv
 - **Windsurf**: `.windsurfrules` + MCP config in `~/.codeium/windsurf/mcp_config.json`
 - **Cline**: `.clinerules` + MCP config in Cline settings
 
-The MCP server exposes 11 tools that your AI assistant can use directly.
+The MCP server exposes 10 tools that your AI assistant can use directly. See the [MCP Tools wiki page](https://github.com/Auriti-Labs/kiro-memory/wiki/MCP-Tools) for details.
 
 ## Architecture
 
@@ -144,7 +160,7 @@ The MCP server exposes 11 tools that your AI assistant can use directly.
           +-------------+-------------+
           |             |             |
        Hooks      MCP Server    Rules Files
-   (auto-capture)  (10 tools)  (editor config)
+   (auto-capture)  (11 tools)  (editor config)
           |             |             |
           +------+------+------+------+
                  |             |
@@ -167,16 +183,15 @@ The MCP server exposes 11 tools that your AI assistant can use directly.
 | Tool | Description |
 |------|-------------|
 | `search` | Full-text search across observations and summaries with project/type filters |
+| `semantic_search` | Hybrid vector + keyword search for semantic similarity |
 | `timeline` | Chronological context around a specific observation |
 | `get_observations` | Retrieve full details of observations by ID |
 | `get_context` | Get recent observations, summaries, and prompts for a project |
-| `store_observation` | Store a new observation from the AI assistant |
-| `store_summary` | Store a session summary |
 | `store_knowledge` | Store structured knowledge (decision, constraint, heuristic, rejected) |
 | `resume_session` | Get checkpoint data to resume a previous session |
+| `save_memory` | Save a structured observation from the AI assistant |
 | `generate_report` | Generate weekly/monthly activity report in Markdown |
-| `get_recent_context` | Get recent memory context for session injection |
-| `save_memory` | Save a structured observation from external tools or scripts |
+| `embedding_stats` | Show vector embedding statistics and coverage |
 
 ### Storage
 
@@ -189,10 +204,10 @@ The MCP server exposes 11 tools that your AI assistant can use directly.
 
 ## SDK
 
-The TypeScript SDK provides full programmatic access to the memory system.
+The TypeScript SDK provides full programmatic access to the AI coding assistant memory system.
 
 ```typescript
-import { createTotalRecall } from 'totalrecall';
+import { createTotalRecall } from 'totalrecallai';
 
 const ctx = createTotalRecall({ project: 'my-project' });
 
@@ -228,27 +243,7 @@ const report = await ctx.generateReport({ period: 'weekly' });
 ctx.close();
 ```
 
-### SDK API Reference
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `getContext()` | `ContextContext` | Recent observations, summaries, and prompts |
-| `storeObservation(data)` | `number` | Store an observation, returns its ID |
-| `storeSummary(data)` | `number` | Store a session summary, returns its ID |
-| `search(query)` | `{ observations, summaries }` | Basic full-text search |
-| `searchAdvanced(query, filters)` | `{ observations, summaries }` | FTS5 search with filters |
-| `hybridSearch(query, opts)` | `ScoredResult[]` | Vector + FTS5 hybrid search with smart ranking |
-| `semanticSearch(query, opts)` | `ScoredResult[]` | Pure vector similarity search |
-| `storeKnowledge(data)` | `number` | Store structured knowledge (decision/constraint/heuristic) |
-| `getKnowledge(filters)` | `KnowledgeItem[]` | Retrieve knowledge by type |
-| `createCheckpoint(sessionId, data)` | `void` | Save session checkpoint for resume |
-| `getCheckpoint(sessionId)` | `DBCheckpoint \| null` | Retrieve latest session checkpoint |
-| `generateReport(opts)` | `ReportData` | Generate weekly/monthly activity report |
-| `runDecay(opts)` | `DecayResult` | Run memory decay and stale detection |
-| `consolidateStale(opts)` | `ConsolidateResult` | Consolidate stale observations |
-| `getTimeline(anchorId, before, after)` | `TimelineEntry[]` | Chronological context around an observation |
-| `getOrCreateSession(id)` | `DBSession` | Get or initialize a session |
-| `close()` | `void` | Close the database connection |
+See the full [SDK Reference](https://github.com/Auriti-Labs/kiro-memory/wiki/SDK-Reference) for all available methods.
 
 ## CLI Reference
 
@@ -258,20 +253,24 @@ totalrecall <command> [options]
 
 | Command | Alias | Description |
 |---------|-------|-------------|
-| `totalrecall install` | -- | Install hooks + MCP for your editor |
-| `totalrecall context` | `ctx` | Display current project context |
-| `totalrecall search <query>` | -- | Search across all stored context |
-| `totalrecall semantic-search <query>` | `ss` | Vector similarity search |
-| `totalrecall observations [limit]` | `obs` | Show recent observations |
-| `totalrecall summaries [limit]` | `sum` | Show recent summaries |
-| `totalrecall add-observation <title> <content>` | `add-obs` | Manually add an observation |
-| `totalrecall add-summary <content>` | `add-sum` | Manually add a summary |
-| `totalrecall add-knowledge <type> <title> <content>` | -- | Store structured knowledge |
-| `totalrecall resume [sessionId]` | -- | Resume from last checkpoint |
-| `totalrecall report` | -- | Generate activity report |
-| `totalrecall decay` | -- | Run memory decay detection |
-| `totalrecall embeddings` | -- | Build/rebuild vector index |
-| `totalrecall doctor` | -- | Run environment diagnostics |
+| `install` | — | Install hooks + MCP for your editor |
+| `context` | `ctx` | Display current project context |
+| `search <query>` | — | Search across all stored context |
+| `semantic-search <query>` | `ss` | Vector similarity search |
+| `observations [limit]` | `obs` | Show recent observations |
+| `summaries [limit]` | `sum` | Show recent summaries |
+| `add-observation <title> <content>` | `add-obs` | Manually add an observation |
+| `add-summary <content>` | `add-sum` | Manually add a summary |
+| `add-knowledge <type> <title> <content>` | — | Store structured knowledge |
+| `resume [sessionId]` | — | Resume from last checkpoint |
+| `report` | — | Generate activity report |
+| `decay` | — | Run memory decay detection |
+| `embeddings` | — | Build/rebuild vector index |
+| `embeddings backfill --all` | — | Regenerate all embeddings with progress bar |
+| `doctor` | — | Run environment diagnostics |
+| `doctor --fix` | — | Auto-fix issues including corrupted embeddings |
+| `service install` | — | Register worker to auto-start on boot |
+| `service uninstall` | — | Remove auto-start registration |
 
 ### Examples
 
@@ -293,7 +292,18 @@ totalrecall resume
 
 # Run memory decay to clean stale observations
 totalrecall decay --days=30
+
+# Regenerate all embeddings
+totalrecall embeddings backfill --all
+
+# Auto-start worker on boot
+totalrecall service install
+
+# Diagnose and fix environment issues
+totalrecall doctor --fix
 ```
+
+See the full [CLI Reference](https://github.com/Auriti-Labs/kiro-memory/wiki/CLI-Reference) for all commands and options.
 
 ## Configuration
 
@@ -305,11 +315,12 @@ totalrecall decay --days=30
 | `TOTALRECALL_WORKER_HOST` | `127.0.0.1` | Worker service bind address |
 | `TOTALRECALL_WORKER_PORT` | `3001` | Worker service port |
 | `TOTALRECALL_LOG_LEVEL` | `INFO` | Log verbosity: `DEBUG`, `INFO`, `WARN`, `ERROR` |
-| `KIRO_CONFIG_DIR` | `~/.kiro` | Kiro CLI configuration directory |
+
+See the full [Configuration guide](https://github.com/Auriti-Labs/kiro-memory/wiki/Configuration) for all options.
 
 ### Worker & Web Dashboard
 
-The worker starts automatically when a Kiro session begins (via the `agentSpawn` hook). Once running, open `http://localhost:3001` in your browser to access the web dashboard with:
+The worker starts automatically when a session begins. Once running, open `http://localhost:3001` to access the web dashboard with:
 
 - **Live feed** of observations, summaries, and prompts (via SSE)
 - **Sessions view** with stats cards and expandable session details
@@ -329,21 +340,16 @@ npm run worker:status    # Check if worker is running
 npm run worker:logs      # View recent logs
 ```
 
-## Requirements
-
-- **Node.js** >= 18
-- **Kiro CLI** -- [kiro.dev](https://kiro.dev/)
-
 ## Development
 
 ```bash
 # Install dependencies
 npm install
 
-# Build and sync to Kiro
+# Build and sync
 npm run dev
 
-# Run tests
+# Run tests (933 tests)
 npm test
 
 # Run specific test suites
@@ -357,100 +363,80 @@ npm run test:server
 
 ### `invalid ELF header` (WSL)
 
-```
-Error: .../better_sqlite3.node: invalid ELF header
-```
-
-This happens when the native module was compiled for Windows but you're running inside WSL (Linux). Common cause: npm installed to the Windows filesystem (`/mnt/c/...`) instead of the Linux one.
-
-**Fix:**
+This happens when the native module was compiled for Windows but you're running inside WSL. Fix: install Node.js natively in WSL using `nvm` or NodeSource, then reinstall:
 
 ```bash
-# Check which node you're using
-which node
-# If it shows /mnt/c/... you're using Windows Node inside WSL
-
-# Install Node.js natively in WSL
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# Or use nvm (recommended)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
 nvm install 22
-
-# Verify
-which node  # Should be /home/... or /root/.nvm/...
-
-# Reinstall
-npm install -g totalrecall
+npm install -g totalrecallai
 ```
 
 ### `npm prefix` pointing to Windows (WSL)
 
-If `npm prefix -g` returns a `/mnt/c/...` path, npm installs global packages on the Windows filesystem, causing native module issues.
-
-**Fix:**
+If `npm prefix -g` returns a `/mnt/c/...` path:
 
 ```bash
 mkdir -p ~/.npm-global
 npm config set prefix ~/.npm-global
 echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
-
-# Reinstall
-npm install -g totalrecall
+npm install -g totalrecallai
 ```
 
 ### Missing build tools (Linux/WSL)
 
-```
-gyp ERR! find Python
-gyp ERR! stack Error: Could not find any Python installation to use
-```
-
-Native modules like `better-sqlite3` need compilation tools.
-
-**Fix:**
-
 ```bash
 sudo apt-get update && sudo apt-get install -y build-essential python3
-npm install -g totalrecall --build-from-source
-```
-
-### `no agent with name totalrecall found`
-
-The agent configuration was not installed. Run the install command:
-
-```bash
-totalrecall install
-```
-
-This creates the agent config at `~/.kiro/agents/totalrecall.json`. Then start Kiro with:
-
-```bash
-kiro-cli --agent totalrecall
+npm install -g totalrecallai --build-from-source
 ```
 
 ### Port 3001 already in use
 
 ```bash
-# Find what's using the port
 lsof -i :3001
-
-# Kill the process
 kill -9 <PID>
-
-# Or use a different port
+# Or use a different port:
 export TOTALRECALL_WORKER_PORT=3002
 ```
 
 ### Quick diagnostics
 
-Run the built-in doctor command to check your environment:
-
 ```bash
-totalrecall doctor
+totalrecall doctor        # Check your environment
+totalrecall doctor --fix  # Auto-fix issues (including corrupted embeddings)
 ```
+
+See the full [Troubleshooting guide](https://github.com/Auriti-Labs/kiro-memory/wiki/Troubleshooting) for all known issues and fixes.
+
+## Frequently Asked Questions
+
+### What is Total Recall?
+
+Total Recall is a persistent memory system for AI coding assistants. It captures context from your coding sessions — files changed, commands run, decisions made — and automatically provides that context to your AI agent in future sessions. It acts as cross-session memory so your agent never loses track of what happened before.
+
+### Does Total Recall require an API key or cloud service?
+
+No. Total Recall runs entirely locally on your machine. Vector embeddings are generated locally using ONNX Runtime — no API keys, no cloud services, no data leaves your machine. All data is stored in a local SQLite database at `~/.totalrecall/`.
+
+### Which editors does Total Recall support?
+
+Total Recall works with Claude Code, Cursor, Windsurf, Cline, and any editor that supports the Model Context Protocol (MCP). Claude Code gets the deepest integration via hooks; other editors use rules files plus the MCP server.
+
+### How is Total Recall different from .cursorrules or CLAUDE.md?
+
+Static files like `.cursorrules` or `CLAUDE.md` require manual maintenance and don't capture session history. Total Recall automatically records what happens in each session, builds structured summaries, and uses vector search to surface the most relevant context. It's dynamic, automatic, and searchable.
+
+### Can I use Total Recall with multiple projects?
+
+Yes. Total Recall automatically detects the current project and scopes observations, summaries, and context per project. The web dashboard includes project filters, and all CLI commands support project-scoped queries.
+
+### How much disk space does Total Recall use?
+
+The SQLite database grows based on usage. A typical project with months of daily use stays under 50 MB. Embeddings add roughly 1.5 KB per observation. The `totalrecall decay` command and retention policies help manage growth over time.
+
+### How do I back up my Total Recall data?
+
+Total Recall includes automatic backup with rotation and gzip compression. You can also export data as JSONL for portable backups. The database is a single SQLite file at `~/.totalrecall/totalrecall.db` that can be copied directly.
 
 ## Security
 
@@ -463,7 +449,7 @@ Total Recall runs **locally only** on `127.0.0.1` and implements multiple layers
 - **Input Validation** on all POST endpoints (type checking, length limits, safe character patterns)
 - **SSE Connection Limit** (max 50 concurrent clients)
 
-To report a security vulnerability, please open a [private security advisory](https://github.com/Auriti-Labs/totalrecall/security/advisories/new).
+To report a security vulnerability, please open a [private security advisory](https://github.com/Auriti-Labs/kiro-memory/security/advisories/new).
 
 ## Contributing
 
