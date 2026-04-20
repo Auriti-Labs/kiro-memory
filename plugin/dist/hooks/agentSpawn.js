@@ -2449,6 +2449,16 @@ function float32ToBuffer(arr) {
   return Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength);
 }
 function bufferToFloat32(buf) {
+  if (typeof buf === "string") {
+    const buffer = Buffer.from(buf, "binary");
+    if (buffer.byteLength === 0 || buffer.byteLength % 4 !== 0) {
+      throw new Error("Invalid embedding: corrupted TEXT storage");
+    }
+    return new Float32Array(buffer.buffer, buffer.byteOffset, buffer.byteLength / 4);
+  }
+  if (buf.byteLength === 0 || buf.byteLength % 4 !== 0) {
+    throw new Error("Invalid embedding: zero-length or misaligned");
+  }
   const arrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
   return new Float32Array(arrayBuffer);
 }
@@ -2475,7 +2485,7 @@ var VectorSearch = class {
       }
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
       const sql = `
-        SELECT e.observation_id, e.embedding,
+        SELECT e.observation_id, CAST(e.embedding AS BLOB) as embedding,
                o.title, o.text, o.type, o.project, o.created_at, o.created_at_epoch
         FROM observation_embeddings e
         JOIN observations o ON o.id = e.observation_id
@@ -2487,20 +2497,25 @@ var VectorSearch = class {
       const rows = db.query(sql).all(...params);
       const scored = [];
       for (const row of rows) {
-        const embedding = bufferToFloat32(row.embedding);
-        const similarity = cosineSimilarity(queryEmbedding, embedding);
-        if (similarity >= threshold) {
-          scored.push({
-            id: row.observation_id,
-            observationId: row.observation_id,
-            similarity,
-            title: row.title,
-            text: row.text,
-            type: row.type,
-            project: row.project,
-            created_at: row.created_at,
-            created_at_epoch: row.created_at_epoch
-          });
+        try {
+          if (!row.embedding) continue;
+          const embedding = bufferToFloat32(row.embedding);
+          if (embedding.length === 0) continue;
+          const similarity = cosineSimilarity(queryEmbedding, embedding);
+          if (similarity >= threshold) {
+            scored.push({
+              id: row.observation_id,
+              observationId: row.observation_id,
+              similarity,
+              title: row.title,
+              text: row.text,
+              type: row.type,
+              project: row.project,
+              created_at: row.created_at,
+              created_at_epoch: row.created_at_epoch
+            });
+          }
+        } catch {
         }
       }
       scored.sort((a, b) => b.similarity - a.similarity);
@@ -3069,8 +3084,8 @@ var TotalRecallSDK = class {
    * Importa un transcript salvando solo i turni user/assistant/system testuali.
    */
   async importConversationTranscript(contentSessionId, transcriptPath) {
-    const { readFileSync: readFileSync3 } = await import("fs");
-    const raw = readFileSync3(transcriptPath, "utf8");
+    const { readFileSync: readFileSync4 } = await import("fs");
+    const raw = readFileSync4(transcriptPath, "utf8");
     const lines = raw.split("\n").filter(Boolean);
     let messageIndex = getConversationMessageCountBySession(this.db.db, contentSessionId);
     let inserted = 0;
@@ -3438,13 +3453,34 @@ function createTotalRecall(config) {
 // src/hooks/agentSpawn.ts
 import { spawn } from "child_process";
 import { dirname as dirname2, join as join4 } from "path";
+import { existsSync as existsSync5, readFileSync as readFileSync3, unlinkSync } from "fs";
 import { fileURLToPath as fileURLToPath2 } from "url";
 var __filename_hook = fileURLToPath2(import.meta.url);
 var __dirname_hook = dirname2(__filename_hook);
+function cleanStalePidFile(pidFile) {
+  try {
+    if (!existsSync5(pidFile)) return;
+    const raw = readFileSync3(pidFile, "utf8").trim();
+    const pid = Number(raw);
+    if (!Number.isInteger(pid) || pid <= 0) {
+      unlinkSync(pidFile);
+      return;
+    }
+    try {
+      process.kill(pid, 0);
+    } catch {
+      unlinkSync(pidFile);
+    }
+  } catch {
+  }
+}
 async function ensureWorkerRunning() {
   const host = process.env.TOTALRECALL_WORKER_HOST || "127.0.0.1";
   const port = process.env.TOTALRECALL_WORKER_PORT || "3001";
   const healthUrl = `http://${host}:${port}/health`;
+  const home = process.env.HOME || process.env.USERPROFILE || "";
+  const dataDir = process.env.TOTALRECALL_DATA_DIR || process.env.CONTEXTKIT_DATA_DIR || (existsSync5(join4(home, ".totalrecall")) ? join4(home, ".totalrecall") : join4(home, ".contextkit"));
+  cleanStalePidFile(join4(dataDir, "worker.pid"));
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 1500);

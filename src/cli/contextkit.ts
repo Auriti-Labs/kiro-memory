@@ -1333,6 +1333,11 @@ async function main() {
     return;
   }
 
+  if (command === 'service') {
+    await handleService(args.slice(1));
+    return;
+  }
+
   if (command === 'plugins') {
     await handlePlugins(args.slice(1));
     return;
@@ -1387,7 +1392,7 @@ async function main() {
 
       case 'embeddings':
       case 'emb':
-        await handleEmbeddings(sdk, args[1]);
+        await handleEmbeddings(sdk, args.slice(1));
         break;
 
       case 'semantic-search':
@@ -1599,7 +1604,8 @@ async function addKnowledge(
   console.log(`  Title: ${title}\n`);
 }
 
-async function handleEmbeddings(sdk: ReturnType<typeof createTotalRecall>, subcommand: string) {
+async function handleEmbeddings(sdk: ReturnType<typeof createTotalRecall>, subArgs: string[]) {
+  const subcommand = subArgs[0];
   switch (subcommand) {
     case 'stats': {
       const stats = sdk.getEmbeddingStats();
@@ -1623,31 +1629,77 @@ async function handleEmbeddings(sdk: ReturnType<typeof createTotalRecall>, subco
       break;
     }
     case 'backfill': {
-      const batchSize = parseInt(args[2]) || 50;
-      console.log(`\nGenerating embeddings (batch size: ${batchSize})...\n`);
+      const isAll = subArgs.includes('--all');
+      const sizeArg = subArgs.find(a => !a.startsWith('-') && a !== 'backfill');
+      const batchSize = parseInt(sizeArg || '') || (isAll ? 500 : 50);
 
       // Initialize embedding service
       const available = await sdk.initializeEmbeddings();
       if (!available) {
-        console.log('  No embedding provider available.');
+        console.log('\n  No embedding provider available.');
         console.log('  Install fastembed or @huggingface/transformers:');
         console.log('    npm install fastembed');
         console.log('    npm install @huggingface/transformers\n');
         process.exit(1);
       }
 
-      const count = await sdk.backfillEmbeddings(batchSize);
-      console.log(`  Generated ${count} embeddings.\n`);
+      if (!isAll) {
+        // Single batch (original behavior)
+        console.log(`\nGenerating embeddings (batch size: ${batchSize})...\n`);
+        const count = await sdk.backfillEmbeddings(batchSize);
+        console.log(`  Generated ${count} embeddings.\n`);
+        const stats = sdk.getEmbeddingStats();
+        console.log(`  Coverage: ${stats.embedded}/${stats.total} (${stats.percentage}%)\n`);
+        break;
+      }
 
-      const stats = sdk.getEmbeddingStats();
-      console.log(`  Coverage: ${stats.embedded}/${stats.total} (${stats.percentage}%)\n`);
+      // --all mode: loop until 100% coverage
+      const startStats = sdk.getEmbeddingStats();
+      const missing = startStats.total - startStats.embedded;
+      if (missing <= 0) {
+        console.log('\n  All observations already have embeddings (100% coverage).\n');
+        break;
+      }
+
+      console.log(`\n  Backfill --all: ${missing} embeddings to generate (batch size: ${batchSize})`);
+      console.log(`  Estimated time: ~${Math.ceil(missing / 160)} minutes\n`);
+
+      let totalGenerated = 0;
+      const startTime = Date.now();
+
+      while (true) {
+        const count = await sdk.backfillEmbeddings(batchSize);
+        if (count === 0) break;
+        totalGenerated += count;
+
+        const stats = sdk.getEmbeddingStats();
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const rate = totalGenerated / (elapsed || 1);
+        const remaining = stats.total - stats.embedded;
+        const eta = remaining > 0 ? Math.ceil(remaining / rate) : 0;
+        const etaMin = Math.floor(eta / 60);
+        const etaSec = eta % 60;
+
+        // Progress line (overwrite)
+        process.stdout.write(
+          `\r  Progress: ${stats.embedded}/${stats.total} (${stats.percentage}%) | +${totalGenerated} | ${Math.round(rate)}/s | ETA ${etaMin}m${etaSec.toString().padStart(2, '0')}s   `
+        );
+
+        if (stats.percentage >= 100) break;
+      }
+
+      const finalStats = sdk.getEmbeddingStats();
+      const totalTime = Math.floor((Date.now() - startTime) / 1000);
+      console.log(`\n\n  ✓ Backfill complete: ${totalGenerated} embeddings generated in ${Math.floor(totalTime / 60)}m${(totalTime % 60).toString().padStart(2, '0')}s`);
+      console.log(`  Coverage: ${finalStats.embedded}/${finalStats.total} (${finalStats.percentage}%)\n`);
       break;
     }
     default:
       console.log('\nUsage: totalrecall embeddings <subcommand>\n');
       console.log('Subcommands:');
       console.log('  stats              Show embedding statistics');
-      console.log('  backfill [size]    Generate embeddings for observations without them (default: 50)\n');
+      console.log('  backfill [size]    Generate embeddings (default: 50)');
+      console.log('  backfill --all     Generate ALL missing embeddings with progress\n');
   }
 }
 
@@ -2120,7 +2172,7 @@ async function runDoctorFix() {
 
   try {
     // 1. Ricostruzione indice FTS5
-    process.stdout.write('  [1/3] Ricostruzione indice FTS5... ');
+    process.stdout.write('  [1/5] Ricostruzione indice FTS5... ');
     const ftsOk = rebuildFtsIndex(db);
     if (ftsOk) {
       console.log('\x1b[32m✓\x1b[0m');
@@ -2130,13 +2182,52 @@ async function runDoctorFix() {
     }
 
     // 2. Rimozione embeddings orfani
-    process.stdout.write('  [2/3] Rimozione embeddings orfani... ');
+    process.stdout.write('  [2/5] Rimozione embeddings orfani... ');
     const removed = removeOrphanedEmbeddings(db);
     console.log(`\x1b[32m✓\x1b[0m (${removed} rimossi)`);
     if (removed > 0) messages.push(`${removed} embedding/s orfani rimossi`);
 
-    // 3. VACUUM database
-    process.stdout.write('  [3/3] VACUUM database...             ');
+    // 3. Fix embedding storage: remove corrupted TEXT-type embeddings
+    //    TEXT-stored embeddings are irrecoverably corrupted (UTF-8 mangled binary data).
+    //    They must be deleted and regenerated via backfill.
+    process.stdout.write('  [3/5] Remove corrupted TEXT embeddings...');
+    try {
+      const textCount = (db.query(
+        "SELECT COUNT(*) as c FROM observation_embeddings WHERE typeof(embedding) = 'text'"
+      ).get() as { c: number })?.c || 0;
+
+      if (textCount > 0) {
+        db.query(
+          "DELETE FROM observation_embeddings WHERE typeof(embedding) = 'text'"
+        ).run();
+        console.log(` \x1b[32m✓\x1b[0m (${textCount} rimossi — run 'totalrecall embeddings backfill' to regenerate)`);
+        messages.push(`${textCount} embedding corrotti (TEXT) rimossi — rigenerare con backfill`);
+      } else {
+        console.log(' \x1b[33m~\x1b[0m (nessun TEXT corrotto)');
+      }
+    } catch (err) {
+      console.log(` \x1b[31m✗\x1b[0m (${err})`);
+    }
+
+    // 4. Cleanup zero-length embeddings
+    process.stdout.write('  [4/5] Cleanup zero-length embeddings...');
+    try {
+      const zeroResult = db.query(
+        "DELETE FROM observation_embeddings WHERE length(embedding) = 0"
+      ).run();
+      const zeroCount = zeroResult.changes;
+      if (zeroCount > 0) {
+        console.log(` \x1b[32m✓\x1b[0m (${zeroCount} rimossi)`);
+        messages.push(`${zeroCount} embedding zero-length rimossi`);
+      } else {
+        console.log(' \x1b[33m~\x1b[0m (nessuno)');
+      }
+    } catch (err) {
+      console.log(` \x1b[31m✗\x1b[0m (${err})`);
+    }
+
+    // 5. VACUUM database
+    process.stdout.write('  [5/5] VACUUM database...             ');
     const vacuumOk = vacuumDatabase(db);
     if (vacuumOk) {
       console.log('\x1b[32m✓\x1b[0m');
@@ -2708,6 +2799,45 @@ async function handlePlugins(subArgs: string[]): Promise<void> {
   process.exit(1);
 }
 
+async function handleService(subArgs: string[]): Promise<void> {
+  const { install, uninstall, status, detectStrategy } = await import('../services/service-installer.js');
+  const sub = subArgs[0];
+
+  if (!sub || sub === 'status') {
+    const s = status();
+    console.log('\n=== Total Recall — Service Status ===\n');
+    console.log(`  Installed:  ${s.installed ? 'yes' : 'no'}`);
+    console.log(`  Strategy:   ${s.strategy}`);
+    console.log(`  Details:    ${s.details}`);
+    if (!s.installed) {
+      console.log(`\n  Detected:   ${detectStrategy()} available`);
+      console.log('  Run: totalrecall service install');
+    }
+    console.log('');
+    return;
+  }
+
+  if (sub === 'install') {
+    const result = install();
+    console.log(`\n  ${result.success ? '✓' : '✗'} ${result.message}`);
+    if (result.success) {
+      console.log(`  Strategy: ${result.strategy}`);
+    }
+    console.log('');
+    return;
+  }
+
+  if (sub === 'uninstall') {
+    const result = uninstall();
+    console.log(`\n  ${result.success ? '✓' : '✗'} ${result.message}\n`);
+    return;
+  }
+
+  console.error(`\n  Unknown service subcommand: ${sub}`);
+  console.error('  Usage: totalrecall service install|uninstall|status\n');
+  process.exit(1);
+}
+
 function showHelp() {
   console.log(`Usage: totalrecall <command> [options]
 
@@ -2760,6 +2890,9 @@ Commands:
   worker:stop               Stop the background worker
   worker:restart            Restart the background worker
   worker:status             Check worker health and PID
+  service install           Auto-start worker on boot (crontab or systemd)
+  service uninstall         Remove auto-start configuration
+  service status            Show auto-start status
   plugins list              Elenca tutti i plugin registrati con stato
   plugins enable <nome>     Abilita un plugin registrato
   plugins disable <nome>    Disabilita un plugin attivo

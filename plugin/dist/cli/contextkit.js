@@ -2326,6 +2326,208 @@ var init_cli_utils = __esm({
   }
 });
 
+// src/services/service-installer.ts
+var service_installer_exports = {};
+__export(service_installer_exports, {
+  detectStrategy: () => detectStrategy,
+  install: () => install,
+  status: () => status,
+  uninstall: () => uninstall
+});
+import { execSync, spawnSync } from "child_process";
+import { join as join5, dirname as dirname2 } from "path";
+import { existsSync as existsSync6, writeFileSync as writeFileSync3, mkdirSync as mkdirSync5, unlinkSync as unlinkSync2 } from "fs";
+import { homedir as homedir2 } from "os";
+function resolveWorkerPath() {
+  const candidates = [
+    join5(dirname2(new URL(import.meta.url).pathname), "..", "worker-service.js"),
+    join5(dirname2(new URL(import.meta.url).pathname), "worker-service.js")
+  ];
+  for (const p of candidates) {
+    if (existsSync6(p)) return p;
+  }
+  return candidates[0];
+}
+function getNodePath() {
+  return process.execPath;
+}
+function isSystemdUserAvailable() {
+  try {
+    const result = spawnSync("systemctl", ["--user", "status"], {
+      timeout: 3e3,
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    const stderr = result.stderr?.toString() || "";
+    if (stderr.includes("Failed to connect")) return false;
+    return result.status === 0 && !result.error;
+  } catch {
+    return false;
+  }
+}
+function isCrontabAvailable() {
+  try {
+    spawnSync("crontab", ["-l"], { timeout: 3e3, stdio: ["pipe", "pipe", "pipe"] });
+    return true;
+  } catch {
+    return false;
+  }
+}
+function detectStrategy() {
+  if (isSystemdUserAvailable()) return "systemd";
+  if (isCrontabAvailable()) return "crontab";
+  return "none";
+}
+function getCrontab() {
+  try {
+    return execSync("crontab -l 2>/dev/null", { encoding: "utf8" });
+  } catch {
+    return "";
+  }
+}
+function setCrontab(content) {
+  const tmp = join5(DATA_DIR, ".crontab-tmp");
+  writeFileSync3(tmp, content, "utf8");
+  try {
+    execSync(`crontab "${tmp}"`, { stdio: "pipe" });
+  } finally {
+    try {
+      unlinkSync2(tmp);
+    } catch {
+    }
+  }
+}
+function buildCrontabEntry() {
+  const nodePath = getNodePath();
+  const workerPath = resolveWorkerPath();
+  const env = `TOTALRECALL_DATA_DIR=${DATA_DIR}`;
+  return `@reboot ${env} ${nodePath} ${workerPath} ${CRONTAB_MARKER}`;
+}
+function installCrontab() {
+  const existing = getCrontab();
+  if (existing.includes(CRONTAB_MARKER)) {
+    return { strategy: "crontab", success: true, message: "Already installed (crontab @reboot)" };
+  }
+  const entry = buildCrontabEntry();
+  const newCrontab = existing.trimEnd() + "\n" + entry + "\n";
+  setCrontab(newCrontab);
+  return { strategy: "crontab", success: true, message: `Installed crontab @reboot entry. Worker will start on boot.` };
+}
+function uninstallCrontab() {
+  const existing = getCrontab();
+  if (!existing.includes(CRONTAB_MARKER)) {
+    return { strategy: "crontab", success: true, message: "Not installed (crontab)" };
+  }
+  const filtered = existing.split("\n").filter((line) => !line.includes(CRONTAB_MARKER)).join("\n");
+  setCrontab(filtered);
+  return { strategy: "crontab", success: true, message: "Removed crontab @reboot entry." };
+}
+function getSystemdDir() {
+  return join5(homedir2(), ".config", "systemd", "user");
+}
+function getServiceFilePath() {
+  return join5(getSystemdDir(), `${SYSTEMD_SERVICE_NAME}.service`);
+}
+function buildServiceFile() {
+  const nodePath = getNodePath();
+  const workerPath = resolveWorkerPath();
+  return `[Unit]
+Description=TotalRecall Worker \u2014 persistent AI memory
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=${nodePath} ${workerPath}
+Environment=TOTALRECALL_DATA_DIR=${DATA_DIR}
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=3
+WorkingDirectory=${homedir2()}
+
+[Install]
+WantedBy=default.target
+`;
+}
+function installSystemd() {
+  const dir = getSystemdDir();
+  mkdirSync5(dir, { recursive: true });
+  const servicePath = getServiceFilePath();
+  writeFileSync3(servicePath, buildServiceFile(), "utf8");
+  try {
+    execSync("systemctl --user daemon-reload", { stdio: "pipe" });
+    execSync(`systemctl --user enable ${SYSTEMD_SERVICE_NAME}`, { stdio: "pipe" });
+    execSync(`systemctl --user start ${SYSTEMD_SERVICE_NAME}`, { stdio: "pipe" });
+  } catch (err) {
+    return { strategy: "systemd", success: false, message: `Service file created but activation failed: ${err}` };
+  }
+  return { strategy: "systemd", success: true, message: `Installed and started systemd user service.` };
+}
+function uninstallSystemd() {
+  try {
+    execSync(`systemctl --user stop ${SYSTEMD_SERVICE_NAME} 2>/dev/null`, { stdio: "pipe" });
+    execSync(`systemctl --user disable ${SYSTEMD_SERVICE_NAME} 2>/dev/null`, { stdio: "pipe" });
+  } catch {
+  }
+  const servicePath = getServiceFilePath();
+  if (existsSync6(servicePath)) {
+    unlinkSync2(servicePath);
+    try {
+      execSync("systemctl --user daemon-reload", { stdio: "pipe" });
+    } catch {
+    }
+  }
+  return { strategy: "systemd", success: true, message: "Removed systemd user service." };
+}
+function install() {
+  const strategy = detectStrategy();
+  switch (strategy) {
+    case "systemd":
+      return installSystemd();
+    case "crontab":
+      return installCrontab();
+    default:
+      return { strategy: "none", success: false, message: "No supported service manager found (need crontab or systemd --user)." };
+  }
+}
+function uninstall() {
+  const results = [];
+  if (existsSync6(getServiceFilePath())) {
+    results.push(uninstallSystemd());
+  }
+  const crontab = getCrontab();
+  if (crontab.includes(CRONTAB_MARKER)) {
+    results.push(uninstallCrontab());
+  }
+  if (results.length === 0) {
+    return { strategy: "none", success: true, message: "No service installation found." };
+  }
+  return results[results.length - 1];
+}
+function status() {
+  if (existsSync6(getServiceFilePath())) {
+    try {
+      const out = execSync(`systemctl --user is-active ${SYSTEMD_SERVICE_NAME} 2>/dev/null`, { encoding: "utf8" }).trim();
+      return { installed: true, strategy: "systemd", running: out === "active", details: `systemd: ${out}` };
+    } catch {
+      return { installed: true, strategy: "systemd", running: false, details: "systemd: inactive or bus unavailable" };
+    }
+  }
+  const crontab = getCrontab();
+  if (crontab.includes(CRONTAB_MARKER)) {
+    return { installed: true, strategy: "crontab", running: false, details: "crontab @reboot entry present (check worker:status for runtime)" };
+  }
+  return { installed: false, strategy: "none", running: false, details: "No service installed. Run: totalrecall service install" };
+}
+var CRONTAB_MARKER, SYSTEMD_SERVICE_NAME;
+var init_service_installer = __esm({
+  "src/services/service-installer.ts"() {
+    "use strict";
+    init_paths();
+    CRONTAB_MARKER = "# totalrecall-worker-autostart";
+    SYSTEMD_SERVICE_NAME = "totalrecall-worker";
+  }
+});
+
 // src/db/index.ts
 var isBun = "Bun" in globalThis;
 var DatabaseClass;
@@ -3267,6 +3469,16 @@ function float32ToBuffer(arr) {
   return Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength);
 }
 function bufferToFloat32(buf) {
+  if (typeof buf === "string") {
+    const buffer = Buffer.from(buf, "binary");
+    if (buffer.byteLength === 0 || buffer.byteLength % 4 !== 0) {
+      throw new Error("Invalid embedding: corrupted TEXT storage");
+    }
+    return new Float32Array(buffer.buffer, buffer.byteOffset, buffer.byteLength / 4);
+  }
+  if (buf.byteLength === 0 || buf.byteLength % 4 !== 0) {
+    throw new Error("Invalid embedding: zero-length or misaligned");
+  }
   const arrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
   return new Float32Array(arrayBuffer);
 }
@@ -3293,7 +3505,7 @@ var VectorSearch = class {
       }
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
       const sql = `
-        SELECT e.observation_id, e.embedding,
+        SELECT e.observation_id, CAST(e.embedding AS BLOB) as embedding,
                o.title, o.text, o.type, o.project, o.created_at, o.created_at_epoch
         FROM observation_embeddings e
         JOIN observations o ON o.id = e.observation_id
@@ -3305,20 +3517,25 @@ var VectorSearch = class {
       const rows = db.query(sql).all(...params);
       const scored = [];
       for (const row of rows) {
-        const embedding = bufferToFloat32(row.embedding);
-        const similarity = cosineSimilarity(queryEmbedding, embedding);
-        if (similarity >= threshold) {
-          scored.push({
-            id: row.observation_id,
-            observationId: row.observation_id,
-            similarity,
-            title: row.title,
-            text: row.text,
-            type: row.type,
-            project: row.project,
-            created_at: row.created_at,
-            created_at_epoch: row.created_at_epoch
-          });
+        try {
+          if (!row.embedding) continue;
+          const embedding = bufferToFloat32(row.embedding);
+          if (embedding.length === 0) continue;
+          const similarity = cosineSimilarity(queryEmbedding, embedding);
+          if (similarity >= threshold) {
+            scored.push({
+              id: row.observation_id,
+              observationId: row.observation_id,
+              similarity,
+              title: row.title,
+              text: row.text,
+              type: row.type,
+              project: row.project,
+              created_at: row.created_at,
+              created_at_epoch: row.created_at_epoch
+            });
+          }
+        } catch {
         }
       }
       scored.sort((a, b) => b.similarity - a.similarity);
@@ -3607,8 +3824,8 @@ var TotalRecallSDK = class {
   }
   detectProject() {
     try {
-      const { execSync: execSync2 } = __require("child_process");
-      const gitRoot = execSync2("git rev-parse --show-toplevel", {
+      const { execSync: execSync3 } = __require("child_process");
+      const gitRoot = execSync3("git rev-parse --show-toplevel", {
         cwd: process.cwd(),
         encoding: "utf8",
         stdio: ["pipe", "pipe", "ignore"]
@@ -3936,8 +4153,8 @@ var TotalRecallSDK = class {
    * Importa un transcript salvando solo i turni user/assistant/system testuali.
    */
   async importConversationTranscript(contentSessionId, transcriptPath) {
-    const { readFileSync: readFileSync5 } = await import("fs");
-    const raw = readFileSync5(transcriptPath, "utf8");
+    const { readFileSync: readFileSync6 } = await import("fs");
+    const raw = readFileSync6(transcriptPath, "utf8");
     const lines = raw.split("\n").filter(Boolean);
     let messageIndex = getConversationMessageCountBySession(this.db.db, contentSessionId);
     let inserted = 0;
@@ -4534,22 +4751,22 @@ function printBanner(opts) {
 init_cli_utils();
 init_Observations();
 init_paths();
-import { execSync } from "child_process";
-import { existsSync as existsSync6, mkdirSync as mkdirSync5, readFileSync as readFileSync4, writeFileSync as writeFileSync3, appendFileSync as appendFileSync2, unlinkSync as unlinkSync2 } from "fs";
-import { join as join5, dirname as dirname2 } from "path";
-import { homedir as homedir2, platform, release } from "os";
+import { execSync as execSync2 } from "child_process";
+import { existsSync as existsSync7, mkdirSync as mkdirSync6, readFileSync as readFileSync5, writeFileSync as writeFileSync4, appendFileSync as appendFileSync2, unlinkSync as unlinkSync3 } from "fs";
+import { join as join6, dirname as dirname3 } from "path";
+import { homedir as homedir3, platform, release } from "os";
 import { fileURLToPath as fileURLToPath2 } from "url";
 import { createInterface } from "readline";
 import * as http from "http";
 var args = process.argv.slice(2);
 var command = args[0];
 var __filename = fileURLToPath2(import.meta.url);
-var __dirname2 = dirname2(__filename);
-var DIST_DIR = dirname2(__dirname2);
+var __dirname2 = dirname3(__filename);
+var DIST_DIR = dirname3(__dirname2);
 var PKG_VERSION = "unknown";
 try {
-  const pkgPath = join5(DIST_DIR, "..", "..", "package.json");
-  PKG_VERSION = JSON.parse(readFileSync4(pkgPath, "utf8")).version;
+  const pkgPath = join6(DIST_DIR, "..", "..", "package.json");
+  PKG_VERSION = JSON.parse(readFileSync5(pkgPath, "utf8")).version;
 } catch {
 }
 var AGENT_TEMPLATE = JSON.stringify({
@@ -4603,8 +4820,8 @@ function isWSL() {
   try {
     const rel = release().toLowerCase();
     if (rel.includes("microsoft") || rel.includes("wsl")) return true;
-    if (existsSync6("/proc/version")) {
-      const proc = readFileSync4("/proc/version", "utf8").toLowerCase();
+    if (existsSync7("/proc/version")) {
+      const proc = readFileSync5("/proc/version", "utf8").toLowerCase();
       return proc.includes("microsoft") || proc.includes("wsl");
     }
     return false;
@@ -4614,7 +4831,7 @@ function isWSL() {
 }
 function commandExists(cmd) {
   try {
-    execSync(`which ${cmd}`, { stdio: "ignore" });
+    execSync2(`which ${cmd}`, { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -4642,7 +4859,7 @@ function runEnvironmentChecks() {
       fix: nodeOnWindows ? "Install Node.js inside WSL:\n  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -\n  sudo apt-get install -y nodejs\n  Or use nvm: https://github.com/nvm-sh/nvm" : void 0
     });
     try {
-      const npmPrefix = execSync("npm prefix -g", { encoding: "utf8" }).trim();
+      const npmPrefix = execSync2("npm prefix -g", { encoding: "utf8" }).trim();
       const prefixOnWindows = isWindowsPath(npmPrefix);
       checks.push({
         name: "WSL: npm global prefix",
@@ -4663,7 +4880,7 @@ function runEnvironmentChecks() {
       });
     }
     try {
-      const npmPath = execSync("which npm", { encoding: "utf8" }).trim();
+      const npmPath = execSync2("which npm", { encoding: "utf8" }).trim();
       const npmOnWindows = isWindowsPath(npmPath);
       checks.push({
         name: "WSL: npm binary",
@@ -4743,9 +4960,9 @@ function askUser(question) {
 }
 function detectShellRc() {
   const shell = process.env.SHELL || "/bin/bash";
-  if (shell.includes("zsh")) return { name: "zsh", rcFile: join5(homedir2(), ".zshrc") };
-  if (shell.includes("fish")) return { name: "fish", rcFile: join5(homedir2(), ".config/fish/config.fish") };
-  return { name: "bash", rcFile: join5(homedir2(), ".bashrc") };
+  if (shell.includes("zsh")) return { name: "zsh", rcFile: join6(homedir3(), ".zshrc") };
+  if (shell.includes("fish")) return { name: "fish", rcFile: join6(homedir3(), ".config/fish/config.fish") };
+  return { name: "bash", rcFile: join6(homedir3(), ".bashrc") };
 }
 var AUTOFIXABLE_CHECKS = /* @__PURE__ */ new Set([
   "WSL: npm global prefix",
@@ -4775,14 +4992,14 @@ async function tryAutoFix(failedChecks) {
   if (prefixCheck) {
     console.log("  Fixing npm global prefix...");
     try {
-      const npmGlobalDir = join5(homedir2(), ".npm-global");
-      mkdirSync5(npmGlobalDir, { recursive: true });
+      const npmGlobalDir = join6(homedir3(), ".npm-global");
+      mkdirSync6(npmGlobalDir, { recursive: true });
       const { spawnSync: spawnNpmConfig } = __require("child_process");
       spawnNpmConfig("npm", ["config", "set", "prefix", npmGlobalDir], { stdio: "ignore" });
       const exportLine = 'export PATH="$HOME/.npm-global/bin:$PATH"';
       let alreadyInRc = false;
-      if (existsSync6(rcFile)) {
-        const content = readFileSync4(rcFile, "utf8");
+      if (existsSync7(rcFile)) {
+        const content = readFileSync5(rcFile, "utf8");
         alreadyInRc = content.includes(".npm-global/bin");
       }
       if (!alreadyInRc) {
@@ -4802,20 +5019,20 @@ ${exportLine}
   const npmBinaryCheck = fixable.find((c) => c.name === "WSL: npm binary");
   if (npmBinaryCheck) {
     console.log("\n  Fixing npm binary (installing nvm + Node.js 22)...");
-    const nvmDir = join5(homedir2(), ".nvm");
+    const nvmDir = join6(homedir3(), ".nvm");
     try {
-      if (existsSync6(nvmDir)) {
+      if (existsSync7(nvmDir)) {
         console.log(`  nvm already installed at ${nvmDir}`);
       } else {
         console.log("  Downloading nvm...");
-        execSync("curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash", {
+        execSync2("curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash", {
           stdio: "inherit",
           timeout: 6e4
         });
         console.log(`  \x1B[32m\u2713\x1B[0m nvm installed`);
       }
       console.log("  Installing Node.js 22 via nvm...");
-      execSync('bash -c "source $HOME/.nvm/nvm.sh && nvm install 22"', {
+      execSync2('bash -c "source $HOME/.nvm/nvm.sh && nvm install 22"', {
         stdio: "inherit",
         timeout: 12e4
       });
@@ -4834,7 +5051,7 @@ ${exportLine}
   if (buildCheck) {
     console.log("\n  Fixing build tools (requires sudo)...");
     try {
-      execSync("sudo apt-get update -qq && sudo apt-get install -y build-essential python3", {
+      execSync2("sudo apt-get update -qq && sudo apt-get install -y build-essential python3", {
         stdio: "inherit",
         timeout: 12e4
       });
@@ -4852,8 +5069,8 @@ ${exportLine}
       const { spawnSync: spawnRebuild } = __require("child_process");
       const globalDirResult = spawnRebuild("npm", ["prefix", "-g"], { encoding: "utf8", stdio: ["pipe", "pipe", "ignore"] });
       const globalDir = (globalDirResult.stdout || "").trim();
-      const sqlitePkg = join5(globalDir, "lib", "node_modules", "totalrecall");
-      if (existsSync6(sqlitePkg)) {
+      const sqlitePkg = join6(globalDir, "lib", "node_modules", "totalrecall");
+      if (existsSync7(sqlitePkg)) {
         spawnRebuild("npm", ["rebuild", "better-sqlite3"], {
           cwd: sqlitePkg,
           stdio: "inherit",
@@ -4902,43 +5119,43 @@ async function installKiro() {
   }
   const distDir = DIST_DIR;
   const kiroDir = KIRO_CONFIG_DIR;
-  const agentsDir = join5(kiroDir, "agents");
-  const settingsDir = join5(kiroDir, "settings");
-  const steeringDir = join5(kiroDir, "steering");
+  const agentsDir = join6(kiroDir, "agents");
+  const settingsDir = join6(kiroDir, "settings");
+  const steeringDir = join6(kiroDir, "steering");
   const dataDir = DATA_DIR;
   console.log("[2/4] Installing Kiro configuration...\n");
   for (const dir of [agentsDir, settingsDir, steeringDir, dataDir]) {
-    mkdirSync5(dir, { recursive: true });
+    mkdirSync6(dir, { recursive: true });
   }
   const agentConfig = AGENT_TEMPLATE.replace(/__DIST_DIR__/g, distDir);
-  const agentDestPath = join5(agentsDir, "totalrecall.json");
-  writeFileSync3(agentDestPath, agentConfig, "utf8");
+  const agentDestPath = join6(agentsDir, "totalrecall.json");
+  writeFileSync4(agentDestPath, agentConfig, "utf8");
   console.log(`  \u2192 Agent config: ${agentDestPath}`);
-  const mcpFilePath = join5(settingsDir, "mcp.json");
+  const mcpFilePath = join6(settingsDir, "mcp.json");
   let mcpConfig = { mcpServers: {} };
-  if (existsSync6(mcpFilePath)) {
+  if (existsSync7(mcpFilePath)) {
     try {
-      mcpConfig = JSON.parse(readFileSync4(mcpFilePath, "utf8"));
+      mcpConfig = JSON.parse(readFileSync5(mcpFilePath, "utf8"));
       if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
     } catch {
     }
   }
   mcpConfig.mcpServers["totalrecall"] = {
     command: "node",
-    args: [join5(distDir, "servers", "mcp-server.js")]
+    args: [join6(distDir, "servers", "mcp-server.js")]
   };
-  writeFileSync3(mcpFilePath, JSON.stringify(mcpConfig, null, 2), "utf8");
+  writeFileSync4(mcpFilePath, JSON.stringify(mcpConfig, null, 2), "utf8");
   console.log(`  \u2192 MCP config:   ${mcpFilePath}`);
-  const steeringDestPath = join5(steeringDir, "totalrecall.md");
-  writeFileSync3(steeringDestPath, STEERING_CONTENT, "utf8");
+  const steeringDestPath = join6(steeringDir, "totalrecall.md");
+  writeFileSync4(steeringDestPath, STEERING_CONTENT, "utf8");
   console.log(`  \u2192 Steering:     ${steeringDestPath}`);
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/4] Shell alias setup\n");
   const { rcFile } = detectShellRc();
   const aliasLine = 'alias kiro="kiro-cli --agent totalrecall"';
   let aliasAlreadySet = false;
-  if (existsSync6(rcFile)) {
-    const rcContent = readFileSync4(rcFile, "utf8");
+  if (existsSync7(rcFile)) {
+    const rcContent = readFileSync5(rcFile, "utf8");
     aliasAlreadySet = rcContent.includes("alias kiro=") && rcContent.includes("totalrecall");
   }
   if (aliasAlreadySet) {
@@ -5045,16 +5262,16 @@ async function installClaudeCode() {
     }
   }
   const distDir = DIST_DIR;
-  const claudeDir = join5(homedir2(), ".claude");
+  const claudeDir = join6(homedir3(), ".claude");
   const dataDir = DATA_DIR;
   console.log("[2/3] Installing Claude Code configuration...\n");
-  mkdirSync5(claudeDir, { recursive: true });
-  mkdirSync5(dataDir, { recursive: true });
-  const settingsPath = join5(claudeDir, "settings.json");
+  mkdirSync6(claudeDir, { recursive: true });
+  mkdirSync6(dataDir, { recursive: true });
+  const settingsPath = join6(claudeDir, "settings.json");
   let settings = {};
-  if (existsSync6(settingsPath)) {
+  if (existsSync7(settingsPath)) {
     try {
-      settings = JSON.parse(readFileSync4(settingsPath, "utf8"));
+      settings = JSON.parse(readFileSync5(settingsPath, "utf8"));
     } catch {
     }
   }
@@ -5069,7 +5286,7 @@ async function installClaudeCode() {
       matcher: "",
       hooks: [{
         type: "command",
-        command: `node ${join5(distDir, config.script)}`,
+        command: `node ${join6(distDir, config.script)}`,
         timeout: config.timeout
       }]
     };
@@ -5084,31 +5301,31 @@ async function installClaudeCode() {
       settings[event].push(hookEntry);
     }
   }
-  writeFileSync3(settingsPath, JSON.stringify(settings, null, 2), "utf8");
+  writeFileSync4(settingsPath, JSON.stringify(settings, null, 2), "utf8");
   console.log(`  \u2192 Hooks config: ${settingsPath}`);
-  const mcpPath = join5(homedir2(), ".mcp.json");
+  const mcpPath = join6(homedir3(), ".mcp.json");
   let mcpConfig = {};
-  if (existsSync6(mcpPath)) {
+  if (existsSync7(mcpPath)) {
     try {
-      mcpConfig = JSON.parse(readFileSync4(mcpPath, "utf8"));
+      mcpConfig = JSON.parse(readFileSync5(mcpPath, "utf8"));
     } catch {
     }
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
   mcpConfig.mcpServers["totalrecall"] = {
     command: "node",
-    args: [join5(distDir, "servers", "mcp-server.js")]
+    args: [join6(distDir, "servers", "mcp-server.js")]
   };
-  writeFileSync3(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
+  writeFileSync4(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
   console.log(`  \u2192 MCP config:   ${mcpPath}`);
-  const steeringPath = join5(claudeDir, "CLAUDE.md");
+  const steeringPath = join6(claudeDir, "CLAUDE.md");
   let existingSteering = "";
-  if (existsSync6(steeringPath)) {
-    existingSteering = readFileSync4(steeringPath, "utf8");
+  if (existsSync7(steeringPath)) {
+    existingSteering = readFileSync5(steeringPath, "utf8");
   }
   if (!existingSteering.includes("Total Recall")) {
     const separator = existingSteering.length > 0 ? "\n\n---\n\n" : "";
-    writeFileSync3(steeringPath, existingSteering + separator + CLAUDE_CODE_STEERING, "utf8");
+    writeFileSync4(steeringPath, existingSteering + separator + CLAUDE_CODE_STEERING, "utf8");
     console.log(`  \u2192 Steering:     ${steeringPath}`);
   } else {
     console.log(`  \u2192 Steering:     ${steeringPath} (already configured)`);
@@ -5152,16 +5369,16 @@ async function installCursor() {
     }
   }
   const distDir = DIST_DIR;
-  const cursorDir = join5(homedir2(), ".cursor");
+  const cursorDir = join6(homedir3(), ".cursor");
   const dataDir = DATA_DIR;
   console.log("[2/3] Installing Cursor configuration...\n");
-  mkdirSync5(cursorDir, { recursive: true });
-  mkdirSync5(dataDir, { recursive: true });
-  const hooksPath = join5(cursorDir, "hooks.json");
+  mkdirSync6(cursorDir, { recursive: true });
+  mkdirSync6(dataDir, { recursive: true });
+  const hooksPath = join6(cursorDir, "hooks.json");
   let hooksConfig = { version: 1, hooks: {} };
-  if (existsSync6(hooksPath)) {
+  if (existsSync7(hooksPath)) {
     try {
-      hooksConfig = JSON.parse(readFileSync4(hooksPath, "utf8"));
+      hooksConfig = JSON.parse(readFileSync5(hooksPath, "utf8"));
       if (!hooksConfig.hooks) hooksConfig.hooks = {};
       if (!hooksConfig.version) hooksConfig.version = 1;
     } catch {
@@ -5177,7 +5394,7 @@ async function installCursor() {
   };
   for (const [event, script] of Object.entries(cursorHookMap)) {
     const hookEntry = {
-      command: `node ${join5(distDir, script)}`
+      command: `node ${join6(distDir, script)}`
     };
     if (!hooksConfig.hooks[event]) {
       hooksConfig.hooks[event] = [hookEntry];
@@ -5188,22 +5405,22 @@ async function installCursor() {
       hooksConfig.hooks[event].push(hookEntry);
     }
   }
-  writeFileSync3(hooksPath, JSON.stringify(hooksConfig, null, 2), "utf8");
+  writeFileSync4(hooksPath, JSON.stringify(hooksConfig, null, 2), "utf8");
   console.log(`  \u2192 Hooks config: ${hooksPath}`);
-  const mcpPath = join5(cursorDir, "mcp.json");
+  const mcpPath = join6(cursorDir, "mcp.json");
   let mcpConfig = {};
-  if (existsSync6(mcpPath)) {
+  if (existsSync7(mcpPath)) {
     try {
-      mcpConfig = JSON.parse(readFileSync4(mcpPath, "utf8"));
+      mcpConfig = JSON.parse(readFileSync5(mcpPath, "utf8"));
     } catch {
     }
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
   mcpConfig.mcpServers["totalrecall"] = {
     command: "node",
-    args: [join5(distDir, "servers", "mcp-server.js")]
+    args: [join6(distDir, "servers", "mcp-server.js")]
   };
-  writeFileSync3(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
+  writeFileSync4(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
   console.log(`  \u2192 MCP config:   ${mcpPath}`);
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/3] Done!\n");
@@ -5245,23 +5462,23 @@ async function installWindsurf() {
   const distDir = DIST_DIR;
   const dataDir = DATA_DIR;
   console.log("[2/3] Installing Windsurf configuration...\n");
-  mkdirSync5(dataDir, { recursive: true });
-  const windsurfDir = join5(homedir2(), ".codeium", "windsurf");
-  mkdirSync5(windsurfDir, { recursive: true });
-  const mcpPath = join5(windsurfDir, "mcp_config.json");
+  mkdirSync6(dataDir, { recursive: true });
+  const windsurfDir = join6(homedir3(), ".codeium", "windsurf");
+  mkdirSync6(windsurfDir, { recursive: true });
+  const mcpPath = join6(windsurfDir, "mcp_config.json");
   let mcpConfig = {};
-  if (existsSync6(mcpPath)) {
+  if (existsSync7(mcpPath)) {
     try {
-      mcpConfig = JSON.parse(readFileSync4(mcpPath, "utf8"));
+      mcpConfig = JSON.parse(readFileSync5(mcpPath, "utf8"));
     } catch {
     }
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
   mcpConfig.mcpServers["totalrecall"] = {
     command: "node",
-    args: [join5(distDir, "servers", "mcp-server.js")]
+    args: [join6(distDir, "servers", "mcp-server.js")]
   };
-  writeFileSync3(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
+  writeFileSync4(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
   console.log(`  \u2192 MCP config:   ${mcpPath}`);
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/3] Done!\n");
@@ -5304,29 +5521,29 @@ async function installCline() {
   const distDir = DIST_DIR;
   const dataDir = DATA_DIR;
   console.log("[2/3] Installing Cline configuration...\n");
-  mkdirSync5(dataDir, { recursive: true });
+  mkdirSync6(dataDir, { recursive: true });
   const platform2 = process.platform;
   let clineSettingsDir;
   if (platform2 === "darwin") {
-    clineSettingsDir = join5(homedir2(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
+    clineSettingsDir = join6(homedir3(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
   } else {
-    clineSettingsDir = join5(homedir2(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
+    clineSettingsDir = join6(homedir3(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
   }
-  mkdirSync5(clineSettingsDir, { recursive: true });
-  const mcpPath = join5(clineSettingsDir, "cline_mcp_settings.json");
+  mkdirSync6(clineSettingsDir, { recursive: true });
+  const mcpPath = join6(clineSettingsDir, "cline_mcp_settings.json");
   let mcpConfig = {};
-  if (existsSync6(mcpPath)) {
+  if (existsSync7(mcpPath)) {
     try {
-      mcpConfig = JSON.parse(readFileSync4(mcpPath, "utf8"));
+      mcpConfig = JSON.parse(readFileSync5(mcpPath, "utf8"));
     } catch {
     }
   }
   if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
   mcpConfig.mcpServers["totalrecall"] = {
     command: "node",
-    args: [join5(distDir, "servers", "mcp-server.js")]
+    args: [join6(distDir, "servers", "mcp-server.js")]
   };
-  writeFileSync3(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
+  writeFileSync4(mcpPath, JSON.stringify(mcpConfig, null, 2), "utf8");
   console.log(`  \u2192 MCP config:   ${mcpPath}`);
   console.log(`  \u2192 Data dir:     ${dataDir}`);
   console.log("\n[3/3] Done!\n");
@@ -5346,19 +5563,19 @@ async function runDoctor() {
   console.log("\n=== Total Recall - Diagnostics ===");
   const checks = runEnvironmentChecks();
   const kiroDir = KIRO_CONFIG_DIR;
-  const agentPath = join5(kiroDir, "agents", "totalrecall.json");
-  const mcpPath = join5(kiroDir, "settings", "mcp.json");
+  const agentPath = join6(kiroDir, "agents", "totalrecall.json");
+  const mcpPath = join6(kiroDir, "settings", "mcp.json");
   const dataDir = DATA_DIR;
   checks.push({
     name: "Kiro agent config",
-    ok: existsSync6(agentPath),
-    message: existsSync6(agentPath) ? agentPath : "Not found",
-    fix: !existsSync6(agentPath) ? "Run: totalrecall install" : void 0
+    ok: existsSync7(agentPath),
+    message: existsSync7(agentPath) ? agentPath : "Not found",
+    fix: !existsSync7(agentPath) ? "Run: totalrecall install" : void 0
   });
   let mcpOk = false;
-  if (existsSync6(mcpPath)) {
+  if (existsSync7(mcpPath)) {
     try {
-      const mcp = JSON.parse(readFileSync4(mcpPath, "utf8"));
+      const mcp = JSON.parse(readFileSync5(mcpPath, "utf8"));
       mcpOk = !!mcp.mcpServers?.["totalrecall"] || !!mcp.mcpServers?.contextkit;
     } catch {
     }
@@ -5371,15 +5588,15 @@ async function runDoctor() {
   });
   checks.push({
     name: "Data directory",
-    ok: existsSync6(dataDir),
-    message: existsSync6(dataDir) ? dataDir : "Not created (will be created on first use)"
+    ok: existsSync7(dataDir),
+    message: existsSync7(dataDir) ? dataDir : "Not created (will be created on first use)"
   });
-  const claudeDir = join5(homedir2(), ".claude");
-  const claudeSettingsPath = join5(claudeDir, "settings.json");
+  const claudeDir = join6(homedir3(), ".claude");
+  const claudeSettingsPath = join6(claudeDir, "settings.json");
   let claudeHooksOk = false;
-  if (existsSync6(claudeSettingsPath)) {
+  if (existsSync7(claudeSettingsPath)) {
     try {
-      const claudeSettings = JSON.parse(readFileSync4(claudeSettingsPath, "utf8"));
+      const claudeSettings = JSON.parse(readFileSync5(claudeSettingsPath, "utf8"));
       claudeHooksOk = !!(claudeSettings?.SessionStart || claudeSettings?.PostToolUse);
       if (claudeHooksOk) {
         const allSettings = JSON.stringify(claudeSettings);
@@ -5388,11 +5605,11 @@ async function runDoctor() {
     } catch {
     }
   }
-  const claudeMcpPath = join5(homedir2(), ".mcp.json");
+  const claudeMcpPath = join6(homedir3(), ".mcp.json");
   let claudeMcpOk = false;
-  if (existsSync6(claudeMcpPath)) {
+  if (existsSync7(claudeMcpPath)) {
     try {
-      const claudeMcp = JSON.parse(readFileSync4(claudeMcpPath, "utf8"));
+      const claudeMcp = JSON.parse(readFileSync5(claudeMcpPath, "utf8"));
       claudeMcpOk = !!claudeMcp.mcpServers?.["totalrecall"];
     } catch {
     }
@@ -5409,12 +5626,12 @@ async function runDoctor() {
     // Non-blocking: optional installation
     message: claudeMcpOk ? "totalrecall registered in ~/.mcp.json" : "Not configured (optional: run totalrecall install --claude-code)"
   });
-  const cursorDir = join5(homedir2(), ".cursor");
-  const cursorHooksPath = join5(cursorDir, "hooks.json");
+  const cursorDir = join6(homedir3(), ".cursor");
+  const cursorHooksPath = join6(cursorDir, "hooks.json");
   let cursorHooksOk = false;
-  if (existsSync6(cursorHooksPath)) {
+  if (existsSync7(cursorHooksPath)) {
     try {
-      const cursorHooks = JSON.parse(readFileSync4(cursorHooksPath, "utf8"));
+      const cursorHooks = JSON.parse(readFileSync5(cursorHooksPath, "utf8"));
       cursorHooksOk = !!(cursorHooks.hooks?.sessionStart || cursorHooks.hooks?.afterFileEdit);
       if (cursorHooksOk) {
         const allHooks = JSON.stringify(cursorHooks.hooks);
@@ -5423,11 +5640,11 @@ async function runDoctor() {
     } catch {
     }
   }
-  const cursorMcpPath = join5(cursorDir, "mcp.json");
+  const cursorMcpPath = join6(cursorDir, "mcp.json");
   let cursorMcpOk = false;
-  if (existsSync6(cursorMcpPath)) {
+  if (existsSync7(cursorMcpPath)) {
     try {
-      const cursorMcp = JSON.parse(readFileSync4(cursorMcpPath, "utf8"));
+      const cursorMcp = JSON.parse(readFileSync5(cursorMcpPath, "utf8"));
       cursorMcpOk = !!cursorMcp.mcpServers?.["totalrecall"];
     } catch {
     }
@@ -5444,11 +5661,11 @@ async function runDoctor() {
     // Non-blocking: optional installation
     message: cursorMcpOk ? "totalrecall registered in ~/.cursor/mcp.json" : "Not configured (optional: run totalrecall install --cursor)"
   });
-  const windsurfMcpPath = join5(homedir2(), ".codeium", "windsurf", "mcp_config.json");
+  const windsurfMcpPath = join6(homedir3(), ".codeium", "windsurf", "mcp_config.json");
   let windsurfMcpOk = false;
-  if (existsSync6(windsurfMcpPath)) {
+  if (existsSync7(windsurfMcpPath)) {
     try {
-      const windsurfMcp = JSON.parse(readFileSync4(windsurfMcpPath, "utf8"));
+      const windsurfMcp = JSON.parse(readFileSync5(windsurfMcpPath, "utf8"));
       windsurfMcpOk = !!windsurfMcp.mcpServers?.["totalrecall"];
     } catch {
     }
@@ -5462,15 +5679,15 @@ async function runDoctor() {
   const clinePlatform = process.platform;
   let clineSettingsBase;
   if (clinePlatform === "darwin") {
-    clineSettingsBase = join5(homedir2(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
+    clineSettingsBase = join6(homedir3(), "Library", "Application Support", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
   } else {
-    clineSettingsBase = join5(homedir2(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
+    clineSettingsBase = join6(homedir3(), ".config", "Code", "User", "globalStorage", "saoudrizwan.claude-dev", "settings");
   }
-  const clineMcpPath = join5(clineSettingsBase, "cline_mcp_settings.json");
+  const clineMcpPath = join6(clineSettingsBase, "cline_mcp_settings.json");
   let clineMcpOk = false;
-  if (existsSync6(clineMcpPath)) {
+  if (existsSync7(clineMcpPath)) {
     try {
-      const clineMcp = JSON.parse(readFileSync4(clineMcpPath, "utf8"));
+      const clineMcp = JSON.parse(readFileSync5(clineMcpPath, "utf8"));
       clineMcpOk = !!clineMcp.mcpServers?.["totalrecall"];
     } catch {
     }
@@ -5484,7 +5701,7 @@ async function runDoctor() {
   let workerOk = false;
   try {
     const port = process.env.TOTALRECALL_WORKER_PORT || "3001";
-    execSync(`curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${port}/health`, {
+    execSync2(`curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${port}/health`, {
       timeout: 2e3,
       encoding: "utf8"
     });
@@ -5557,6 +5774,10 @@ async function main() {
     await handleWorker(command);
     return;
   }
+  if (command === "service") {
+    await handleService(args.slice(1));
+    return;
+  }
   if (command === "plugins") {
     await handlePlugins(args.slice(1));
     return;
@@ -5600,7 +5821,7 @@ async function main() {
         break;
       case "embeddings":
       case "emb":
-        await handleEmbeddings(sdk, args[1]);
+        await handleEmbeddings(sdk, args.slice(1));
         break;
       case "semantic-search":
       case "sem":
@@ -5780,7 +6001,8 @@ Knowledge stored successfully.`);
   console.log(`  Title: ${title}
 `);
 }
-async function handleEmbeddings(sdk, subcommand) {
+async function handleEmbeddings(sdk, subArgs) {
+  const subcommand = subArgs[0];
   switch (subcommand) {
     case "stats": {
       const stats = sdk.getEmbeddingStats();
@@ -5802,23 +6024,63 @@ async function handleEmbeddings(sdk, subcommand) {
       break;
     }
     case "backfill": {
-      const batchSize = parseInt(args[2]) || 50;
-      console.log(`
-Generating embeddings (batch size: ${batchSize})...
-`);
+      const isAll = subArgs.includes("--all");
+      const sizeArg = subArgs.find((a) => !a.startsWith("-") && a !== "backfill");
+      const batchSize = parseInt(sizeArg || "") || (isAll ? 500 : 50);
       const available = await sdk.initializeEmbeddings();
       if (!available) {
-        console.log("  No embedding provider available.");
+        console.log("\n  No embedding provider available.");
         console.log("  Install fastembed or @huggingface/transformers:");
         console.log("    npm install fastembed");
         console.log("    npm install @huggingface/transformers\n");
         process.exit(1);
       }
-      const count = await sdk.backfillEmbeddings(batchSize);
-      console.log(`  Generated ${count} embeddings.
+      if (!isAll) {
+        console.log(`
+Generating embeddings (batch size: ${batchSize})...
 `);
-      const stats = sdk.getEmbeddingStats();
-      console.log(`  Coverage: ${stats.embedded}/${stats.total} (${stats.percentage}%)
+        const count = await sdk.backfillEmbeddings(batchSize);
+        console.log(`  Generated ${count} embeddings.
+`);
+        const stats = sdk.getEmbeddingStats();
+        console.log(`  Coverage: ${stats.embedded}/${stats.total} (${stats.percentage}%)
+`);
+        break;
+      }
+      const startStats = sdk.getEmbeddingStats();
+      const missing = startStats.total - startStats.embedded;
+      if (missing <= 0) {
+        console.log("\n  All observations already have embeddings (100% coverage).\n");
+        break;
+      }
+      console.log(`
+  Backfill --all: ${missing} embeddings to generate (batch size: ${batchSize})`);
+      console.log(`  Estimated time: ~${Math.ceil(missing / 160)} minutes
+`);
+      let totalGenerated = 0;
+      const startTime = Date.now();
+      while (true) {
+        const count = await sdk.backfillEmbeddings(batchSize);
+        if (count === 0) break;
+        totalGenerated += count;
+        const stats = sdk.getEmbeddingStats();
+        const elapsed = Math.floor((Date.now() - startTime) / 1e3);
+        const rate = totalGenerated / (elapsed || 1);
+        const remaining = stats.total - stats.embedded;
+        const eta = remaining > 0 ? Math.ceil(remaining / rate) : 0;
+        const etaMin = Math.floor(eta / 60);
+        const etaSec = eta % 60;
+        process.stdout.write(
+          `\r  Progress: ${stats.embedded}/${stats.total} (${stats.percentage}%) | +${totalGenerated} | ${Math.round(rate)}/s | ETA ${etaMin}m${etaSec.toString().padStart(2, "0")}s   `
+        );
+        if (stats.percentage >= 100) break;
+      }
+      const finalStats = sdk.getEmbeddingStats();
+      const totalTime = Math.floor((Date.now() - startTime) / 1e3);
+      console.log(`
+
+  \u2713 Backfill complete: ${totalGenerated} embeddings generated in ${Math.floor(totalTime / 60)}m${(totalTime % 60).toString().padStart(2, "0")}s`);
+      console.log(`  Coverage: ${finalStats.embedded}/${finalStats.total} (${finalStats.percentage}%)
 `);
       break;
     }
@@ -5826,7 +6088,8 @@ Generating embeddings (batch size: ${batchSize})...
       console.log("\nUsage: totalrecall embeddings <subcommand>\n");
       console.log("Subcommands:");
       console.log("  stats              Show embedding statistics");
-      console.log("  backfill [size]    Generate embeddings for observations without them (default: 50)\n");
+      console.log("  backfill [size]    Generate embeddings (default: 50)");
+      console.log("  backfill --all     Generate ALL missing embeddings with progress\n");
   }
 }
 async function semanticSearchCli(sdk, query) {
@@ -5926,7 +6189,7 @@ async function generateReportCli(sdk, cliArgs) {
       output = formatReportText(data);
   }
   if (outputArg) {
-    writeFileSync3(outputArg, output, "utf8");
+    writeFileSync4(outputArg, output, "utf8");
     console.log(`
   Report saved to: ${outputArg}
 `);
@@ -6078,7 +6341,7 @@ async function exportObservations(sdk, cliArgs) {
     }
     const output = generateExportOutput(observations, format);
     if (outputArg) {
-      writeFileSync3(outputArg, output, "utf8");
+      writeFileSync4(outputArg, output, "utf8");
       console.error(`
   Esportate ${observations.length} observations in: ${outputArg}
 `);
@@ -6138,13 +6401,13 @@ async function importObservations(cliArgs) {
     console.error("Errore: specifica il percorso del file JSONL\n  totalrecall import <file.jsonl> [--dry-run]");
     process.exit(1);
   }
-  if (!existsSync6(filePath)) {
+  if (!existsSync7(filePath)) {
     console.error(`Errore: file non trovato: ${filePath}`);
     process.exit(1);
   }
   let content;
   try {
-    content = readFileSync4(filePath, "utf8");
+    content = readFileSync5(filePath, "utf8");
   } catch (err) {
     console.error(`Errore lettura file: ${err.message}`);
     process.exit(1);
@@ -6186,7 +6449,7 @@ async function runDoctorFix() {
   const db = kmDb.db;
   const messages = [];
   try {
-    process.stdout.write("  [1/3] Ricostruzione indice FTS5... ");
+    process.stdout.write("  [1/5] Ricostruzione indice FTS5... ");
     const ftsOk = rebuildFtsIndex(db);
     if (ftsOk) {
       console.log("\x1B[32m\u2713\x1B[0m");
@@ -6194,11 +6457,43 @@ async function runDoctorFix() {
     } else {
       console.log("\x1B[33m~\x1B[0m (FTS non disponibile o gia' integro)");
     }
-    process.stdout.write("  [2/3] Rimozione embeddings orfani... ");
+    process.stdout.write("  [2/5] Rimozione embeddings orfani... ");
     const removed = removeOrphanedEmbeddings(db);
     console.log(`\x1B[32m\u2713\x1B[0m (${removed} rimossi)`);
     if (removed > 0) messages.push(`${removed} embedding/s orfani rimossi`);
-    process.stdout.write("  [3/3] VACUUM database...             ");
+    process.stdout.write("  [3/5] Remove corrupted TEXT embeddings...");
+    try {
+      const textCount = db.query(
+        "SELECT COUNT(*) as c FROM observation_embeddings WHERE typeof(embedding) = 'text'"
+      ).get()?.c || 0;
+      if (textCount > 0) {
+        db.query(
+          "DELETE FROM observation_embeddings WHERE typeof(embedding) = 'text'"
+        ).run();
+        console.log(` \x1B[32m\u2713\x1B[0m (${textCount} rimossi \u2014 run 'totalrecall embeddings backfill' to regenerate)`);
+        messages.push(`${textCount} embedding corrotti (TEXT) rimossi \u2014 rigenerare con backfill`);
+      } else {
+        console.log(" \x1B[33m~\x1B[0m (nessun TEXT corrotto)");
+      }
+    } catch (err) {
+      console.log(` \x1B[31m\u2717\x1B[0m (${err})`);
+    }
+    process.stdout.write("  [4/5] Cleanup zero-length embeddings...");
+    try {
+      const zeroResult = db.query(
+        "DELETE FROM observation_embeddings WHERE length(embedding) = 0"
+      ).run();
+      const zeroCount = zeroResult.changes;
+      if (zeroCount > 0) {
+        console.log(` \x1B[32m\u2713\x1B[0m (${zeroCount} rimossi)`);
+        messages.push(`${zeroCount} embedding zero-length rimossi`);
+      } else {
+        console.log(" \x1B[33m~\x1B[0m (nessuno)");
+      }
+    } catch (err) {
+      console.log(` \x1B[31m\u2717\x1B[0m (${err})`);
+    }
+    process.stdout.write("  [5/5] VACUUM database...             ");
     const vacuumOk = vacuumDatabase(db);
     if (vacuumOk) {
       console.log("\x1B[32m\u2713\x1B[0m");
@@ -6446,8 +6741,8 @@ Sottocomandi:
 async function handleWorker(commandName) {
   const host = String(process.env.TOTALRECALL_WORKER_HOST || process.env.CONTEXTKIT_WORKER_HOST || "127.0.0.1");
   const port = String(process.env.TOTALRECALL_WORKER_PORT || process.env.CONTEXTKIT_WORKER_PORT || "3001");
-  const pidFile = join5(DATA_DIR, "worker.pid");
-  const workerPath = join5(DIST_DIR, "worker-service.js");
+  const pidFile = join6(DATA_DIR, "worker.pid");
+  const workerPath = join6(DIST_DIR, "worker-service.js");
   const healthUrl = `http://${host}:${port}/health`;
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   async function isHealthy() {
@@ -6463,8 +6758,8 @@ async function handleWorker(commandName) {
   }
   function readPid() {
     try {
-      if (!existsSync6(pidFile)) return null;
-      const raw = readFileSync4(pidFile, "utf8").trim();
+      if (!existsSync7(pidFile)) return null;
+      const raw = readFileSync5(pidFile, "utf8").trim();
       const pid = Number(raw);
       return Number.isInteger(pid) && pid > 0 ? pid : null;
     } catch {
@@ -6482,9 +6777,9 @@ async function handleWorker(commandName) {
   async function stopWorker() {
     const pid = readPid();
     if (!pid) {
-      if (existsSync6(pidFile)) {
+      if (existsSync7(pidFile)) {
         try {
-          unlinkSync2(pidFile);
+          unlinkSync3(pidFile);
         } catch {
         }
       }
@@ -6492,7 +6787,7 @@ async function handleWorker(commandName) {
     }
     if (!processExists(pid)) {
       try {
-        unlinkSync2(pidFile);
+        unlinkSync3(pidFile);
       } catch {
       }
       return false;
@@ -6505,7 +6800,7 @@ async function handleWorker(commandName) {
     for (let i = 0; i < 20; i++) {
       if (!processExists(pid)) {
         try {
-          if (existsSync6(pidFile)) unlinkSync2(pidFile);
+          if (existsSync7(pidFile)) unlinkSync3(pidFile);
         } catch {
         }
         return true;
@@ -6519,7 +6814,7 @@ async function handleWorker(commandName) {
     for (let i = 0; i < 10; i++) {
       if (!processExists(pid)) {
         try {
-          if (existsSync6(pidFile)) unlinkSync2(pidFile);
+          if (existsSync7(pidFile)) unlinkSync3(pidFile);
         } catch {
         }
         return true;
@@ -6538,7 +6833,7 @@ async function handleWorker(commandName) {
     const stalePid = readPid();
     if (stalePid && !processExists(stalePid)) {
       try {
-        unlinkSync2(pidFile);
+        unlinkSync3(pidFile);
       } catch {
       }
     }
@@ -6587,7 +6882,7 @@ async function handleWorker(commandName) {
       const pid = readPid();
       if (pid && !processExists(pid)) {
         try {
-          unlinkSync2(pidFile);
+          unlinkSync3(pidFile);
         } catch {
         }
       }
@@ -6731,6 +7026,45 @@ async function handlePlugins(subArgs) {
   console.error("  Usa: list | enable <nome> | disable <nome>\n");
   process.exit(1);
 }
+async function handleService(subArgs) {
+  const { install: install2, uninstall: uninstall2, status: status2, detectStrategy: detectStrategy2 } = await Promise.resolve().then(() => (init_service_installer(), service_installer_exports));
+  const sub = subArgs[0];
+  if (!sub || sub === "status") {
+    const s = status2();
+    console.log("\n=== Total Recall \u2014 Service Status ===\n");
+    console.log(`  Installed:  ${s.installed ? "yes" : "no"}`);
+    console.log(`  Strategy:   ${s.strategy}`);
+    console.log(`  Details:    ${s.details}`);
+    if (!s.installed) {
+      console.log(`
+  Detected:   ${detectStrategy2()} available`);
+      console.log("  Run: totalrecall service install");
+    }
+    console.log("");
+    return;
+  }
+  if (sub === "install") {
+    const result = install2();
+    console.log(`
+  ${result.success ? "\u2713" : "\u2717"} ${result.message}`);
+    if (result.success) {
+      console.log(`  Strategy: ${result.strategy}`);
+    }
+    console.log("");
+    return;
+  }
+  if (sub === "uninstall") {
+    const result = uninstall2();
+    console.log(`
+  ${result.success ? "\u2713" : "\u2717"} ${result.message}
+`);
+    return;
+  }
+  console.error(`
+  Unknown service subcommand: ${sub}`);
+  console.error("  Usage: totalrecall service install|uninstall|status\n");
+  process.exit(1);
+}
 function showHelp() {
   console.log(`Usage: totalrecall <command> [options]
 
@@ -6783,6 +7117,9 @@ Commands:
   worker:stop               Stop the background worker
   worker:restart            Restart the background worker
   worker:status             Check worker health and PID
+  service install           Auto-start worker on boot (crontab or systemd)
+  service uninstall         Remove auto-start configuration
+  service status            Show auto-start status
   plugins list              Elenca tutti i plugin registrati con stato
   plugins enable <nome>     Abilita un plugin registrato
   plugins disable <nome>    Disabilita un plugin attivo

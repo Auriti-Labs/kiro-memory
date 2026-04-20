@@ -1260,6 +1260,16 @@ function float32ToBuffer(arr) {
   return Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength);
 }
 function bufferToFloat32(buf) {
+  if (typeof buf === "string") {
+    const buffer = Buffer.from(buf, "binary");
+    if (buffer.byteLength === 0 || buffer.byteLength % 4 !== 0) {
+      throw new Error("Invalid embedding: corrupted TEXT storage");
+    }
+    return new Float32Array(buffer.buffer, buffer.byteOffset, buffer.byteLength / 4);
+  }
+  if (buf.byteLength === 0 || buf.byteLength % 4 !== 0) {
+    throw new Error("Invalid embedding: zero-length or misaligned");
+  }
   const arrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
   return new Float32Array(arrayBuffer);
 }
@@ -1286,7 +1296,7 @@ var VectorSearch = class {
       }
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
       const sql = `
-        SELECT e.observation_id, e.embedding,
+        SELECT e.observation_id, CAST(e.embedding AS BLOB) as embedding,
                o.title, o.text, o.type, o.project, o.created_at, o.created_at_epoch
         FROM observation_embeddings e
         JOIN observations o ON o.id = e.observation_id
@@ -1298,20 +1308,25 @@ var VectorSearch = class {
       const rows = db.query(sql).all(...params);
       const scored = [];
       for (const row of rows) {
-        const embedding = bufferToFloat32(row.embedding);
-        const similarity = cosineSimilarity(queryEmbedding, embedding);
-        if (similarity >= threshold) {
-          scored.push({
-            id: row.observation_id,
-            observationId: row.observation_id,
-            similarity,
-            title: row.title,
-            text: row.text,
-            type: row.type,
-            project: row.project,
-            created_at: row.created_at,
-            created_at_epoch: row.created_at_epoch
-          });
+        try {
+          if (!row.embedding) continue;
+          const embedding = bufferToFloat32(row.embedding);
+          if (embedding.length === 0) continue;
+          const similarity = cosineSimilarity(queryEmbedding, embedding);
+          if (similarity >= threshold) {
+            scored.push({
+              id: row.observation_id,
+              observationId: row.observation_id,
+              similarity,
+              title: row.title,
+              text: row.text,
+              type: row.type,
+              project: row.project,
+              created_at: row.created_at,
+              created_at_epoch: row.created_at_epoch
+            });
+          }
+        } catch {
         }
       }
       scored.sort((a, b) => b.similarity - a.similarity);

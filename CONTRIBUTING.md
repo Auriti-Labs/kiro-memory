@@ -27,8 +27,14 @@ Legacy identifiers are compatibility-only:
 
 ### Prerequisites
 
-- Node.js >= 18
-- [Bun](https://bun.sh/) >= 1.0 (used for tests and worker)
+- Node.js >= 18 (primary runtime for CLI, worker, hooks, and MCP server)
+- [Bun](https://bun.sh/) >= 1.0 (used for running tests via `bun test`)
+
+### Runtime Contract
+
+Total Recall targets **Node.js >= 18** as the production runtime. All CLI commands, the background worker, hooks, and the MCP server must work under Node.
+
+Bun is used only for the test runner (`bun test`). The SQLite layer has adapters for both runtimes (`better-sqlite3` for Node, `bun:sqlite` for Bun), selected automatically at startup.
 
 ### Getting Started
 

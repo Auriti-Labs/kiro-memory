@@ -10,10 +10,35 @@ import { runHook, detectProject, formatSmartContext } from './utils.js';
 import { createTotalRecall } from '../sdk/index.js';
 import { spawn } from 'child_process';
 import { dirname, join } from 'path';
+import { existsSync, readFileSync, unlinkSync } from 'fs';
 import { fileURLToPath } from 'url';
 
 const __filename_hook = fileURLToPath(import.meta.url);
 const __dirname_hook = dirname(__filename_hook);
+
+/**
+ * Clean up stale PID file if the process is no longer running.
+ * Prevents the worker from appearing "alive" when it has crashed.
+ */
+function cleanStalePidFile(pidFile: string): void {
+  try {
+    if (!existsSync(pidFile)) return;
+    const raw = readFileSync(pidFile, 'utf8').trim();
+    const pid = Number(raw);
+    if (!Number.isInteger(pid) || pid <= 0) {
+      unlinkSync(pidFile);
+      return;
+    }
+    try {
+      process.kill(pid, 0); // Check if process is alive (signal 0 = no-op)
+    } catch {
+      // Process is dead — remove stale PID file
+      unlinkSync(pidFile);
+    }
+  } catch {
+    // Ignore errors (permission, race condition)
+  }
+}
 
 /**
  * Start the worker in background if not already running
@@ -22,6 +47,13 @@ async function ensureWorkerRunning(): Promise<void> {
   const host = process.env.TOTALRECALL_WORKER_HOST || '127.0.0.1';
   const port = process.env.TOTALRECALL_WORKER_PORT || '3001';
   const healthUrl = `http://${host}:${port}/health`;
+
+  // Clean up stale PID file before health check
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  const dataDir = process.env.TOTALRECALL_DATA_DIR
+    || process.env.CONTEXTKIT_DATA_DIR
+    || (existsSync(join(home, '.totalrecall')) ? join(home, '.totalrecall') : join(home, '.contextkit'));
+  cleanStalePidFile(join(dataDir, 'worker.pid'));
 
   // Check if worker is already running
   try {

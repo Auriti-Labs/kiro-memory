@@ -17,8 +17,20 @@ const ALLOWED_EVENTS = new Set([
   'session-created'
 ]);
 
+const startedAt = Date.now();
+
 export function createCoreRouter(ctx: WorkerContext, workerToken: string): Router {
   const router = Router();
+
+  // Error tracking for diagnostics
+  const recentErrors: Array<{ category: string; message: string; ts: string }> = [];
+  const MAX_RECENT_ERRORS = 20;
+
+  // Allow other modules to push errors via ctx
+  (ctx as any)._pushDiagnosticError = (category: string, message: string) => {
+    recentErrors.push({ category, message, ts: new Date().toISOString() });
+    if (recentErrors.length > MAX_RECENT_ERRORS) recentErrors.shift();
+  };
 
   // Dedicated rate limit for /api/notify (more restrictive)
   const notifyLimiter = rateLimit({
@@ -46,12 +58,37 @@ export function createCoreRouter(ctx: WorkerContext, workerToken: string): Route
     res.json({ ok: true });
   });
 
-  // Health check
+  // Health check with diagnostics
   router.get('/health', (_req, res) => {
+    const uptimeSeconds = Math.floor((Date.now() - startedAt) / 1000);
+    const oneHourAgo = new Date(Date.now() - 3_600_000).toISOString();
+    const errorsLastHour = recentErrors.filter(e => e.ts >= oneHourAgo).length;
+
+    // Embedding health (lazy, cached for 60s)
+    let embeddingHealth: any = null;
+    try {
+      const row = ctx.db.query(`
+        SELECT
+          (SELECT COUNT(*) FROM observations) as total,
+          (SELECT COUNT(*) FROM observation_embeddings) as embedded,
+          (SELECT COUNT(*) FROM observation_embeddings WHERE typeof(embedding) = 'blob') as blob_type,
+          (SELECT COUNT(*) FROM observation_embeddings WHERE typeof(embedding) = 'text') as text_type,
+          (SELECT COUNT(*) FROM observation_embeddings WHERE length(embedding) = 0) as zero_length
+      `).get() as any;
+      if (row) embeddingHealth = row;
+    } catch { /* ignore — table may not exist */ }
+
     res.json({
       status: 'ok',
       timestamp: Date.now(),
-      version: VERSION
+      version: VERSION,
+      uptime_seconds: uptimeSeconds,
+      pid: process.pid,
+      diagnostics: {
+        errors_last_hour: errorsLastHour,
+        last_error: recentErrors.length > 0 ? recentErrors[recentErrors.length - 1] : null,
+        embedding_health: embeddingHealth
+      }
     });
   });
 

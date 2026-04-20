@@ -65,8 +65,21 @@ function float32ToBuffer(arr: Float32Array): Buffer {
 
 /**
  * Convert SQLite BLOB Buffer to Float32Array.
+ * Handles both Buffer (correct BLOB storage) and string (legacy TEXT storage).
+ * Note: string-stored embeddings are likely corrupted by UTF-8 encoding and
+ * should be regenerated via backfill. This handler prevents crashes.
  */
-function bufferToFloat32(buf: Buffer | Uint8Array): Float32Array {
+function bufferToFloat32(buf: Buffer | Uint8Array | string): Float32Array {
+  if (typeof buf === 'string') {
+    const buffer = Buffer.from(buf, 'binary');
+    if (buffer.byteLength === 0 || buffer.byteLength % 4 !== 0) {
+      throw new Error('Invalid embedding: corrupted TEXT storage');
+    }
+    return new Float32Array(buffer.buffer, buffer.byteOffset, buffer.byteLength / 4);
+  }
+  if (buf.byteLength === 0 || buf.byteLength % 4 !== 0) {
+    throw new Error('Invalid embedding: zero-length or misaligned');
+  }
   const arrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
   return new Float32Array(arrayBuffer);
 }
@@ -111,8 +124,9 @@ export class VectorSearch {
         : '';
 
       // Sort by recency and limit candidates — avoids loading all embeddings
+      // CAST ensures TEXT-stored embeddings are returned as Buffer by better-sqlite3
       const sql = `
-        SELECT e.observation_id, e.embedding,
+        SELECT e.observation_id, CAST(e.embedding AS BLOB) as embedding,
                o.title, o.text, o.type, o.project, o.created_at, o.created_at_epoch
         FROM observation_embeddings e
         JOIN observations o ON o.id = e.observation_id
@@ -137,8 +151,11 @@ export class VectorSearch {
       const scored: VectorSearchResult[] = [];
 
       for (const row of rows) {
-        const embedding = bufferToFloat32(row.embedding);
-        const similarity = cosineSimilarity(queryEmbedding, embedding);
+        try {
+          if (!row.embedding) continue; // NULL embedding — skip
+          const embedding = bufferToFloat32(row.embedding);
+          if (embedding.length === 0) continue; // Zero-length — skip
+          const similarity = cosineSimilarity(queryEmbedding, embedding);
 
         if (similarity >= threshold) {
           scored.push({
@@ -152,6 +169,9 @@ export class VectorSearch {
             created_at: row.created_at,
             created_at_epoch: row.created_at_epoch
           });
+        }
+        } catch {
+          // Skip corrupted/invalid embedding row
         }
       }
 
