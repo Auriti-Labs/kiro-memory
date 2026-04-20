@@ -28,11 +28,11 @@
   "license": "AGPL-3.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Auriti-Labs/totalrecall.git"
+    "url": "https://github.com/Auriti-Labs/kiro-memory.git"
   },
-  "homepage": "https://github.com/Auriti-Labs/totalrecall#readme",
+  "homepage": "https://github.com/Auriti-Labs/kiro-memory#readme",
   "bugs": {
-    "url": "https://github.com/Auriti-Labs/totalrecall/issues"
+    "url": "https://github.com/Auriti-Labs/kiro-memory/issues"
   },
   "type": "module",
   "exports": {

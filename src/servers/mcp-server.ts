@@ -13,6 +13,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { TOTALRECALL_VERSION } from '../shared/version.js';
 
 // Redirige console.log su stderr per non rompere il protocollo MCP (usa stdio)
 const originalLog = console.log;
@@ -83,7 +84,7 @@ function buildErrorResult(error: any): { content: Array<{ type: 'text'; text: st
 async function main() {
   const server = new McpServer({
     name: 'totalrecall',
-    version: '1.0.0'
+    version: TOTALRECALL_VERSION
   });
 
   // --------------------------------------------------------------------------
