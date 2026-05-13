@@ -22,7 +22,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
 import { join, dirname } from 'path';
-import { existsSync, mkdirSync, writeFileSync, unlinkSync, chmodSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, unlinkSync, chmodSync, readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { TotalRecallDatabase } from './sqlite/Database.js';
 import { getHybridSearch } from './search/HybridSearch.js';
@@ -169,7 +169,11 @@ app.use(express.static(__worker_dirname, {
 app.get('/', (_req, res) => {
   const viewerPath = join(__worker_dirname, 'viewer.html');
   if (existsSync(viewerPath)) {
-    res.sendFile(viewerPath);
+    try {
+      res.type('html').send(readFileSync(viewerPath, 'utf-8'));
+    } catch {
+      res.status(500).json({ error: 'Failed to read viewer.html' });
+    }
   } else {
     res.status(404).json({ error: 'Viewer not found. Run npm run build first.' });
   }

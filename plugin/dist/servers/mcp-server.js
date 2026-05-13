@@ -4051,6 +4051,9 @@ var coerce = {
 };
 var NEVER = INVALID;
 
+// src/shared/version.ts
+var TOTALRECALL_VERSION = "4.0.2" ? "4.0.2" : FALLBACK_VERSION;
+
 // src/servers/mcp-server.ts
 console.log = (...args) => console.error("[totalrecall-mcp]", ...args);
 var WORKER_HOST = process.env.TOTALRECALL_WORKER_HOST || "127.0.0.1";
@@ -4095,7 +4098,7 @@ Avvia il worker con: cd <totalrecall-dir> && npm run worker:start`
 async function main() {
   const server = new McpServer({
     name: "totalrecall",
-    version: "1.0.0"
+    version: TOTALRECALL_VERSION
   });
   server.registerTool(
     "search",

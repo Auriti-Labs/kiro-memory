@@ -3426,7 +3426,7 @@ async function runHook(name, handler) {
 }
 
 // src/shared/version.ts
-var TOTALRECALL_VERSION = "4.0.0" ? "4.0.0" : FALLBACK_VERSION;
+var TOTALRECALL_VERSION = "4.0.2" ? "4.0.2" : FALLBACK_VERSION;
 
 // src/index.ts
 var VERSION = TOTALRECALL_VERSION;
